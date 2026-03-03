@@ -403,6 +403,7 @@ defmodule EDA.Voice do
             secret_key: session_state.secret_key,
             encryption_mode: session_state.encryption_mode,
             udp_socket: session_state.udp_socket,
+            dave_manager: session_state.dave_manager,
             ip: session_state.ip,
             port: session_state.port,
             restart_count: 0
