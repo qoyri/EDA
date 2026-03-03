@@ -243,6 +243,8 @@ defmodule EDA.Voice do
   def handle_call({:play, guild_id, input, type}, _from, state) do
     case Map.get(state.guilds, guild_id) do
       %State{ready: true, audio_pid: nil} = voice_state ->
+        voice_state = sync_playback_progress(voice_state, guild_id)
+
         cond do
           not session_alive?(guild_id) ->
             stale_vs = %{voice_state | ready: false}
@@ -272,7 +274,12 @@ defmodule EDA.Voice do
     case Map.get(state.guilds, guild_id) do
       %State{audio_pid: pid} = voice_state when is_pid(pid) ->
         Process.exit(pid, :kill)
-        new_vs = %{voice_state | audio_pid: nil}
+
+        new_vs =
+          voice_state
+          |> Map.put(:audio_pid, nil)
+          |> sync_playback_progress(guild_id)
+
         {:reply, :ok, put_in(state, [:guilds, guild_id], new_vs)}
 
       _ ->
@@ -284,7 +291,13 @@ defmodule EDA.Voice do
     case Map.get(state.guilds, guild_id) do
       %State{audio_pid: pid} when is_pid(pid) ->
         Process.exit(pid, :kill)
-        new_vs = %{state.guilds[guild_id] | audio_pid: nil, paused: true}
+
+        new_vs =
+          state.guilds[guild_id]
+          |> Map.put(:audio_pid, nil)
+          |> Map.put(:paused, true)
+          |> sync_playback_progress(guild_id)
+
         {:reply, :ok, put_in(state, [:guilds, guild_id], new_vs)}
 
       _ ->
@@ -473,6 +486,7 @@ defmodule EDA.Voice do
             listening: false
         }
 
+        Audio.clear_playback_progress(guild_id)
         {:noreply, put_in(state, [:guilds, guild_id], new_vs)}
     end
   end
@@ -526,6 +540,8 @@ defmodule EDA.Voice do
 
       voice_state ->
         new_vs = %{voice_state | audio_pid: nil, sequence: seq, timestamp: ts, nonce: nonce}
+
+        Audio.clear_playback_progress(guild_id)
 
         EDA.Gateway.Events.dispatch("VOICE_PLAYBACK_FINISHED", %{
           "guild_id" => guild_id
@@ -656,10 +672,22 @@ defmodule EDA.Voice do
       :gen_udp.close(voice_state.udp_socket)
     end
 
+    Audio.clear_playback_progress(guild_id)
+
     # Terminate the voice session process
     case Registry.lookup(EDA.Voice.Registry, {:session, guild_id}) do
       [{pid, _}] -> DynamicSupervisor.terminate_child(EDA.Voice.DynamicSupervisor, pid)
       [] -> :ok
+    end
+  end
+
+  defp sync_playback_progress(%State{} = voice_state, guild_id) do
+    case Audio.playback_progress(guild_id) do
+      {:ok, {seq, ts, nonce}} ->
+        %{voice_state | sequence: seq, timestamp: ts, nonce: nonce}
+
+      :error ->
+        voice_state
     end
   end
 end

@@ -14,6 +14,7 @@ defmodule EDA.Voice.Audio do
   @frame_duration_us 20_000
   @opus_frame_samples 960
   @silence_frames 5
+  @playback_progress_table :eda_voice_playback_progress
 
   # IP Discovery
 
@@ -73,7 +74,33 @@ defmodule EDA.Voice.Audio do
     end)
   end
 
+  @doc false
+  @spec playback_progress(String.t()) :: {:ok, {integer(), integer(), integer()}} | :error
+  def playback_progress(guild_id) do
+    ensure_playback_progress_table()
+
+    case :ets.lookup(@playback_progress_table, guild_id) do
+      [{^guild_id, {seq, ts, nonce}}] -> {:ok, {seq, ts, nonce}}
+      _ -> :error
+    end
+  end
+
+  @doc false
+  @spec clear_playback_progress(String.t()) :: :ok
+  def clear_playback_progress(guild_id) do
+    ensure_playback_progress_table()
+    :ets.delete(@playback_progress_table, guild_id)
+    :ok
+  end
+
   defp player_loop(guild_id, input, :url, voice_state) do
+    record_playback_progress(
+      guild_id,
+      voice_state.sequence,
+      voice_state.timestamp,
+      voice_state.nonce
+    )
+
     args = build_ffmpeg_args(input)
 
     Logger.info("Starting ffmpeg: #{inspect(args)}")
@@ -99,6 +126,13 @@ defmodule EDA.Voice.Audio do
   end
 
   defp player_loop(guild_id, frames, :raw, voice_state) do
+    record_playback_progress(
+      guild_id,
+      voice_state.sequence,
+      voice_state.timestamp,
+      voice_state.nonce
+    )
+
     Session.send_payload(guild_id, Payload.speaking(voice_state.ssrc, true))
 
     {final_seq, final_ts, final_nonce, _} =
@@ -120,14 +154,17 @@ defmodule EDA.Voice.Audio do
   # FFmpeg outputs OGG pages via `-f ogg`. We parse those pages to get individual
   # opus frames with guaranteed boundaries, then send each frame with monotonic
   # clock-based timing to prevent drift.
-  defp stream_from_port(port, _guild_id, voice_state) do
+  defp stream_from_port(port, guild_id, voice_state) do
     stream = %{
+      guild_id: guild_id,
       vs: voice_state,
       seq: voice_state.sequence,
       ts: voice_state.timestamp,
       nonce: voice_state.nonce,
       frame_idx: 0,
-      start: System.monotonic_time(:microsecond),
+      # Anchor timing when the first Opus frame is sent, not when playback starts.
+      # This avoids startup-latency catch-up bursts that make the beginning sound fast.
+      start: nil,
       buffer: <<>>,
       skip: 2
     }
@@ -163,11 +200,21 @@ defmodule EDA.Voice.Audio do
 
   defp send_timed_frames([], stream), do: stream
 
-  defp send_timed_frames([frame | rest], %{vs: vs, seq: seq, ts: ts, nonce: nonce} = s) do
+  defp send_timed_frames(
+         [frame | rest],
+         %{guild_id: guild_id, vs: vs, seq: seq, ts: ts, nonce: nonce} = s
+       ) do
     now = System.monotonic_time(:microsecond)
+    start = s.start || now
+
     send_single_frame(frame, vs, seq, ts, nonce)
 
     next_idx = s.frame_idx + 1
+    next_seq = band(seq + 1, 0xFFFF)
+    next_ts = ts + @opus_frame_samples
+    next_nonce = nonce + 1
+
+    record_playback_progress(guild_id, next_seq, next_ts, next_nonce)
 
     # Collect diagnostic data
     slot = rem(s.frame_idx, @diag_window)
@@ -175,24 +222,25 @@ defmodule EDA.Voice.Audio do
     Process.put({:diag, slot}, %{
       idx: s.frame_idx,
       size: byte_size(frame),
-      actual_us: now - s.start,
-      drift_us: now - s.start - s.frame_idx * @frame_duration_us
+      actual_us: now - start,
+      drift_us: now - start - s.frame_idx * @frame_duration_us
     })
 
     if slot == @diag_window - 1 do
       dump_diagnostics(div(s.frame_idx, @diag_window))
     end
 
-    target = s.start + next_idx * @frame_duration_us
+    target = start + next_idx * @frame_duration_us
     sleep_now = System.monotonic_time(:microsecond)
     sleep_us = target - sleep_now
     if sleep_us > 1000, do: Process.sleep(div(sleep_us, 1000))
 
     send_timed_frames(rest, %{
       s
-      | seq: band(seq + 1, 0xFFFF),
-        ts: ts + @opus_frame_samples,
-        nonce: nonce + 1,
+      | start: start,
+        seq: next_seq,
+        ts: next_ts,
+        nonce: next_nonce,
         frame_idx: next_idx
     })
   end
@@ -230,18 +278,24 @@ defmodule EDA.Voice.Audio do
     Enum.each(0..(@diag_window - 1), fn i -> Process.delete({:diag, i}) end)
   end
 
-  defp send_frames(frames, _guild_id, voice_state, seq, timestamp, nonce) when is_list(frames) do
+  defp send_frames(frames, guild_id, voice_state, seq, timestamp, nonce) when is_list(frames) do
     start = System.monotonic_time(:microsecond)
 
     Enum.reduce(frames, {seq, timestamp, nonce, 0}, fn frame, {s, t, n, i} ->
       send_single_frame(frame, voice_state, s, t, n)
+
+      next_seq = band(s + 1, 0xFFFF)
+      next_ts = t + @opus_frame_samples
+      next_nonce = n + 1
+
+      record_playback_progress(guild_id, next_seq, next_ts, next_nonce)
 
       target = start + (i + 1) * @frame_duration_us
       now = System.monotonic_time(:microsecond)
       sleep_us = target - now
       if sleep_us > 1000, do: Process.sleep(div(sleep_us, 1000))
 
-      {band(s + 1, 0xFFFF), t + @opus_frame_samples, n + 1, i + 1}
+      {next_seq, next_ts, next_nonce, i + 1}
     end)
   end
 
@@ -323,6 +377,34 @@ defmodule EDA.Voice.Audio do
 
       {:error, :timeout} ->
         :timeout
+    end
+  end
+
+  defp record_playback_progress(guild_id, seq, ts, nonce) do
+    ensure_playback_progress_table()
+    :ets.insert(@playback_progress_table, {guild_id, {seq, ts, nonce}})
+    :ok
+  end
+
+  defp ensure_playback_progress_table do
+    case :ets.whereis(@playback_progress_table) do
+      :undefined ->
+        try do
+          :ets.new(@playback_progress_table, [
+            :named_table,
+            :public,
+            :set,
+            read_concurrency: true,
+            write_concurrency: true
+          ])
+        rescue
+          ArgumentError -> :ok
+        end
+
+        :ok
+
+      _ ->
+        :ok
     end
   end
 
