@@ -76,7 +76,7 @@ defmodule EDA.Voice.Dave.Manager do
   end
 
   def encrypt_frame(%__MODULE__{mls_session: session} = manager, opus_frame) do
-    case Native.encrypt_opus(session, opus_frame) do
+    case normalize_encrypt_result(Native.encrypt_opus(session, opus_frame)) do
       {:ok, encrypted} ->
         {encrypted, manager}
 
@@ -107,7 +107,7 @@ defmodule EDA.Voice.Dave.Manager do
   end
 
   def decrypt_frame(%__MODULE__{mls_session: session} = manager, frame, sender_user_id) do
-    case Native.decrypt_audio(session, sender_user_id, frame) do
+    case normalize_decrypt_result(Native.decrypt_audio(session, sender_user_id, frame)) do
       {:ok, decrypted} ->
         {:ok, decrypted, manager}
 
@@ -325,4 +325,19 @@ defmodule EDA.Voice.Dave.Manager do
        do: {:ok, commit, welcome}
 
   defp normalize_process_proposals_result(other), do: {:error, other}
+
+  defp normalize_encrypt_result({:ok, encrypted}) when is_binary(encrypted), do: {:ok, encrypted}
+
+  defp normalize_encrypt_result({:ok, {:ok, encrypted}}) when is_binary(encrypted),
+    do: {:ok, encrypted}
+
+  defp normalize_encrypt_result({:error, reason}), do: {:error, reason}
+  defp normalize_encrypt_result(other), do: {:error, other}
+
+  defp normalize_decrypt_result({:ok, decrypted}) when is_binary(decrypted), do: {:ok, decrypted}
+
+  defp normalize_decrypt_result({:ok, {:ok, decrypted}}) when is_binary(decrypted),
+    do: {:ok, decrypted}
+
+  defp normalize_decrypt_result(other), do: {:error, other}
 end
