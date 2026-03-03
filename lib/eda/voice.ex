@@ -24,7 +24,7 @@ defmodule EDA.Voice do
 
   require Logger
 
-  alias EDA.Voice.{Audio, Session, State}
+  alias EDA.Voice.{Audio, Dave, Session, State}
 
   # Client API
 
@@ -242,15 +242,18 @@ defmodule EDA.Voice do
   def handle_call({:play, guild_id, input, type}, _from, state) do
     case Map.get(state.guilds, guild_id) do
       %State{ready: true, audio_pid: nil} = voice_state ->
-        case Registry.lookup(EDA.Voice.Registry, {:session, guild_id}) do
-          [{_session_pid, _}] ->
+        cond do
+          not session_alive?(guild_id) ->
+            stale_vs = %{voice_state | ready: false}
+            {:reply, {:error, :not_connected}, put_in(state, [:guilds, guild_id], stale_vs)}
+
+          not voice_crypto_ready?(voice_state) ->
+            {:reply, {:error, :not_ready}, state}
+
+          true ->
             pid = Audio.play(guild_id, input, type, voice_state)
             new_vs = %{voice_state | audio_pid: pid}
             {:reply, :ok, put_in(state, [:guilds, guild_id], new_vs)}
-
-          [] ->
-            stale_vs = %{voice_state | ready: false}
-            {:reply, {:error, :not_connected}, put_in(state, [:guilds, guild_id], stale_vs)}
         end
 
       %State{ready: true, audio_pid: _pid} ->
@@ -306,8 +309,11 @@ defmodule EDA.Voice do
   def handle_call({:ready?, guild_id}, _from, state) do
     ready =
       case Map.get(state.guilds, guild_id) do
-        %State{ready: true} -> true
-        _ -> false
+        %State{ready: true} = voice_state ->
+          session_alive?(guild_id) and voice_crypto_ready?(voice_state)
+
+        _ ->
+          false
       end
 
     {:reply, ready, state}
@@ -596,6 +602,16 @@ defmodule EDA.Voice do
   end
 
   defp maybe_start_session(_guild_id, _state), do: :ok
+
+  defp session_alive?(guild_id) do
+    Registry.lookup(EDA.Voice.Registry, {:session, guild_id}) != []
+  end
+
+  defp voice_crypto_ready?(%State{dave_manager: %Dave.Manager{} = manager}) do
+    Dave.Manager.ready?(manager)
+  end
+
+  defp voice_crypto_ready?(%State{}), do: true
 
   defp cleanup_voice(guild_id, voice_state) do
     if voice_state.audio_pid, do: Process.exit(voice_state.audio_pid, :kill)

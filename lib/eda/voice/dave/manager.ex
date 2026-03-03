@@ -64,6 +64,17 @@ defmodule EDA.Voice.Dave.Manager do
   @spec active?(t()) :: boolean()
   def active?(%__MODULE__{protocol_version: v, mls_session: s}), do: v > 0 and not is_nil(s)
 
+  @doc "Returns true when the MLS session is ready to encrypt media."
+  @spec ready?(t()) :: boolean()
+  def ready?(%__MODULE__{mls_session: nil}), do: false
+
+  def ready?(%__MODULE__{mls_session: session}) do
+    case normalize_ready_result(Native.ready?(session)) do
+      {:ok, ready} -> ready
+      _ -> false
+    end
+  end
+
   @doc """
   Encrypts an Opus frame through DAVE E2EE.
 
@@ -340,4 +351,8 @@ defmodule EDA.Voice.Dave.Manager do
     do: {:ok, decrypted}
 
   defp normalize_decrypt_result(other), do: {:error, other}
+
+  defp normalize_ready_result({:ok, ready}) when is_boolean(ready), do: {:ok, ready}
+  defp normalize_ready_result(ready) when is_boolean(ready), do: {:ok, ready}
+  defp normalize_ready_result(other), do: {:error, other}
 end
