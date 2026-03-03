@@ -174,6 +174,35 @@ defmodule EDA.Voice.Session do
     |> handle_event_result()
   end
 
+  # Binary DAVE control frames (v8):
+  # <<sequence::16, opcode::8, payload::binary>>
+  def handle_frame({:binary, <<seq::16-big, op::8, payload::binary>>}, state)
+      when op in [25, 27, 29, 30] do
+    new_state = %{state | seq_ack: max(state.seq_ack, seq)}
+
+    dave_data =
+      case {op, payload} do
+        {25, external_sender} ->
+          %{"external_sender_bin" => external_sender}
+
+        {27, <<operation_type::8, proposals::binary>>} ->
+          %{"operation_type" => operation_type, "proposals_bin" => proposals}
+
+        {29, <<transition_id::16-big, commit::binary>>} ->
+          %{"transition_id" => transition_id, "commit_bin" => commit}
+
+        {30, <<transition_id::16-big, welcome::binary>>} ->
+          %{"transition_id" => transition_id, "welcome_bin" => welcome}
+
+        _ ->
+          %{}
+      end
+
+    %{"op" => op, "d" => dave_data}
+    |> Event.handle(new_state)
+    |> handle_event_result()
+  end
+
   # Binary frames with 2-byte sequence prefix (v8)
   def handle_frame({:binary, <<seq::16-big, json::binary>>}, state) do
     new_state = %{state | seq_ack: max(state.seq_ack, seq)}

@@ -67,8 +67,13 @@ defmodule EDA.Voice.Dave.Native do
   @spec process_welcome(reference(), binary()) :: :ok | :error
   def process_welcome(_ref, _welcome), do: :erlang.nif_error(:nif_not_loaded)
 
-  @doc "Encrypts an Opus audio packet using DAVE E2EE. Returns `{:ok, encrypted_binary}`."
-  @spec encrypt_opus(reference(), binary()) :: {:ok, binary()}
+  @doc """
+  Encrypts an Opus audio packet using DAVE E2EE.
+
+  Returns `{:ok, encrypted_binary}` or `{:error, :not_ready | :encryption_failed | :error}`.
+  """
+  @spec encrypt_opus(reference(), binary()) ::
+          {:ok, binary()} | {:error, :not_ready | :encryption_failed | :error}
   def encrypt_opus(_ref, _packet), do: :erlang.nif_error(:nif_not_loaded)
 
   @doc "Decrypts a DAVE-encrypted audio packet. Returns `{:ok, decrypted_binary}`."

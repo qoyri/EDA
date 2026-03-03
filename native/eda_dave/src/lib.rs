@@ -1,4 +1,4 @@
-use davey::{DaveSession, ProposalsOperationType};
+use davey::{DaveSession, EncryptError, ProposalsOperationType};
 use rustler::{Atom, Binary, Env, NewBinary, ResourceArc};
 use std::num::NonZeroU16;
 use std::sync::Mutex;
@@ -7,6 +7,8 @@ mod atoms {
     rustler::atoms! {
         ok,
         error,
+        not_ready,
+        encryption_failed,
         nil,
         append,
         revoke,
@@ -137,7 +139,8 @@ fn encrypt_opus<'a>(
     let mut session = resource.0.lock().map_err(|_| atoms::error())?;
     match session.encrypt_opus(packet.as_slice()) {
         Ok(encrypted) => Ok((atoms::ok(), to_binary(env, &encrypted))),
-        Err(_) => Err(atoms::error()),
+        Err(EncryptError::NotReady) => Err(atoms::not_ready()),
+        Err(EncryptError::EncryptionFailed) => Err(atoms::encryption_failed()),
     }
 }
 
