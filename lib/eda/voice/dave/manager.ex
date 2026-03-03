@@ -137,12 +137,13 @@ defmodule EDA.Voice.Dave.Manager do
           :ok ->
             Logger.debug("DAVE: External sender set")
             # After setting external sender, send our key package
-            case Native.create_key_package(session) do
+            case normalize_key_package_result(Native.create_key_package(session)) do
               {:ok, key_package} ->
+                Logger.debug("DAVE: Sending MLS key package (#{byte_size(key_package)} bytes)")
                 {manager, [Payload.dave_mls_key_package(key_package)]}
 
-              _ ->
-                Logger.error("DAVE: Failed to create key package")
+              {:error, reason} ->
+                Logger.error("DAVE: Failed to create key package: #{inspect(reason)}")
                 {manager, []}
             end
 
@@ -168,11 +169,13 @@ defmodule EDA.Voice.Dave.Manager do
 
     case raw_or_base64(data, "proposals_bin", "proposals") do
       {:ok, proposals} ->
-        case Native.process_proposals(session, op_type, proposals) do
+        case normalize_process_proposals_result(
+               Native.process_proposals(session, op_type, proposals)
+             ) do
           {:ok, commit, welcome} when byte_size(commit) > 0 ->
             Logger.debug(
-              "DAVE: Proposals processed, sending commit" <>
-                if(is_binary(welcome), do: " + welcome", else: "")
+              "DAVE: Proposals processed, sending commit (#{byte_size(commit)} bytes)" <>
+                if(is_binary(welcome), do: " + welcome (#{byte_size(welcome)} bytes)", else: "")
             )
 
             {manager, [Payload.dave_mls_commit_welcome(commit, welcome)]}
@@ -181,8 +184,8 @@ defmodule EDA.Voice.Dave.Manager do
             Logger.debug("DAVE: Proposals processed, no commit needed")
             {manager, []}
 
-          _ ->
-            Logger.error("DAVE: Failed to process proposals")
+          {:error, reason} ->
+            Logger.error("DAVE: Failed to process proposals: #{inspect(reason)}")
             {manager, []}
         end
 
@@ -304,4 +307,22 @@ defmodule EDA.Voice.Dave.Manager do
   end
 
   defp normalize_integer(_value, fallback), do: fallback
+
+  defp normalize_key_package_result({:ok, key_package}) when is_binary(key_package),
+    do: {:ok, key_package}
+
+  defp normalize_key_package_result({:ok, {:ok, key_package}}) when is_binary(key_package),
+    do: {:ok, key_package}
+
+  defp normalize_key_package_result(other), do: {:error, other}
+
+  defp normalize_process_proposals_result({:ok, commit, welcome})
+       when is_binary(commit) and (is_binary(welcome) or is_nil(welcome)),
+       do: {:ok, commit, welcome}
+
+  defp normalize_process_proposals_result({:ok, {:ok, commit, welcome}})
+       when is_binary(commit) and (is_binary(welcome) or is_nil(welcome)),
+       do: {:ok, commit, welcome}
+
+  defp normalize_process_proposals_result(other), do: {:error, other}
 end
