@@ -90,9 +90,10 @@ defmodule EDA.Voice.Event do
       if dave_version > 0 do
         me = EDA.Cache.me()
         user_id = String.to_integer(me["id"])
+        channel_id = String.to_integer(state.channel_id)
 
         dave_manager =
-          Dave.Manager.new(dave_version, user_id, String.to_integer(state.guild_id))
+          Dave.Manager.new(dave_version, user_id, channel_id)
 
         %{new_state | dave_manager: dave_manager}
       else
