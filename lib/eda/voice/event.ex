@@ -111,7 +111,20 @@ defmodule EDA.Voice.Event do
       "channel_id" => state.channel_id
     })
 
-    {:ok, new_state}
+    # Per DAVE flow, send our key package after SESSION_DESCRIPTION indicates
+    # DAVE support. We still also handle OP25-triggered key package sends.
+    if dave_version > 0 do
+      case Dave.Manager.key_package_payload(new_state.dave_manager) do
+        {:ok, payload} ->
+          Logger.debug("DAVE: Sending initial MLS key package after SESSION_DESCRIPTION")
+          {:reply, payload, new_state}
+
+        :error ->
+          {:ok, new_state}
+      end
+    else
+      {:ok, new_state}
+    end
   end
 
   def handle(%{"op" => 6}, state) do

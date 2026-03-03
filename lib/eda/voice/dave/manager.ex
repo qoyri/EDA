@@ -132,6 +132,24 @@ defmodule EDA.Voice.Dave.Manager do
   end
 
   @doc """
+  Builds an OP26 key package payload from the current MLS session.
+
+  Returns `{:ok, payload}` when available, otherwise `:error`.
+  """
+  @spec key_package_payload(t()) :: {:ok, term()} | :error
+  def key_package_payload(%__MODULE__{mls_session: nil}), do: :error
+
+  def key_package_payload(%__MODULE__{mls_session: session}) do
+    case normalize_key_package_result(Native.create_key_package(session)) do
+      {:ok, key_package} ->
+        {:ok, Payload.dave_mls_key_package(normalize_key_package_wire(key_package))}
+
+      _ ->
+        :error
+    end
+  end
+
+  @doc """
   Handles an MLS-related voice gateway event.
 
   Returns `{updated_manager, reply_payloads}` where `reply_payloads` is
@@ -150,6 +168,7 @@ defmodule EDA.Voice.Dave.Manager do
             # After setting external sender, send our key package
             case normalize_key_package_result(Native.create_key_package(session)) do
               {:ok, key_package} ->
+                key_package = normalize_key_package_wire(key_package)
                 Logger.debug("DAVE: Sending MLS key package (#{byte_size(key_package)} bytes)")
                 {manager, [Payload.dave_mls_key_package(key_package)]}
 
@@ -213,9 +232,11 @@ defmodule EDA.Voice.Dave.Manager do
 
     case raw_or_base64(data, "commit_bin", "commit") do
       {:ok, commit} ->
-        case Native.process_commit(session, commit) do
+        result = Native.process_commit(session, commit)
+
+        case normalize_atom_result(result) do
           :ok ->
-            epoch = Native.get_epoch(session)
+            epoch = normalize_epoch_result(Native.get_epoch(session))
             Logger.info("DAVE: Commit processed, epoch=#{epoch}")
 
             :telemetry.execute([:eda, :voice, :dave, :epoch_change], %{epoch: epoch}, %{})
@@ -224,7 +245,7 @@ defmodule EDA.Voice.Dave.Manager do
             {manager, [Payload.dave_ready_for_transition(transition_id)]}
 
           :error ->
-            Logger.error("DAVE: Failed to process commit")
+            Logger.error("DAVE: Failed to process commit result=#{inspect(result)}")
             {manager, []}
         end
 
@@ -241,9 +262,15 @@ defmodule EDA.Voice.Dave.Manager do
 
     case raw_or_base64(data, "welcome_bin", "welcome") do
       {:ok, welcome} ->
-        case Native.process_welcome(session, welcome) do
+        Logger.debug(
+          "DAVE: Processing welcome transition_id=#{transition_id} size=#{byte_size(welcome)}"
+        )
+
+        {status, detail} = process_welcome_candidates(session, welcome)
+
+        case status do
           :ok ->
-            epoch = Native.get_epoch(session)
+            epoch = normalize_epoch_result(Native.get_epoch(session))
             Logger.info("DAVE: Welcome processed, epoch=#{epoch}")
 
             :telemetry.execute([:eda, :voice, :dave, :epoch_change], %{epoch: epoch}, %{})
@@ -252,7 +279,7 @@ defmodule EDA.Voice.Dave.Manager do
             {manager, [Payload.dave_ready_for_transition(transition_id)]}
 
           :error ->
-            Logger.error("DAVE: Failed to process welcome")
+            Logger.error("DAVE: Failed to process welcome attempts=#{inspect(detail)}")
             {manager, []}
         end
 
@@ -270,7 +297,7 @@ defmodule EDA.Voice.Dave.Manager do
 
   # OP 22: DAVE_EXECUTE_TRANSITION
   def handle_mls_event(manager, 22, _data) do
-    Logger.info("DAVE: Execute transition, epoch=#{manager.pending_epoch}")
+    Logger.info("DAVE: Execute transition, epoch=#{inspect(manager.pending_epoch)}")
     {%{manager | pending_epoch: nil, transition_id: nil}, []}
   end
 
@@ -355,4 +382,50 @@ defmodule EDA.Voice.Dave.Manager do
   defp normalize_ready_result({:ok, ready}) when is_boolean(ready), do: {:ok, ready}
   defp normalize_ready_result(ready) when is_boolean(ready), do: {:ok, ready}
   defp normalize_ready_result(other), do: {:error, other}
+
+  defp normalize_atom_result({:ok, atom}) when is_atom(atom), do: atom
+  defp normalize_atom_result(atom) when is_atom(atom), do: atom
+  defp normalize_atom_result(_), do: :error
+
+  defp normalize_epoch_result({:ok, epoch}) when is_integer(epoch), do: epoch
+  defp normalize_epoch_result(epoch) when is_integer(epoch), do: epoch
+  defp normalize_epoch_result(_), do: 0
+
+  # Some davey builds return OP26 content as MLSMessage(KeyPackage) (0001 0005 ...),
+  # while older gateway behavior expects a bare KeyPackage body.
+  defp normalize_key_package_wire(<<0x00, 0x01, 0x00, 0x05, rest::binary>>), do: rest
+  defp normalize_key_package_wire(key_package), do: key_package
+
+  defp process_welcome_candidates(session, welcome_payload) do
+    candidates =
+      case welcome_payload do
+        <<_tid::16-big, rest::binary>> ->
+          [rest, welcome_payload]
+
+        _ ->
+          [welcome_payload]
+      end
+
+    Enum.reduce_while(Enum.with_index(candidates, 1), {:error, []}, fn {candidate, idx},
+                                                                       {:error, acc} ->
+      raw_result = process_welcome_with_timeout(session, candidate)
+      status = normalize_atom_result(raw_result)
+      detail = %{candidate: idx, size: byte_size(candidate), raw: raw_result, status: status}
+
+      if status == :ok do
+        {:halt, {:ok, [detail | acc]}}
+      else
+        {:cont, {:error, [detail | acc]}}
+      end
+    end)
+  end
+
+  defp process_welcome_with_timeout(session, payload) do
+    task = Task.async(fn -> Native.process_welcome(session, payload) end)
+
+    case Task.yield(task, 2_000) || Task.shutdown(task, :brutal_kill) do
+      {:ok, result} -> result
+      nil -> :timeout
+    end
+  end
 end

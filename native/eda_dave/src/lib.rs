@@ -46,14 +46,7 @@ fn create_key_package<'a>(
 ) -> Result<(Atom, Binary<'a>), Atom> {
     let mut session = resource.0.lock().map_err(|_| atoms::error())?;
     match session.create_key_package() {
-        Ok(bytes) => {
-            // OP26 expects MLSMessage(KeyPackage), not a bare KeyPackage.
-            // Prefix with MLS 1.0 + WireFormat::KeyPackage.
-            let mut encoded = Vec::with_capacity(4 + bytes.len());
-            encoded.extend_from_slice(&[0x00, 0x01, 0x00, 0x05]);
-            encoded.extend_from_slice(&bytes);
-            Ok((atoms::ok(), to_binary(env, &encoded)))
-        }
+        Ok(bytes) => Ok((atoms::ok(), to_binary(env, &bytes))),
         Err(_) => Err(atoms::error()),
     }
 }

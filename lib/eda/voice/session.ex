@@ -197,8 +197,14 @@ defmodule EDA.Voice.Session do
         {29, <<transition_id::16-big, commit::binary>>} ->
           %{"transition_id" => transition_id, "commit_bin" => commit}
 
-        {30, <<transition_id::16-big, welcome::binary>>} ->
-          %{"transition_id" => transition_id, "welcome_bin" => welcome}
+        {30, welcome_payload} ->
+          transition_id =
+            case welcome_payload do
+              <<tid::16-big, _::binary>> -> tid
+              _ -> 0
+            end
+
+          %{"transition_id" => transition_id, "welcome_bin" => welcome_payload}
 
         _ ->
           %{}
@@ -297,6 +303,15 @@ defmodule EDA.Voice.Session do
   def handle_info({:udp, _socket, _ip, _port, _packet}, state), do: {:ok, state}
 
   def handle_info(_msg, state), do: {:ok, state}
+
+  @impl true
+  def terminate(reason, state) do
+    Logger.warning(
+      "Voice session terminating for guild #{state.guild_id}: reason=#{inspect(reason)} ready=#{state.ready} seq_ack=#{state.seq_ack}"
+    )
+
+    :ok
+  end
 
   # Private
 
