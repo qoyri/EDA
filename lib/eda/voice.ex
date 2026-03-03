@@ -208,8 +208,9 @@ defmodule EDA.Voice do
     voice_state =
       case Map.get(state.guilds, guild_id) do
         %State{} = existing ->
-          # Preserve session/token/ready fields on repeated joins.
-          %{existing | guild_id: guild_id, channel_id: channel_id}
+          existing
+          |> reset_runtime_state()
+          |> Map.merge(%{guild_id: guild_id, channel_id: channel_id})
 
         nil ->
           %State{
@@ -386,7 +387,15 @@ defmodule EDA.Voice do
         {:noreply, state}
 
       voice_state ->
-        new_vs = %{voice_state | session_id: session_id}
+        new_vs =
+          if voice_state.session_id == session_id do
+            %{voice_state | session_id: session_id}
+          else
+            voice_state
+            |> reset_runtime_state()
+            |> Map.put(:session_id, session_id)
+          end
+
         new_state = put_in(state, [:guilds, guild_id], new_vs)
         maybe_start_session(guild_id, new_vs)
         {:noreply, new_state}
@@ -404,7 +413,15 @@ defmodule EDA.Voice do
         {:noreply, state}
 
       voice_state ->
-        new_vs = %{voice_state | token: token, endpoint: endpoint}
+        new_vs =
+          if voice_state.token == token and voice_state.endpoint == endpoint do
+            %{voice_state | token: token, endpoint: endpoint}
+          else
+            voice_state
+            |> reset_runtime_state()
+            |> Map.merge(%{token: token, endpoint: endpoint})
+          end
+
         new_state = put_in(state, [:guilds, guild_id], new_vs)
         maybe_start_session(guild_id, new_vs)
         {:noreply, new_state}
@@ -602,6 +619,25 @@ defmodule EDA.Voice do
   end
 
   defp maybe_start_session(_guild_id, _state), do: :ok
+
+  defp reset_runtime_state(%State{} = voice_state) do
+    if voice_state.audio_pid, do: Process.exit(voice_state.audio_pid, :kill)
+    if voice_state.udp_socket, do: :gen_udp.close(voice_state.udp_socket)
+
+    %{
+      voice_state
+      | ready: false,
+        secret_key: nil,
+        udp_socket: nil,
+        ssrc: nil,
+        dave_manager: nil,
+        encryption_mode: nil,
+        ip: nil,
+        port: nil,
+        audio_pid: nil,
+        listening: false
+    }
+  end
 
   defp session_alive?(guild_id) do
     Registry.lookup(EDA.Voice.Registry, {:session, guild_id}) != []
