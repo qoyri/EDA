@@ -142,7 +142,7 @@ defmodule EDA.Voice.Dave.Manager do
   def key_package_payload(%__MODULE__{mls_session: session}) do
     case normalize_key_package_result(Native.create_key_package(session)) do
       {:ok, key_package} ->
-        {:ok, Payload.dave_mls_key_package(normalize_key_package_wire(key_package))}
+        {:ok, Payload.dave_mls_key_package(key_package)}
 
       _ ->
         :error
@@ -168,7 +168,6 @@ defmodule EDA.Voice.Dave.Manager do
             # After setting external sender, send our key package
             case normalize_key_package_result(Native.create_key_package(session)) do
               {:ok, key_package} ->
-                key_package = normalize_key_package_wire(key_package)
                 Logger.debug("DAVE: Sending MLS key package (#{byte_size(key_package)} bytes)")
                 {manager, [Payload.dave_mls_key_package(key_package)]}
 
@@ -390,11 +389,6 @@ defmodule EDA.Voice.Dave.Manager do
   defp normalize_epoch_result({:ok, epoch}) when is_integer(epoch), do: epoch
   defp normalize_epoch_result(epoch) when is_integer(epoch), do: epoch
   defp normalize_epoch_result(_), do: 0
-
-  # Some davey builds return OP26 content as MLSMessage(KeyPackage) (0001 0005 ...),
-  # while older gateway behavior expects a bare KeyPackage body.
-  defp normalize_key_package_wire(<<0x00, 0x01, 0x00, 0x05, rest::binary>>), do: rest
-  defp normalize_key_package_wire(key_package), do: key_package
 
   defp process_welcome_candidates(session, welcome_payload) do
     candidates =
