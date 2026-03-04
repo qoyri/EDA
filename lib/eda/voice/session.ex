@@ -141,13 +141,16 @@ defmodule EDA.Voice.Session do
     {:ok, %{state | ready: false, udp_socket: nil, secret_key: nil}}
   end
 
-  # 4014 → bot was disconnected from voice (kicked by admin, channel deleted, etc.)
+  # 4014 → bot was disconnected from voice. Attempt a bounded restart/rejoin
+  # through EDA.Voice state management.
   def handle_disconnect(%{reason: {:remote, code, _msg}}, state)
       when code in @disconnect_close_codes do
-    Logger.info("Voice session ended for guild #{state.guild_id} (disconnected)")
+    Logger.warning(
+      "Voice session ended for guild #{state.guild_id} with 4014 (disconnected), attempting restart"
+    )
 
     cleanup_state(state)
-    EDA.Voice.voice_disconnected(state.guild_id)
+    EDA.Voice.restart_session(state.guild_id)
     {:ok, %{state | ready: false, udp_socket: nil, secret_key: nil}}
   end
 

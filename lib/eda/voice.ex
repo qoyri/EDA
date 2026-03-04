@@ -162,8 +162,12 @@ defmodule EDA.Voice do
   # Internal callbacks from Voice.Event and Voice.Audio
 
   @doc false
-  def voice_state_update(guild_id, session_id) do
-    GenServer.cast(__MODULE__, {:voice_state_update, guild_id, session_id})
+  def voice_state_update(guild_id, session_id),
+    do: voice_state_update(guild_id, session_id, nil)
+
+  @doc false
+  def voice_state_update(guild_id, session_id, channel_id) do
+    GenServer.cast(__MODULE__, {:voice_state_update, guild_id, session_id, channel_id})
   end
 
   @doc false
@@ -196,6 +200,7 @@ defmodule EDA.Voice do
   @impl true
   def init(_) do
     Process.flag(:trap_exit, true)
+    Audio.init_playback_progress_table()
     {:ok, %{guilds: %{}}}
   end
 
@@ -391,22 +396,34 @@ defmodule EDA.Voice do
   end
 
   @impl true
-  def handle_cast({:voice_state_update, guild_id, session_id}, state) do
-    Logger.debug("voice_state_update received: guild=#{guild_id} session_id=#{session_id}")
+  def handle_cast({:voice_state_update, guild_id, session_id, channel_id}, state) do
+    Logger.debug(
+      "voice_state_update received: guild=#{guild_id} session_id=#{session_id} channel_id=#{inspect(channel_id)}"
+    )
 
     case Map.get(state.guilds, guild_id) do
       nil ->
         Logger.warning("voice_state_update: guild #{guild_id} not in voice state map, ignoring")
         {:noreply, state}
 
+      %State{} = voice_state when is_nil(channel_id) ->
+        maybe_restart_after_channel_drop(guild_id, voice_state)
+
+        new_vs =
+          voice_state
+          |> reset_runtime_state()
+          |> Map.put(:session_id, session_id)
+
+        {:noreply, put_in(state, [:guilds, guild_id], new_vs)}
+
       voice_state ->
         new_vs =
-          if voice_state.session_id == session_id do
-            %{voice_state | session_id: session_id}
+          if voice_state.session_id == session_id and voice_state.channel_id == channel_id do
+            %{voice_state | session_id: session_id, channel_id: channel_id}
           else
             voice_state
             |> reset_runtime_state()
-            |> Map.put(:session_id, session_id)
+            |> Map.merge(%{session_id: session_id, channel_id: channel_id})
           end
 
         new_state = put_in(state, [:guilds, guild_id], new_vs)
@@ -472,10 +489,12 @@ defmodule EDA.Voice do
       voice_state ->
         if voice_state.audio_pid, do: Process.exit(voice_state.audio_pid, :kill)
 
-        # Clear ALL connection fields so maybe_start_session won't re-trigger
+        # Clear ALL connection fields so maybe_start_session won't re-trigger.
+        # Also clear channel_id to reflect actual disconnected state.
         new_vs = %{
           voice_state
           | ready: false,
+            channel_id: nil,
             secret_key: nil,
             udp_socket: nil,
             session_id: nil,
@@ -589,13 +608,31 @@ defmodule EDA.Voice do
 
   # Private
 
+  defp maybe_restart_after_channel_drop(_guild_id, %State{channel_id: nil}), do: :ok
+
+  defp maybe_restart_after_channel_drop(guild_id, %State{restart_count: count}) when count > 0 do
+    Logger.debug(
+      "voice_state_update: guild #{guild_id} already restarting after channel drop, skipping duplicate trigger"
+    )
+
+    :ok
+  end
+
+  defp maybe_restart_after_channel_drop(guild_id, %State{channel_id: channel_id}) do
+    Logger.warning(
+      "voice_state_update: bot disconnected from channel #{channel_id} in guild #{guild_id}, scheduling voice restart"
+    )
+
+    GenServer.cast(__MODULE__, {:restart_session, guild_id})
+  end
+
   defp maybe_start_session(guild_id, %State{
          session_id: sid,
          token: tok,
          endpoint: ep,
          channel_id: cid
        })
-       when not is_nil(sid) and not is_nil(tok) and not is_nil(ep) do
+       when not is_nil(sid) and not is_nil(tok) and not is_nil(ep) and not is_nil(cid) do
     # Don't start a second session if one already exists
     case Registry.lookup(EDA.Voice.Registry, {:session, guild_id}) do
       [{_pid, _}] ->
@@ -630,13 +667,16 @@ defmodule EDA.Voice do
       "maybe_start_session: not ready for guild #{guild_id} — " <>
         "session_id=#{inspect(vs.session_id != nil)} " <>
         "token=#{inspect(vs.token != nil)} " <>
-        "endpoint=#{inspect(vs.endpoint != nil)}"
+        "endpoint=#{inspect(vs.endpoint != nil)} " <>
+        "channel_id=#{inspect(vs.channel_id != nil)}"
     )
   end
 
   defp maybe_start_session(_guild_id, _state), do: :ok
 
   defp reset_runtime_state(%State{} = voice_state) do
+    terminate_voice_session(voice_state.guild_id)
+
     if voice_state.audio_pid, do: Process.exit(voice_state.audio_pid, :kill)
     if voice_state.udp_socket, do: :gen_udp.close(voice_state.udp_socket)
 
@@ -673,8 +713,10 @@ defmodule EDA.Voice do
     end
 
     Audio.clear_playback_progress(guild_id)
+    terminate_voice_session(guild_id)
+  end
 
-    # Terminate the voice session process
+  defp terminate_voice_session(guild_id) do
     case Registry.lookup(EDA.Voice.Registry, {:session, guild_id}) do
       [{pid, _}] -> DynamicSupervisor.terminate_child(EDA.Voice.DynamicSupervisor, pid)
       [] -> :ok

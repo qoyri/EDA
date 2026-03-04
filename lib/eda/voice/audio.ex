@@ -75,21 +75,48 @@ defmodule EDA.Voice.Audio do
   end
 
   @doc false
+  @spec init_playback_progress_table() :: :ok
+  def init_playback_progress_table do
+    case :ets.whereis(@playback_progress_table) do
+      :undefined ->
+        :ets.new(@playback_progress_table, [
+          :named_table,
+          :public,
+          :set,
+          read_concurrency: true,
+          write_concurrency: true
+        ])
+
+        :ok
+
+      _ ->
+        :ok
+    end
+  rescue
+    ArgumentError ->
+      :ok
+  end
+
+  @doc false
   @spec playback_progress(String.t()) :: {:ok, {integer(), integer(), integer()}} | :error
   def playback_progress(guild_id) do
-    ensure_playback_progress_table()
-
-    case :ets.lookup(@playback_progress_table, guild_id) do
-      [{^guild_id, {seq, ts, nonce}}] -> {:ok, {seq, ts, nonce}}
-      _ -> :error
+    if :ets.whereis(@playback_progress_table) == :undefined do
+      :error
+    else
+      case :ets.lookup(@playback_progress_table, guild_id) do
+        [{^guild_id, {seq, ts, nonce}}] -> {:ok, {seq, ts, nonce}}
+        _ -> :error
+      end
     end
   end
 
   @doc false
   @spec clear_playback_progress(String.t()) :: :ok
   def clear_playback_progress(guild_id) do
-    ensure_playback_progress_table()
-    :ets.delete(@playback_progress_table, guild_id)
+    if :ets.whereis(@playback_progress_table) != :undefined do
+      :ets.delete(@playback_progress_table, guild_id)
+    end
+
     :ok
   end
 
@@ -381,31 +408,11 @@ defmodule EDA.Voice.Audio do
   end
 
   defp record_playback_progress(guild_id, seq, ts, nonce) do
-    ensure_playback_progress_table()
-    :ets.insert(@playback_progress_table, {guild_id, {seq, ts, nonce}})
-    :ok
-  end
-
-  defp ensure_playback_progress_table do
-    case :ets.whereis(@playback_progress_table) do
-      :undefined ->
-        try do
-          :ets.new(@playback_progress_table, [
-            :named_table,
-            :public,
-            :set,
-            read_concurrency: true,
-            write_concurrency: true
-          ])
-        rescue
-          ArgumentError -> :ok
-        end
-
-        :ok
-
-      _ ->
-        :ok
+    if :ets.whereis(@playback_progress_table) != :undefined do
+      :ets.insert(@playback_progress_table, {guild_id, {seq, ts, nonce}})
     end
+
+    :ok
   end
 
   # FFmpeg helpers

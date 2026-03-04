@@ -237,7 +237,7 @@ defmodule EDA.Gateway.Events do
         "VOICE_STATE_UPDATE for our bot: guild=#{guild_id} channel=#{data["channel_id"]} session_id=#{data["session_id"]}"
       )
 
-      EDA.Voice.voice_state_update(guild_id, data["session_id"])
+      EDA.Voice.voice_state_update(guild_id, data["session_id"], data["channel_id"])
     end
   end
 
