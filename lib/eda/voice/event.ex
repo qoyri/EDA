@@ -73,6 +73,7 @@ defmodule EDA.Voice.Event do
     # SESSION_DESCRIPTION - we have the secret key, voice is ready!
     secret_key = data["secret_key"] |> :erlang.list_to_binary()
     mode = data["mode"]
+
     dave_version =
       get_in(data, ["dave", "protocol_version"]) ||
         data["dave_protocol_version"] ||
