@@ -34,7 +34,10 @@ defmodule EDA.Gateway.Events do
 
       consumer ->
         struct = EDA.Event.from_raw(effective_type, data)
-        event = {String.to_atom(effective_type), struct}
+        event_type_atom = String.to_atom(effective_type)
+        event = {event_type_atom, struct}
+
+        EDA.Collector.notify(event_type_atom, struct)
         dispatch_to_consumer(consumer, effective_type, event)
     end
 

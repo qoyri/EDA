@@ -166,6 +166,55 @@ defmodule EDA do
     to: EDA.Gateway.MemberChunker,
     as: :fetch
 
+  # ── Event Collectors ─────────────────────────────────────────────────
+
+  @doc """
+  Awaits a `MESSAGE_CREATE` event matching the given filter.
+
+  ## Examples
+
+      {:ok, msg} = EDA.await_message(fn msg ->
+        msg.channel_id == channel_id and msg.author["id"] == user_id
+      end, timeout: 30_000)
+  """
+  @spec await_message((term() -> boolean()), keyword()) ::
+          {:ok, term()} | {:ok, [term()]} | {:error, :timeout}
+  def await_message(filter, opts \\ []) do
+    EDA.Collector.await(:MESSAGE_CREATE, filter, opts)
+  end
+
+  @doc """
+  Awaits a `MESSAGE_REACTION_ADD` event matching the given filter.
+
+  ## Examples
+
+      {:ok, reaction} = EDA.await_reaction(fn r ->
+        r.message_id == msg_id and r.user_id != bot_id
+      end, timeout: 60_000)
+  """
+  @spec await_reaction((term() -> boolean()), keyword()) ::
+          {:ok, term()} | {:ok, [term()]} | {:error, :timeout}
+  def await_reaction(filter, opts \\ []) do
+    EDA.Collector.await(:MESSAGE_REACTION_ADD, filter, opts)
+  end
+
+  @doc """
+  Awaits an `INTERACTION_CREATE` event matching the given filter.
+
+  Useful for collecting button clicks, select menu selections, and modal submissions.
+
+  ## Examples
+
+      {:ok, interaction} = EDA.await_component(fn i ->
+        EDA.Interaction.custom_id(i) == "confirm_btn"
+      end, timeout: 30_000)
+  """
+  @spec await_component((term() -> boolean()), keyword()) ::
+          {:ok, term()} | {:ok, [term()]} | {:error, :timeout}
+  def await_component(filter, opts \\ []) do
+    EDA.Collector.await(:INTERACTION_CREATE, filter, opts)
+  end
+
   # ── Ready State ──────────────────────────────────────────────────────
 
   @doc """
