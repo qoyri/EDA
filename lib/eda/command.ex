@@ -53,7 +53,9 @@ defmodule EDA.Command do
     options: [],
     default_member_permissions: nil,
     nsfw: false,
-    contexts: nil
+    contexts: nil,
+    name_localizations: nil,
+    description_localizations: nil
   ]
 
   @type command_type :: :slash | :user | :message
@@ -66,7 +68,9 @@ defmodule EDA.Command do
           options: [Option.t()],
           default_member_permissions: String.t() | nil,
           nsfw: boolean(),
-          contexts: [non_neg_integer()] | nil
+          contexts: [non_neg_integer()] | nil,
+          name_localizations: map() | nil,
+          description_localizations: map() | nil
         }
 
   @command_name_regex ~r/^[-_\p{L}\p{N}]{1,32}$/u
@@ -178,6 +182,40 @@ defmodule EDA.Command do
     %{cmd | contexts: values}
   end
 
+  @doc """
+  Adds localized name and/or description for a given locale.
+
+  Discord locale codes: `"fr"`, `"de"`, `"es-ES"`, `"ja"`, `"pt-BR"`, etc.
+  See [Discord docs](https://discord.com/developers/docs/reference#locales) for the full list.
+
+  ## Examples
+
+      slash("ping", "Pings the bot")
+      |> localize("fr", name: "ping", description: "Ping le bot")
+      |> localize("de", description: "Pingt den Bot")
+  """
+  @spec localize(t(), String.t(), keyword()) :: t()
+  def localize(%__MODULE__{} = cmd, locale, opts) when is_binary(locale) do
+    cmd =
+      case Keyword.get(opts, :name) do
+        nil ->
+          cmd
+
+        name ->
+          names = Map.put(cmd.name_localizations || %{}, locale, name)
+          %{cmd | name_localizations: names}
+      end
+
+    case Keyword.get(opts, :description) do
+      nil ->
+        cmd
+
+      desc ->
+        descs = Map.put(cmd.description_localizations || %{}, locale, desc)
+        %{cmd | description_localizations: descs}
+    end
+  end
+
   # ── Serialization ───────────────────────────────────────────────────
 
   @doc "Converts the command struct to a plain map for the Discord API."
@@ -208,8 +246,22 @@ defmodule EDA.Command do
 
     map = if cmd.nsfw, do: Map.put(map, :nsfw, true), else: map
 
-    if cmd.contexts do
-      Map.put(map, :contexts, cmd.contexts)
+    map =
+      if cmd.contexts do
+        Map.put(map, :contexts, cmd.contexts)
+      else
+        map
+      end
+
+    map =
+      if cmd.name_localizations do
+        Map.put(map, :name_localizations, cmd.name_localizations)
+      else
+        map
+      end
+
+    if cmd.description_localizations do
+      Map.put(map, :description_localizations, cmd.description_localizations)
     else
       map
     end
