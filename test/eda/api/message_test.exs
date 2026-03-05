@@ -507,6 +507,23 @@ defmodule EDA.API.MessageTest do
     end
   end
 
+  # ── forward ───────────────────────────────────────────────────────
+
+  describe "forward/3" do
+    test "POST with message_reference type 1", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "POST", "/channels/999/messages", fn conn ->
+        {:ok, raw, conn} = Plug.Conn.read_body(conn)
+        body = Jason.decode!(raw)
+        assert body["message_reference"]["type"] == 1
+        assert body["message_reference"]["channel_id"] == "111"
+        assert body["message_reference"]["message_id"] == "222"
+        json(conn, %{"id" => "333", "type" => 0})
+      end)
+
+      assert {:ok, %{"id" => "333"}} = Message.forward("999", "111", "222")
+    end
+  end
+
   defp assert_multipart_request(conn) do
     [content_type] = Plug.Conn.get_req_header(conn, "content-type")
     assert content_type =~ "multipart/form-data; boundary="

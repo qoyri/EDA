@@ -41,6 +41,27 @@ defmodule EDA.API.Message do
     post("/channels/#{channel_id}/messages", payload)
   end
 
+  @doc """
+  Forwards a message to another channel.
+
+  Creates a message reference with `type: 1` (forward) pointing to the original message.
+
+  ## Examples
+
+      EDA.API.Message.forward(target_channel_id, source_channel_id, message_id)
+  """
+  @spec forward(String.t() | integer(), String.t() | integer(), String.t() | integer()) ::
+          {:ok, map()} | {:error, term()}
+  def forward(target_channel_id, source_channel_id, message_id) do
+    post("/channels/#{target_channel_id}/messages", %{
+      message_reference: %{
+        type: 1,
+        channel_id: to_string(source_channel_id),
+        message_id: to_string(message_id)
+      }
+    })
+  end
+
   @doc "Gets a message by ID."
   @spec get(String.t() | integer(), String.t() | integer()) ::
           {:ok, map()} | {:error, term()}
