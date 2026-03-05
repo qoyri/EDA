@@ -126,6 +126,46 @@ defmodule EDA.API.Thread do
     end
   end
 
+  @doc """
+  Removes a member from a thread.
+
+  ## Examples
+
+      :ok = Thread.remove_member(thread_id, user_id)
+  """
+  @spec remove_member(String.t() | integer(), String.t() | integer()) :: :ok | {:error, term()}
+  def remove_member(channel_id, user_id) do
+    case EDA.HTTP.Client.delete("/channels/#{channel_id}/thread-members/#{user_id}") do
+      {:ok, _} -> :ok
+      error -> error
+    end
+  end
+
+  @doc """
+  Gets a thread member object for a user.
+
+  ## Examples
+
+      {:ok, member} = Thread.get_member(thread_id, user_id)
+  """
+  @spec get_member(String.t() | integer(), String.t() | integer()) ::
+          {:ok, map()} | {:error, term()}
+  def get_member(channel_id, user_id) do
+    EDA.HTTP.Client.get("/channels/#{channel_id}/thread-members/#{user_id}")
+  end
+
+  @doc """
+  Lists members of a thread.
+
+  ## Examples
+
+      {:ok, members} = Thread.list_members(thread_id)
+  """
+  @spec list_members(String.t() | integer()) :: {:ok, [map()]} | {:error, term()}
+  def list_members(channel_id) do
+    EDA.HTTP.Client.get("/channels/#{channel_id}/thread-members")
+  end
+
   @doc "Lists active threads in a guild."
   @spec list_active(String.t() | integer()) :: {:ok, map()} | {:error, term()}
   def list_active(guild_id) do
