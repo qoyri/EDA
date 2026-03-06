@@ -99,15 +99,27 @@ defmodule EDA.ComponentTest do
   # ── Section ────────────────────────────────────────────────────────
 
   describe "section/2" do
-    test "creates a section with single text" do
-      s = section(text_display("Hello"))
+    test "creates a section with single text and accessory" do
+      s = section(text_display("Hello"), accessory: thumbnail("https://example.com/img.png"))
       assert s.type == 9
       assert length(s.components) == 1
+      assert s.accessory.type == 11
     end
 
-    test "creates a section with multiple texts" do
-      s = section([text_display("A"), text_display("B"), text_display("C")])
+    test "creates a section with multiple texts and accessory" do
+      s =
+        section([text_display("A"), text_display("B"), text_display("C")],
+          accessory: button("Click", custom_id: "btn")
+        )
+
       assert length(s.components) == 3
+      assert s.accessory.type == 2
+    end
+
+    test "raises when accessory is missing" do
+      assert_raise ArgumentError, ~r/section requires an :accessory/, fn ->
+        section(text_display("Hello"))
+      end
     end
 
     test "accepts thumbnail accessory" do

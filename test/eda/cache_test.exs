@@ -116,11 +116,19 @@ defmodule EDA.CacheTest do
   end
 
   describe "me/put_me" do
-    test "stores and retrieves bot user" do
+    test "stores and retrieves bot user as struct" do
       user = %{"id" => "bot_id", "username" => "TestBot"}
       EDA.Cache.put_me(user)
 
-      assert EDA.Cache.me() == user
+      me = EDA.Cache.me()
+      assert %EDA.User{id: "bot_id", username: "TestBot"} = me
+    end
+
+    test "me_raw returns the original map" do
+      user = %{"id" => "bot_id_raw", "username" => "RawBot"}
+      EDA.Cache.put_me(user)
+
+      assert EDA.Cache.me_raw() == user
     end
   end
 end

@@ -109,7 +109,8 @@ defmodule EDA.HTTP.Client do
 
   def app_id do
     case EDA.Cache.me() do
-      %{"id" => id} -> id
+      %EDA.User{id: id} when not is_nil(id) -> id
+      %{"id" => id} when not is_nil(id) -> id
       _ -> raise "application_id not available, bot not connected"
     end
   end
@@ -187,8 +188,13 @@ defmodule EDA.HTTP.Client do
 
   defp parse_error(%{status_code: code, body: body}) do
     case Jason.decode(body) do
-      {:ok, %{"message" => message, "code" => error_code}} ->
-        %{status: code, message: message, code: error_code}
+      {:ok, %{"message" => message, "code" => error_code} = parsed} ->
+        error = %{status: code, message: message, code: error_code}
+
+        case parsed do
+          %{"errors" => errors} -> Map.put(error, :errors, errors)
+          _ -> error
+        end
 
       {:ok, data} ->
         %{status: code, data: data}

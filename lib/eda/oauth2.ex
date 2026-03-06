@@ -62,7 +62,8 @@ defmodule EDA.OAuth2 do
 
   defp resolve_client_id do
     case EDA.Cache.me() do
-      %{"id" => id} -> id
+      %EDA.User{id: id} when not is_nil(id) -> id
+      %{"id" => id} when not is_nil(id) -> id
       _ -> raise "No client_id provided and bot user not cached. Pass :client_id explicitly."
     end
   end

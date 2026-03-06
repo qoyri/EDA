@@ -246,6 +246,22 @@ defmodule EDA do
   @spec ready?() :: boolean()
   defdelegate ready?(), to: EDA.Gateway.ReadyTracker
 
+  # ── Gateway Latency ─────────────────────────────────────────────────
+
+  @doc """
+  Returns the gateway heartbeat latency in milliseconds for the given shard.
+
+  Defaults to shard 0 (single-shard bots). Returns `nil` if the shard
+  hasn't received a heartbeat ACK yet or isn't connected.
+
+  ## Examples
+
+      EDA.latency()       # => 42
+      EDA.latency(1)      # => 55  (shard 1)
+  """
+  @spec latency(non_neg_integer()) :: non_neg_integer() | nil
+  defdelegate latency(shard_id \\ 0), to: EDA.Gateway.Connection, as: :heartbeat_latency
+
   # ── Internals ───────────────────────────────────────────────────────
 
   defp broadcast_presence(presence) do

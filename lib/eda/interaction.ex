@@ -432,7 +432,8 @@ defmodule EDA.Interaction do
 
   defp app_id do
     case EDA.Cache.me() do
-      %{"id" => id} -> id
+      %EDA.User{id: id} when not is_nil(id) -> id
+      %{"id" => id} when not is_nil(id) -> id
       _ -> raise "application_id not available, bot not connected"
     end
   end

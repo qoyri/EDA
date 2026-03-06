@@ -25,22 +25,35 @@ defmodule EDA.Cache do
   # Current User (Bot)
 
   @doc """
-  Gets the current bot user.
+  Gets the current bot user as an `%EDA.User{}` struct.
+
+  Returns `nil` if the bot hasn't connected yet.
+  The raw map is also stored for internal callers that need string-key access.
   """
-  @spec me() :: map() | nil
+  @spec me() :: EDA.User.t() | map() | nil
   def me do
-    case :persistent_term.get(@me_key, nil) do
-      nil -> nil
-      user -> user
-    end
+    :persistent_term.get(@me_key, nil)
   end
 
   @doc """
-  Stores the current bot user.
+  Returns the raw map of the current bot user (string keys).
+
+  Used internally by code that expects `me["id"]` string-key access
+  (e.g., `app_id/0`, voice event routing).
+  """
+  @spec me_raw() :: map() | nil
+  def me_raw do
+    :persistent_term.get(:eda_current_user_raw, nil)
+  end
+
+  @doc """
+  Stores the current bot user. Saves both the parsed `%EDA.User{}` struct
+  and the raw map for backward compatibility.
   """
   @spec put_me(map()) :: :ok
-  def put_me(user) do
-    :persistent_term.put(@me_key, user)
+  def put_me(user) when is_map(user) do
+    :persistent_term.put(@me_key, EDA.User.from_raw(user))
+    :persistent_term.put(:eda_current_user_raw, user)
     :ok
   end
 

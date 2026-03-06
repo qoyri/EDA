@@ -184,7 +184,9 @@ defmodule EDA.Component do
 
     case opts[:accessory] do
       nil ->
-        map
+        raise ArgumentError,
+              "section requires an :accessory (thumbnail or button). " <>
+                "Example: section([text], accessory: thumbnail(\"url\"))"
 
       %{type: type} = accessory when type in [@thumbnail, @button] ->
         Map.put(map, :accessory, accessory)
