@@ -33,6 +33,14 @@ defmodule EDA.File do
   @doc """
   Creates a file from binary data.
 
+  The `data` argument must be an Elixir binary (`<<...>>`). If you receive data
+  as a list of bytes (e.g. from a Rust NIF returning `Vec<u8>`), convert it first
+  with `:erlang.list_to_binary/1`:
+
+      # NIF returns [0, 1, 2, ...] (charlist/list) instead of <<0, 1, 2, ...>> (binary)
+      data = :erlang.list_to_binary(nif_result)
+      EDA.File.from_binary(data, "output.bin")
+
   ## Options
 
     * `:description` - Alt text for the file (max 1024 chars)
