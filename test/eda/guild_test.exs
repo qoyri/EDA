@@ -108,4 +108,18 @@ defmodule EDA.GuildTest do
       assert {:ok, [%EDA.Channel{id: "ch1"}]} = Guild.channels("111")
     end
   end
+
+  # ── icon_url ─────────────────────────────────────────────────────────
+
+  describe "icon_url/1" do
+    test "returns CDN URL when icon is set" do
+      guild = %Guild{id: "123", icon: "abc123"}
+      assert Guild.icon_url(guild) == "https://cdn.discordapp.com/icons/123/abc123.png"
+    end
+
+    test "returns nil when icon is nil" do
+      guild = %Guild{id: "123", icon: nil}
+      assert Guild.icon_url(guild) == nil
+    end
+  end
 end

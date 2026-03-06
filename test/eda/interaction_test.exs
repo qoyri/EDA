@@ -455,4 +455,41 @@ defmodule EDA.InteractionTest do
       assert sub_command_name(struct) == "add"
     end
   end
+
+  # ── selected_values ──────────────────────────────────────────────────
+
+  describe "selected_values/1" do
+    test "returns values from select menu interaction" do
+      interaction = %{data: %{"values" => ["opt1", "opt2"]}}
+      assert selected_values(interaction) == ["opt1", "opt2"]
+    end
+
+    test "returns values from raw map interaction" do
+      interaction = %{"data" => %{"values" => ["a"]}}
+      assert selected_values(interaction) == ["a"]
+    end
+
+    test "returns empty list when no values" do
+      assert selected_values(%{data: %{}}) == []
+      assert selected_values(%{}) == []
+    end
+  end
+
+  # ── component_type ───────────────────────────────────────────────────
+
+  describe "component_type/1" do
+    test "returns component type from interaction" do
+      assert component_type(%{data: %{"component_type" => 2}}) == 2
+      assert component_type(%{data: %{"component_type" => 3}}) == 3
+    end
+
+    test "returns component type from raw map" do
+      assert component_type(%{"data" => %{"component_type" => 5}}) == 5
+    end
+
+    test "returns nil when not a component interaction" do
+      assert component_type(%{data: %{}}) == nil
+      assert component_type(%{}) == nil
+    end
+  end
 end

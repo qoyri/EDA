@@ -222,6 +222,42 @@ defmodule EDA.Interaction do
   def custom_id(%{"data" => %{"custom_id" => id}}), do: id
   def custom_id(_), do: nil
 
+  @doc """
+  Returns the selected values from a select menu interaction.
+
+  Returns an empty list if the interaction is not a select menu.
+
+  ## Examples
+
+      values = EDA.Interaction.selected_values(interaction)
+      # => ["option_1", "option_2"]
+  """
+  @spec selected_values(interaction()) :: [String.t()]
+  def selected_values(%{data: %{"values" => values}}) when is_list(values), do: values
+  def selected_values(%{"data" => %{"values" => values}}) when is_list(values), do: values
+  def selected_values(_), do: []
+
+  @doc """
+  Returns the component type for a message component interaction.
+
+  Returns `nil` if not a component interaction.
+
+  Common types: `2` = button, `3` = string select, `5` = user select,
+  `6` = role select, `7` = mentionable select, `8` = channel select.
+
+  ## Examples
+
+      case EDA.Interaction.component_type(interaction) do
+        2 -> handle_button(interaction)
+        3 -> handle_select(interaction)
+        _ -> :ignore
+      end
+  """
+  @spec component_type(interaction()) :: non_neg_integer() | nil
+  def component_type(%{data: %{"component_type" => t}}), do: t
+  def component_type(%{"data" => %{"component_type" => t}}), do: t
+  def component_type(_), do: nil
+
   # ── Response Helpers ────────────────────────────────────────────────
 
   @doc """
