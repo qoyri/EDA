@@ -341,11 +341,7 @@ defmodule EDA.Voice.Audio do
               next_nonce = n + 1
 
               record_playback_progress(guild_id, next_seq, next_ts, next_nonce)
-
-              target = start + (i + 1) * @frame_duration_us
-              now = System.monotonic_time(:microsecond)
-              sleep_us = target - now
-              if sleep_us > 1000, do: Process.sleep(div(sleep_us, 1000))
+              pace_frame(start, i)
 
               {:cont, %{acc | seq: next_seq, ts: next_ts, nonce: next_nonce, frame_idx: i + 1}}
 
@@ -355,6 +351,16 @@ defmodule EDA.Voice.Audio do
           end
       end
     )
+  end
+
+  defp pace_frame(start, frame_idx) do
+    target = start + (frame_idx + 1) * @frame_duration_us
+    now = System.monotonic_time(:microsecond)
+    sleep_us = target - now
+
+    if sleep_us > 1000 do
+      Process.sleep(div(sleep_us, 1000))
+    end
   end
 
   defp send_single_frame(frame, voice_state, seq, timestamp, nonce) do
