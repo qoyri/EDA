@@ -144,12 +144,9 @@ defmodule EDA.Voice.Audio do
     # Must send speaking before any audio data
     Session.send_payload(guild_id, Payload.speaking(voice_state.ssrc, true))
 
-    final = stream_from_port(port, guild_id, voice_state)
-
-    send_silence(guild_id, voice_state, final.seq, final.ts, final.nonce)
-    Session.send_payload(guild_id, Payload.speaking(voice_state.ssrc, false))
-
-    EDA.Voice.playback_finished(guild_id, final.seq, final.ts, final.nonce)
+    port
+    |> stream_from_port(guild_id, voice_state)
+    |> finish_playback(guild_id, voice_state)
   end
 
   defp player_loop(guild_id, frames, :raw, voice_state, _opts) do
@@ -162,20 +159,30 @@ defmodule EDA.Voice.Audio do
 
     Session.send_payload(guild_id, Payload.speaking(voice_state.ssrc, true))
 
-    {final_seq, final_ts, final_nonce, _} =
-      send_frames(
-        frames,
-        guild_id,
-        voice_state,
-        voice_state.sequence,
-        voice_state.timestamp,
-        voice_state.nonce
-      )
+    frames
+    |> send_frames(
+      guild_id,
+      voice_state,
+      voice_state.sequence,
+      voice_state.timestamp,
+      voice_state.nonce
+    )
+    |> finish_playback(guild_id, voice_state)
+  end
 
-    send_silence(guild_id, voice_state, final_seq, final_ts, final_nonce)
+  defp finish_playback(%{status: :ok} = final, guild_id, voice_state) do
+    final = send_silence(guild_id, voice_state, final.seq, final.ts, final.nonce)
+    complete_playback(guild_id, voice_state, final)
+  end
+
+  defp finish_playback(final, guild_id, voice_state) do
+    complete_playback(guild_id, voice_state, final)
+  end
+
+  defp complete_playback(guild_id, voice_state, final) do
     Session.send_payload(guild_id, Payload.speaking(voice_state.ssrc, false))
-
-    EDA.Voice.playback_finished(guild_id, final_seq, final_ts, final_nonce)
+    EDA.Voice.playback_finished(guild_id, final.seq, final.ts, final.nonce)
+    :ok
   end
 
   # FFmpeg outputs OGG pages via `-f ogg`. We parse those pages to get individual
@@ -189,6 +196,7 @@ defmodule EDA.Voice.Audio do
       ts: voice_state.timestamp,
       nonce: voice_state.nonce,
       frame_idx: 0,
+      status: :ok,
       # Anchor timing when the first Opus frame is sent, not when playback starts.
       # This avoids startup-latency catch-up bursts that make the beginning sound fast.
       start: nil,
@@ -206,7 +214,15 @@ defmodule EDA.Voice.Audio do
           Ogg.extract_frames(<<buffer::binary, chunk::binary>>, skip)
 
         updated = send_timed_frames(frames, %{s | buffer: remaining, skip: new_skip})
-        do_stream(port, updated)
+
+        case updated.status do
+          :ok ->
+            do_stream(port, updated)
+
+          {:error, _reason} ->
+            close_port(port)
+            updated
+        end
 
       {^port, {:exit_status, 0}} ->
         Logger.debug("FFmpeg finished successfully")
@@ -217,7 +233,7 @@ defmodule EDA.Voice.Audio do
         s
     after
       10_000 ->
-        Port.close(port)
+        close_port(port)
         Logger.warning("FFmpeg timed out")
         s
     end
@@ -234,42 +250,47 @@ defmodule EDA.Voice.Audio do
     now = System.monotonic_time(:microsecond)
     start = s.start || now
 
-    send_single_frame(frame, vs, seq, ts, nonce)
+    case send_single_frame(frame, vs, seq, ts, nonce) do
+      :ok ->
+        next_idx = s.frame_idx + 1
+        next_seq = band(seq + 1, 0xFFFF)
+        next_ts = ts + @opus_frame_samples
+        next_nonce = nonce + 1
 
-    next_idx = s.frame_idx + 1
-    next_seq = band(seq + 1, 0xFFFF)
-    next_ts = ts + @opus_frame_samples
-    next_nonce = nonce + 1
+        record_playback_progress(guild_id, next_seq, next_ts, next_nonce)
 
-    record_playback_progress(guild_id, next_seq, next_ts, next_nonce)
+        # Collect diagnostic data
+        slot = rem(s.frame_idx, @diag_window)
 
-    # Collect diagnostic data
-    slot = rem(s.frame_idx, @diag_window)
+        Process.put({:diag, slot}, %{
+          idx: s.frame_idx,
+          size: byte_size(frame),
+          actual_us: now - start,
+          drift_us: now - start - s.frame_idx * @frame_duration_us
+        })
 
-    Process.put({:diag, slot}, %{
-      idx: s.frame_idx,
-      size: byte_size(frame),
-      actual_us: now - start,
-      drift_us: now - start - s.frame_idx * @frame_duration_us
-    })
+        if slot == @diag_window - 1 do
+          dump_diagnostics(div(s.frame_idx, @diag_window))
+        end
 
-    if slot == @diag_window - 1 do
-      dump_diagnostics(div(s.frame_idx, @diag_window))
+        target = start + next_idx * @frame_duration_us
+        sleep_now = System.monotonic_time(:microsecond)
+        sleep_us = target - sleep_now
+        if sleep_us > 1000, do: Process.sleep(div(sleep_us, 1000))
+
+        send_timed_frames(rest, %{
+          s
+          | start: start,
+            seq: next_seq,
+            ts: next_ts,
+            nonce: next_nonce,
+            frame_idx: next_idx
+        })
+
+      {:error, reason} ->
+        log_send_failure(guild_id, s.frame_idx, reason)
+        %{s | status: {:error, reason}}
     end
-
-    target = start + next_idx * @frame_duration_us
-    sleep_now = System.monotonic_time(:microsecond)
-    sleep_us = target - sleep_now
-    if sleep_us > 1000, do: Process.sleep(div(sleep_us, 1000))
-
-    send_timed_frames(rest, %{
-      s
-      | start: start,
-        seq: next_seq,
-        ts: next_ts,
-        nonce: next_nonce,
-        frame_idx: next_idx
-    })
   end
 
   defp dump_diagnostics(window_num) do
@@ -308,54 +329,74 @@ defmodule EDA.Voice.Audio do
   defp send_frames(frames, guild_id, voice_state, seq, timestamp, nonce) when is_list(frames) do
     start = System.monotonic_time(:microsecond)
 
-    Enum.reduce(frames, {seq, timestamp, nonce, 0}, fn frame, {s, t, n, i} ->
-      send_single_frame(frame, voice_state, s, t, n)
+    Enum.reduce_while(
+      frames,
+      %{seq: seq, ts: timestamp, nonce: nonce, frame_idx: 0, status: :ok},
+      fn
+        frame, %{seq: s, ts: t, nonce: n, frame_idx: i} = acc ->
+          case send_single_frame(frame, voice_state, s, t, n) do
+            :ok ->
+              next_seq = band(s + 1, 0xFFFF)
+              next_ts = t + @opus_frame_samples
+              next_nonce = n + 1
 
-      next_seq = band(s + 1, 0xFFFF)
-      next_ts = t + @opus_frame_samples
-      next_nonce = n + 1
+              record_playback_progress(guild_id, next_seq, next_ts, next_nonce)
+              pace_frame(start, i)
 
-      record_playback_progress(guild_id, next_seq, next_ts, next_nonce)
+              {:cont, %{acc | seq: next_seq, ts: next_ts, nonce: next_nonce, frame_idx: i + 1}}
 
-      target = start + (i + 1) * @frame_duration_us
-      now = System.monotonic_time(:microsecond)
-      sleep_us = target - now
-      if sleep_us > 1000, do: Process.sleep(div(sleep_us, 1000))
+            {:error, reason} ->
+              log_send_failure(guild_id, i, reason)
+              {:halt, %{acc | status: {:error, reason}}}
+          end
+      end
+    )
+  end
 
-      {next_seq, next_ts, next_nonce, i + 1}
-    end)
+  defp pace_frame(start, frame_idx) do
+    target = start + (frame_idx + 1) * @frame_duration_us
+    now = System.monotonic_time(:microsecond)
+    sleep_us = target - now
+
+    if sleep_us > 1000 do
+      Process.sleep(div(sleep_us, 1000))
+    end
   end
 
   defp send_single_frame(frame, voice_state, seq, timestamp, nonce) do
-    # DAVE E2EE encrypt if active (before transport encryption)
-    frame = maybe_dave_encrypt(frame, voice_state.dave_manager)
-
-    packet =
-      Crypto.encrypt_packet(
-        frame,
-        seq,
-        timestamp,
-        voice_state.ssrc,
-        voice_state.secret_key,
-        voice_state.encryption_mode,
-        nonce
-      )
-
-    :gen_udp.send(
-      voice_state.udp_socket,
-      String.to_charlist(voice_state.ip),
-      voice_state.port,
-      packet
-    )
+    with {:ok, frame} <- maybe_dave_encrypt(frame, voice_state.dave_manager),
+         packet <-
+           Crypto.encrypt_packet(
+             frame,
+             seq,
+             timestamp,
+             voice_state.ssrc,
+             voice_state.secret_key,
+             voice_state.encryption_mode,
+             nonce
+           ),
+         :ok <-
+           :gen_udp.send(
+             voice_state.udp_socket,
+             String.to_charlist(voice_state.ip),
+             voice_state.port,
+             packet
+           ) do
+      :ok
+    else
+      {:error, reason} -> {:error, reason}
+      error -> {:error, {:udp_send_failed, error}}
+    end
   end
 
   defp maybe_dave_encrypt(frame, %Dave.Manager{} = mgr) do
     case Dave.Manager.encrypt_frame(mgr, frame) do
-      {encrypted, _updated_mgr} -> encrypted
+      {:ok, encrypted, _updated_mgr} -> {:ok, encrypted}
+      {:error, reason, _updated_mgr} -> {:error, {:dave_encrypt_failed, reason}}
     end
   end
 
-  defp maybe_dave_encrypt(frame, _manager), do: frame
+  defp maybe_dave_encrypt(frame, _manager), do: {:ok, frame}
 
   defp send_silence(guild_id, voice_state, seq, ts, nonce) do
     silence = <<0xF8, 0xFF, 0xFE>>
@@ -369,6 +410,18 @@ defmodule EDA.Voice.Audio do
       ts,
       nonce
     )
+  end
+
+  defp log_send_failure(guild_id, frame_idx, reason) do
+    Logger.warning(
+      "Stopping voice playback in guild #{guild_id} at frame #{frame_idx} due to send failure: #{inspect(reason)}"
+    )
+  end
+
+  defp close_port(port) do
+    Port.close(port)
+  catch
+    :error, :badarg -> :ok
   end
 
   # Listening (incoming audio)

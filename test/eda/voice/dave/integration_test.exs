@@ -9,11 +9,9 @@ defmodule EDA.Voice.Dave.IntegrationTest do
 
       frame = <<0xFC, 1, 2, 3, 4, 5, 6, 7, 8>>
 
-      # Encrypt
-      {encrypted, manager} = Manager.encrypt_frame(manager, frame)
+      {:ok, encrypted, manager} = Manager.encrypt_frame(manager, frame)
       assert encrypted == frame
 
-      # Decrypt
       {:ok, decrypted, _manager} = Manager.decrypt_frame(manager, encrypted, 99_999)
       assert decrypted == frame
     end
@@ -26,15 +24,11 @@ defmodule EDA.Voice.Dave.IntegrationTest do
       assert is_reference(manager.mls_session)
     end
 
-    test "encrypt_frame produces different output than input (when session is active)" do
-      # Without a completed MLS handshake, encrypt_opus may fail and fall back
-      # to passthrough, or succeed with passthrough mode data.
-      # This test verifies the manager doesn't crash either way.
-      manager = Manager.new(1, 12_345, 67_890)
+    test "encrypt_frame fails closed when the DAVE session is unavailable" do
+      manager = %Manager{protocol_version: 1, mls_session: nil}
       frame = <<0xFC, 1, 2, 3, 4, 5, 6, 7, 8>>
 
-      {result, _manager} = Manager.encrypt_frame(manager, frame)
-      assert is_binary(result)
+      assert {:error, :session_unavailable, _manager} = Manager.encrypt_frame(manager, frame)
     end
   end
 

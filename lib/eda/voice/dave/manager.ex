@@ -79,29 +79,36 @@ defmodule EDA.Voice.Dave.Manager do
   Encrypts an Opus frame through DAVE E2EE.
 
   In passthrough mode, returns the frame unchanged.
-  Returns `{encrypted_frame, updated_manager}`.
+  Returns `{:ok, encrypted_frame, updated_manager}` on success.
+  Returns `{:error, reason, updated_manager}` when an active DAVE session
+  cannot encrypt media, so callers can stop playback instead of sending
+  undecryptable raw Opus.
   """
-  @spec encrypt_frame(t(), binary()) :: {binary(), t()}
-  def encrypt_frame(%__MODULE__{mls_session: nil} = manager, opus_frame) do
-    {opus_frame, manager}
+  @spec encrypt_frame(t(), binary()) :: {:ok, binary(), t()} | {:error, term(), t()}
+  def encrypt_frame(%__MODULE__{protocol_version: 0, mls_session: nil} = manager, opus_frame) do
+    {:ok, opus_frame, manager}
+  end
+
+  def encrypt_frame(%__MODULE__{mls_session: nil} = manager, _opus_frame) do
+    {:error, :session_unavailable, manager}
   end
 
   def encrypt_frame(%__MODULE__{mls_session: session} = manager, opus_frame) do
     case normalize_encrypt_result(Native.encrypt_opus(session, opus_frame)) do
       {:ok, encrypted} ->
-        {encrypted, manager}
+        {:ok, encrypted, manager}
 
       {:error, :not_ready} ->
-        Logger.debug("DAVE: encrypt_opus not ready, sending unencrypted")
-        {opus_frame, manager}
+        Logger.warning("DAVE: encrypt_opus not ready, aborting media send")
+        {:error, :not_ready, manager}
 
       {:error, reason} ->
-        Logger.debug("DAVE: encrypt_opus failed (#{inspect(reason)}), sending unencrypted")
-        {opus_frame, manager}
+        Logger.warning("DAVE: encrypt_opus failed (#{inspect(reason)}), aborting media send")
+        {:error, reason, manager}
 
-      _ ->
-        Logger.debug("DAVE: encrypt_opus failed, sending unencrypted")
-        {opus_frame, manager}
+      other ->
+        Logger.warning("DAVE: encrypt_opus failed (#{inspect(other)}), aborting media send")
+        {:error, other, manager}
     end
   end
 
