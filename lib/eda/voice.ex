@@ -62,9 +62,18 @@ defmodule EDA.Voice do
   Options:
   - `:volume` - FFmpeg volume multiplier applied to `:url` inputs
   """
+  @spec play(String.t(), String.t() | Enumerable.t()) :: :ok | {:error, term()}
+  def play(guild_id, input), do: play(guild_id, input, :url, [])
+
+  @spec play(String.t(), String.t() | Enumerable.t(), keyword()) :: :ok | {:error, term()}
+  def play(guild_id, input, opts) when is_list(opts), do: play(guild_id, input, :url, opts)
+
+  @spec play(String.t(), String.t() | Enumerable.t(), atom()) :: :ok | {:error, term()}
+  def play(guild_id, input, type) when is_atom(type), do: play(guild_id, input, type, [])
+
   @spec play(String.t(), String.t() | Enumerable.t(), atom(), keyword()) ::
           :ok | {:error, term()}
-  def play(guild_id, input, type \\ :url, opts \\ []) do
+  def play(guild_id, input, type, opts) when is_atom(type) and is_list(opts) do
     GenServer.call(__MODULE__, {:play, guild_id, input, type, opts})
   end
 
