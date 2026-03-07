@@ -33,7 +33,16 @@ defmodule EDA.Voice.Dave.ManagerTest do
     test "returns frame unchanged when version is 0" do
       manager = Manager.new(0, 12_345, 67_890)
       frame = <<0xFC, 1, 2, 3, 4, 5>>
-      assert {^frame, _manager} = Manager.encrypt_frame(manager, frame)
+      assert {:ok, ^frame, _manager} = Manager.encrypt_frame(manager, frame)
+    end
+  end
+
+  describe "encrypt_frame/2 active DAVE session" do
+    test "returns an error when DAVE is enabled but no MLS session is available" do
+      manager = %Manager{protocol_version: 1, mls_session: nil}
+      frame = <<0xFC, 1, 2, 3, 4, 5>>
+
+      assert {:error, :session_unavailable, _manager} = Manager.encrypt_frame(manager, frame)
     end
   end
 
