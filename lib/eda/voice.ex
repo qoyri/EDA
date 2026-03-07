@@ -58,10 +58,23 @@ defmodule EDA.Voice do
   Types:
   - `:url` - URL or file path (passed to ffmpeg)
   - `:raw` - Raw opus frames
+
+  Options:
+  - `:volume` - FFmpeg volume multiplier applied to `:url` inputs
   """
+  @spec play(String.t(), String.t() | Enumerable.t()) :: :ok | {:error, term()}
+  def play(guild_id, input), do: play(guild_id, input, :url, [])
+
+  @spec play(String.t(), String.t() | Enumerable.t(), keyword()) :: :ok | {:error, term()}
+  def play(guild_id, input, opts) when is_list(opts), do: play(guild_id, input, :url, opts)
+
   @spec play(String.t(), String.t() | Enumerable.t(), atom()) :: :ok | {:error, term()}
-  def play(guild_id, input, type \\ :url) do
-    GenServer.call(__MODULE__, {:play, guild_id, input, type})
+  def play(guild_id, input, type) when is_atom(type), do: play(guild_id, input, type, [])
+
+  @spec play(String.t(), String.t() | Enumerable.t(), atom(), keyword()) ::
+          :ok | {:error, term()}
+  def play(guild_id, input, type, opts) when is_atom(type) and is_list(opts) do
+    GenServer.call(__MODULE__, {:play, guild_id, input, type, opts})
   end
 
   @doc """
@@ -245,7 +258,7 @@ defmodule EDA.Voice do
     end
   end
 
-  def handle_call({:play, guild_id, input, type}, _from, state) do
+  def handle_call({:play, guild_id, input, type, opts}, _from, state) do
     case Map.get(state.guilds, guild_id) do
       %State{ready: true, audio_pid: nil} = voice_state ->
         voice_state = sync_playback_progress(voice_state, guild_id)
@@ -259,7 +272,7 @@ defmodule EDA.Voice do
             {:reply, {:error, :not_ready}, state}
 
           true ->
-            pid = Audio.play(guild_id, input, type, voice_state)
+            pid = Audio.play(guild_id, input, type, voice_state, opts)
             new_vs = %{voice_state | audio_pid: pid}
             {:reply, :ok, put_in(state, [:guilds, guild_id], new_vs)}
         end
