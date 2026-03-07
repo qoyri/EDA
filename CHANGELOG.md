@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-03-07
+
+### Installation
+
+```elixir
+def deps do
+  [
+    {:eda, "~> 0.1.3"}
+  ]
+end
+```
+
+### Added
+
+- **Voice** — FFmpeg volume passthrough for voice playback (`play/3` with `volume:` option) ([#2](https://github.com/qoyri/EDA/pull/2) by [@christomitov](https://github.com/christomitov))
+
+### Fixed
+
+- **DAVE** — Fail closed on media encryption errors — stops playback cleanly instead of sending undecryptable raw Opus when DAVE encryption fails ([#3](https://github.com/qoyri/EDA/pull/3) by [@christomitov](https://github.com/christomitov))
+
+### Acknowledgments
+
+Thanks to [@christomitov](https://github.com/christomitov) for both contributions in this release.
+
 ## [0.1.2] - 2026-03-05
 
 ### Installation
