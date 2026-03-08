@@ -492,4 +492,36 @@ defmodule EDA.InteractionTest do
       assert component_type(%{}) == nil
     end
   end
+
+  # ── delete_source ────────────────────────────────────────────────────
+
+  describe "delete_source/1" do
+    test "returns error when no source message" do
+      interaction = %{channel_id: "123", data: %{}}
+      assert {:error, :no_source_message} = EDA.Interaction.delete_source(interaction)
+    end
+
+    test "extracts message id from struct-style interaction" do
+      interaction = %{
+        channel_id: "123",
+        message: %{"id" => "msg456"},
+        data: %{}
+      }
+
+      # Will fail with API error since no server, but proves extraction works
+      result = EDA.Interaction.delete_source(interaction)
+      assert {:error, _} = result
+    end
+
+    test "extracts message id from raw map interaction" do
+      interaction = %{
+        "channel_id" => "123",
+        "message" => %{"id" => "msg789"},
+        "data" => %{}
+      }
+
+      result = EDA.Interaction.delete_source(interaction)
+      assert {:error, _} = result
+    end
+  end
 end

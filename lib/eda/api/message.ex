@@ -28,17 +28,24 @@ defmodule EDA.API.Message do
   end
 
   def create(channel_id, opts) when is_list(opts) do
-    case build_message_payload(opts) do
-      {payload, files} ->
-        request_multipart(:post, "/channels/#{channel_id}/messages", payload, files)
+    {delete_after, opts} = Keyword.pop(opts, :delete_after)
 
-      payload ->
-        post("/channels/#{channel_id}/messages", payload)
-    end
+    result =
+      case build_message_payload(opts) do
+        {payload, files} ->
+          request_multipart(:post, "/channels/#{channel_id}/messages", payload, files)
+
+        payload ->
+          post("/channels/#{channel_id}/messages", payload)
+      end
+
+    maybe_schedule_delete(result, channel_id, delete_after)
   end
 
   def create(channel_id, payload) when is_map(payload) do
-    post("/channels/#{channel_id}/messages", payload)
+    {delete_after, payload} = Map.pop(payload, :delete_after)
+    result = post("/channels/#{channel_id}/messages", payload)
+    maybe_schedule_delete(result, channel_id, delete_after)
   end
 
   @doc """
@@ -305,4 +312,71 @@ defmodule EDA.API.Message do
       end
     end)
   end
+
+  # ── Reply ──────────────────────────────────────────────────────────
+
+  @doc """
+  Replies to a message, automatically setting `message_reference`.
+
+  Accepts a message struct (with `:channel_id` and `:id`) or a raw map
+  (with `"channel_id"` and `"id"`).
+
+  ## Examples
+
+      EDA.API.Message.reply(msg, "Got it!")
+      EDA.API.Message.reply(msg, content: "Reply with embed", embeds: [embed])
+  """
+  @spec reply(map(), String.t() | keyword() | map()) :: {:ok, map()} | {:error, term()}
+  def reply(%{channel_id: cid, id: mid}, content) do
+    do_reply(cid, mid, content)
+  end
+
+  def reply(%{"channel_id" => cid, "id" => mid}, content) do
+    do_reply(cid, mid, content)
+  end
+
+  defp do_reply(channel_id, message_id, content) when is_binary(content) do
+    create(channel_id, %{content: content, message_reference: %{message_id: message_id}})
+  end
+
+  defp do_reply(channel_id, message_id, opts) when is_list(opts) do
+    {delete_after, opts} = Keyword.pop(opts, :delete_after)
+
+    payload =
+      opts
+      |> build_message_payload()
+      |> then(fn
+        {payload, files} ->
+          {Map.put(payload, :message_reference, %{message_id: message_id}), files}
+
+        payload ->
+          Map.put(payload, :message_reference, %{message_id: message_id})
+      end)
+
+    result =
+      case payload do
+        {payload, files} ->
+          request_multipart(:post, "/channels/#{channel_id}/messages", payload, files)
+
+        payload ->
+          post("/channels/#{channel_id}/messages", payload)
+      end
+
+    maybe_schedule_delete(result, channel_id, delete_after)
+  end
+
+  defp do_reply(channel_id, message_id, payload) when is_map(payload) do
+    payload = Map.put_new(payload, :message_reference, %{message_id: message_id})
+    create(channel_id, payload)
+  end
+
+  # ── Private ────────────────────────────────────────────────────────
+
+  defp maybe_schedule_delete({:ok, %{"id" => msg_id}} = result, channel_id, delete_after)
+       when is_integer(delete_after) do
+    EDA.AutoDelete.schedule(to_string(channel_id), msg_id, delete_after)
+    result
+  end
+
+  defp maybe_schedule_delete(result, _channel_id, _delete_after), do: result
 end

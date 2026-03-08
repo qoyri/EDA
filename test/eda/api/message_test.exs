@@ -524,6 +524,48 @@ defmodule EDA.API.MessageTest do
     end
   end
 
+  # ── reply ─────────────────────────────────────────────────────────
+
+  describe "reply/2" do
+    test "adds message_reference with struct-style message", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "POST", "/channels/111/messages", fn conn ->
+        {:ok, raw, conn} = Plug.Conn.read_body(conn)
+        body = Jason.decode!(raw)
+        assert body["content"] == "Got it!"
+        assert body["message_reference"]["message_id"] == "222"
+        json(conn, %{"id" => "333"})
+      end)
+
+      msg = %{channel_id: "111", id: "222"}
+      assert {:ok, _} = Message.reply(msg, "Got it!")
+    end
+
+    test "adds message_reference with raw map message", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "POST", "/channels/111/messages", fn conn ->
+        {:ok, raw, conn} = Plug.Conn.read_body(conn)
+        body = Jason.decode!(raw)
+        assert body["message_reference"]["message_id"] == "222"
+        json(conn, %{"id" => "333"})
+      end)
+
+      msg = %{"channel_id" => "111", "id" => "222"}
+      assert {:ok, _} = Message.reply(msg, "Reply!")
+    end
+
+    test "reply with keyword opts", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "POST", "/channels/111/messages", fn conn ->
+        {:ok, raw, conn} = Plug.Conn.read_body(conn)
+        body = Jason.decode!(raw)
+        assert body["content"] == "With embed"
+        assert body["message_reference"]["message_id"] == "222"
+        json(conn, %{"id" => "333"})
+      end)
+
+      msg = %{channel_id: "111", id: "222"}
+      assert {:ok, _} = Message.reply(msg, content: "With embed")
+    end
+  end
+
   defp assert_multipart_request(conn) do
     [content_type] = Plug.Conn.get_req_header(conn, "content-type")
     assert content_type =~ "multipart/form-data; boundary="

@@ -575,4 +575,74 @@ defmodule EDA.ComponentTest do
       assert length(decoded["components"]) == 2
     end
   end
+
+  # ── disable_all ──────────────────────────────────────────────────────
+
+  describe "disable_all/1" do
+    test "disables buttons in action row" do
+      row =
+        action_row([
+          button("A", custom_id: "a"),
+          button("B", custom_id: "b")
+        ])
+
+      [disabled_row] = disable_all([row])
+      assert Enum.all?(disabled_row.components, &(&1.disabled == true))
+    end
+
+    test "disables select menus" do
+      row =
+        action_row([
+          string_select("select1", [
+            select_option("Option 1", "1"),
+            select_option("Option 2", "2")
+          ])
+        ])
+
+      [disabled_row] = disable_all([row])
+      [select] = disabled_row.components
+      assert select.disabled == true
+    end
+
+    test "preserves non-interactive components" do
+      text = text_display("Hello")
+      sep = separator()
+
+      result = disable_all([text, sep])
+      assert result == [text, sep]
+    end
+
+    test "handles string-keyed components from Discord API" do
+      row = %{
+        "type" => 1,
+        "components" => [
+          %{"type" => 2, "label" => "Click", "custom_id" => "btn1"},
+          %{"type" => 3, "custom_id" => "sel1", "options" => []}
+        ]
+      }
+
+      [disabled_row] = disable_all([row])
+      assert Enum.all?(disabled_row["components"], &(&1["disabled"] == true))
+    end
+
+    test "handles deeply nested components" do
+      components = [
+        action_row([
+          button("A", custom_id: "a"),
+          button("B", custom_id: "b")
+        ]),
+        action_row([
+          string_select("s1", [select_option("X", "x")])
+        ])
+      ]
+
+      result = disable_all(components)
+
+      Enum.each(result, fn row ->
+        Enum.each(row.components, fn c ->
+          assert c.disabled == true
+        end)
+      end)
+    end
+  end
 end

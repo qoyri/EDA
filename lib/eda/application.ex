@@ -45,6 +45,9 @@ defmodule EDA.Application do
       # Event collector for await patterns
       EDA.Collector,
 
+      # Auto-delete message scheduler
+      EDA.AutoDelete,
+
       # Task supervisor for event dispatch
       {Task.Supervisor, name: EDA.Gateway.TaskSupervisor},
 

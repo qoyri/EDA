@@ -597,6 +597,53 @@ defmodule EDA.Component do
     end
   end
 
+  # ── Bulk Operations ─────────────────────────────────────────────────
+
+  # Interactive component types: button (2), string_select (3),
+  # user_select (5), role_select (6), mentionable_select (7), channel_select (8)
+  @interactive_types [2, 3, 5, 6, 7, 8]
+
+  @doc """
+  Recursively disables all interactive components (buttons, select menus)
+  in a component tree.
+
+  Useful after a user interacts with a message — disable all buttons/selects
+  to prevent further clicks, then update the message.
+
+  Non-interactive components (text, thumbnails, separators, etc.) are left untouched.
+
+  ## Examples
+
+      disabled = EDA.Component.disable_all(message["components"])
+
+      EDA.Interaction.respond(interaction,
+        type: :update,
+        components: disabled
+      )
+  """
+  @spec disable_all([map()]) :: [map()]
+  def disable_all(components) when is_list(components) do
+    Enum.map(components, &disable_component/1)
+  end
+
+  defp disable_component(%{"type" => t} = c) when t in @interactive_types do
+    Map.put(c, "disabled", true)
+  end
+
+  defp disable_component(%{type: t} = c) when t in @interactive_types do
+    Map.put(c, :disabled, true)
+  end
+
+  defp disable_component(%{"components" => children} = c) do
+    Map.put(c, "components", disable_all(children))
+  end
+
+  defp disable_component(%{components: children} = c) do
+    %{c | components: disable_all(children)}
+  end
+
+  defp disable_component(c), do: c
+
   defp put_if(map, _key, nil), do: map
   defp put_if(map, _key, false), do: map
   defp put_if(map, key, value), do: Map.put(map, key, value)

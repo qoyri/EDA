@@ -84,6 +84,36 @@ defmodule EDA.Embed do
   @spec new() :: t()
   def new, do: %__MODULE__{}
 
+  @doc """
+  Creates a red error embed with the given text as description.
+
+  Returns a pipeable embed struct — add fields, footer, etc. as needed.
+
+  ## Examples
+
+      EDA.Embed.error("Something went wrong")
+      EDA.Embed.error("Not found") |> EDA.Embed.footer("Try again later")
+  """
+  @spec error(String.t()) :: t()
+  def error(text) when is_binary(text) do
+    new() |> color(:red) |> description(text)
+  end
+
+  @doc """
+  Creates a green success embed with the given text as description.
+
+  Returns a pipeable embed struct — add fields, footer, etc. as needed.
+
+  ## Examples
+
+      EDA.Embed.success("User banned successfully")
+      EDA.Embed.success("Done!") |> EDA.Embed.title("Operation Complete")
+  """
+  @spec success(String.t()) :: t()
+  def success(text) when is_binary(text) do
+    new() |> color(:green) |> description(text)
+  end
+
   # ── Setters ─────────────────────────────────────────────────────────
 
   @doc "Sets the embed title (max 256 characters)."

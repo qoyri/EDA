@@ -346,10 +346,19 @@ defmodule EDA.Interaction do
 
   def followup(interaction, opts) when is_list(opts) do
     app_id = interaction["application_id"] || app_id()
+    {delete_after, opts} = Keyword.pop(opts, :delete_after)
     {files, opts} = Keyword.pop(opts, :files, [])
     data = build_message_data(opts)
 
-    EDA.API.Interaction.create_followup(app_id, interaction["token"], data, files)
+    result = EDA.API.Interaction.create_followup(app_id, interaction["token"], data, files)
+
+    with {:ok, %{"id" => msg_id}} <- result,
+         true <- is_integer(delete_after) do
+      channel_id = interaction["channel_id"] || Map.get(interaction, :channel_id)
+      EDA.AutoDelete.schedule(to_string(channel_id), msg_id, delete_after)
+    end
+
+    result
   end
 
   @doc "Deletes the original interaction response."
@@ -358,6 +367,69 @@ defmodule EDA.Interaction do
     app_id = interaction["application_id"] || app_id()
 
     EDA.API.Interaction.delete_response(app_id, interaction["token"])
+  end
+
+  @doc """
+  Deletes the message that triggered a component interaction.
+
+  When a user clicks a button or select menu, the interaction contains
+  a reference to the source message. This helper deletes that message —
+  useful in multi-step workflows where the previous step is no longer relevant.
+
+  ## Examples
+
+      # User clicks "Confirm" button → delete the prompt, show result
+      EDA.Interaction.delete_source(interaction)
+      EDA.Interaction.respond(interaction, "Done!")
+  """
+  @spec delete_source(interaction()) :: :ok | {:error, term()}
+  def delete_source(interaction) do
+    channel_id = interaction["channel_id"] || Map.get(interaction, :channel_id)
+
+    message_id =
+      case interaction do
+        %{message: %{"id" => id}} -> id
+        %{"message" => %{"id" => id}} -> id
+        %{message: %{id: id}} -> id
+        _ -> nil
+      end
+
+    if channel_id && message_id do
+      EDA.API.Message.delete(channel_id, message_id)
+    else
+      {:error, :no_source_message}
+    end
+  end
+
+  @doc """
+  Defers the interaction, runs the given function, then edits the response.
+
+  Wraps the common `defer → do work → edit_response` pattern in a single call.
+  The function receives no arguments and should return a string or keyword list
+  suitable for `edit_response/2`.
+
+  ## Options
+
+    * `:ephemeral` — if `true`, the thinking indicator and response are ephemeral
+
+  ## Examples
+
+      EDA.Interaction.defer_and_edit(interaction, fn ->
+        result = do_heavy_work()
+        "Result: \#{result}"
+      end)
+
+      EDA.Interaction.defer_and_edit(interaction, fn ->
+        data = fetch_data()
+        [content: "Here's your data", embeds: [build_embed(data)]]
+      end, ephemeral: true)
+  """
+  @spec defer_and_edit(interaction(), (-> String.t() | keyword()), keyword()) ::
+          {:ok, map()} | {:error, term()}
+  def defer_and_edit(interaction, fun, opts \\ []) when is_function(fun, 0) do
+    with :ok <- defer(interaction, opts) do
+      edit_response(interaction, fun.())
+    end
   end
 
   @doc """
