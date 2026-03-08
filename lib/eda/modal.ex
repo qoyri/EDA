@@ -158,7 +158,17 @@ defmodule EDA.Modal do
       # => %{"subject" => "Bug report", "body" => "The bot crashed..."}
   """
   @spec get_values(map()) :: %{String.t() => String.t()}
+  def get_values(%{data: %{"components" => rows}}) when is_list(rows) do
+    extract_values(rows)
+  end
+
   def get_values(%{"data" => %{"components" => rows}}) when is_list(rows) do
+    extract_values(rows)
+  end
+
+  def get_values(_), do: %{}
+
+  defp extract_values(rows) do
     rows
     |> Enum.flat_map(fn
       %{"components" => components} when is_list(components) -> components
@@ -169,8 +179,6 @@ defmodule EDA.Modal do
       %{"custom_id" => id} -> {id, nil}
     end)
   end
-
-  def get_values(_), do: %{}
 
   @doc """
   Extracts a single value from a MODAL_SUBMIT interaction by custom_id.
