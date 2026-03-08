@@ -139,6 +139,10 @@ defmodule EDA.Embed do
     %{embed | color: value}
   end
 
+  def color(%__MODULE__{} = embed, :random) do
+    %{embed | color: EDA.Color.random()}
+  end
+
   def color(%__MODULE__{} = embed, name) when is_atom(name) do
     case Map.fetch(@colors, name) do
       {:ok, value} ->
