@@ -49,26 +49,43 @@ defmodule EDA.User do
     }
   end
 
-  @doc "Returns a mention string like `<@id>`."
-  @spec mention(t()) :: String.t()
+  @doc "Returns a mention string like `<@id>`. Accepts structs and raw maps."
+  @spec mention(t() | map()) :: String.t()
   def mention(%__MODULE__{id: id}), do: "<@#{id}>"
+  def mention(%{"id" => id}), do: "<@#{id}>"
 
-  @doc "Returns the CDN URL for the user's avatar."
-  @spec avatar_url(t()) :: String.t() | nil
+  @doc """
+  Returns the CDN URL for the user's avatar, or `nil` if none set.
+
+  Accepts both `%EDA.User{}` structs and raw maps (from cache).
+  """
+  @spec avatar_url(t() | map()) :: String.t() | nil
   def avatar_url(%__MODULE__{avatar: nil}), do: nil
 
   def avatar_url(%__MODULE__{id: id, avatar: avatar}),
     do: "#{@discord_cdn}/avatars/#{id}/#{avatar}.png"
 
-  @doc "Returns the display name (global_name if set, otherwise username)."
-  @spec display_name(t()) :: String.t() | nil
+  def avatar_url(%{"avatar" => nil}), do: nil
+
+  def avatar_url(%{"avatar" => a, "id" => id}) when is_binary(a),
+    do: "#{@discord_cdn}/avatars/#{id}/#{a}.png"
+
+  @doc """
+  Returns the display name (global_name if set, otherwise username).
+
+  Accepts both `%EDA.User{}` structs and raw maps (from cache).
+  """
+  @spec display_name(t() | map()) :: String.t() | nil
   def display_name(%__MODULE__{global_name: name}) when is_binary(name), do: name
   def display_name(%__MODULE__{username: name}), do: name
+  def display_name(%{"global_name" => name}) when is_binary(name), do: name
+  def display_name(%{"username" => name}), do: name
 
-  @doc "Returns `true` if the user is a bot."
-  @spec bot?(t()) :: boolean()
+  @doc "Returns `true` if the user is a bot. Accepts structs and raw maps."
+  @spec bot?(t() | map()) :: boolean()
   def bot?(%__MODULE__{bot: true}), do: true
-  def bot?(%__MODULE__{}), do: false
+  def bot?(%{"bot" => true}), do: true
+  def bot?(_), do: false
 
   # ── Entity Manager ──
 

@@ -1,4 +1,6 @@
 defmodule EDA.Interaction do
+  require Logger
+
   @moduledoc """
   Helpers for working with Discord interactions.
 
@@ -428,7 +430,13 @@ defmodule EDA.Interaction do
           {:ok, map()} | {:error, term()}
   def defer_and_edit(interaction, fun, opts \\ []) when is_function(fun, 0) do
     with :ok <- defer(interaction, opts) do
-      edit_response(interaction, fun.())
+      try do
+        edit_response(interaction, fun.())
+      rescue
+        e ->
+          Logger.error("defer_and_edit callback crashed: #{Exception.message(e)}")
+          edit_response(interaction, "An error occurred.")
+      end
     end
   end
 

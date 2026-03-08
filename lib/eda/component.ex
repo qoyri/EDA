@@ -621,7 +621,9 @@ defmodule EDA.Component do
         components: disabled
       )
   """
-  @spec disable_all([map()]) :: [map()]
+  @spec disable_all([map()] | nil) :: [map()]
+  def disable_all(nil), do: []
+
   def disable_all(components) when is_list(components) do
     Enum.map(components, &disable_component/1)
   end
