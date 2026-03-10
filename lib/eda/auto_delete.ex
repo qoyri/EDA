@@ -48,7 +48,28 @@ defmodule EDA.AutoDelete do
 
   def schedule(channel_id, message_id, delay_ms)
       when is_integer(delay_ms) and delay_ms >= 0 do
-    GenServer.cast(__MODULE__, {:schedule, channel_id, message_id, delay_ms})
+    GenServer.cast(__MODULE__, {:schedule_message, channel_id, message_id, delay_ms})
+  end
+
+  @doc """
+  Schedules an interaction response for deletion after `delay_ms` milliseconds.
+
+  Uses the interaction token to delete the original response — works for both
+  ephemeral and non-ephemeral responses. Unlike `schedule/3`, this doesn't need
+  a message ID since interaction responses are deleted via their token.
+
+  Does nothing if `delay_ms` is `nil`.
+
+  ## Examples
+
+      EDA.AutoDelete.schedule_interaction_response(app_id, token, 10_000)
+  """
+  @spec schedule_interaction_response(String.t(), String.t(), non_neg_integer() | nil) :: :ok
+  def schedule_interaction_response(_app_id, _token, nil), do: :ok
+
+  def schedule_interaction_response(app_id, token, delay_ms)
+      when is_integer(delay_ms) and delay_ms >= 0 do
+    GenServer.cast(__MODULE__, {:schedule_interaction, app_id, token, delay_ms})
   end
 
   # ── GenServer Callbacks ─────────────────────────────────────────────
@@ -57,13 +78,18 @@ defmodule EDA.AutoDelete do
   def init(:ok), do: {:ok, %{}}
 
   @impl true
-  def handle_cast({:schedule, channel_id, message_id, delay_ms}, state) do
-    Process.send_after(self(), {:delete, channel_id, message_id}, delay_ms)
+  def handle_cast({:schedule_message, channel_id, message_id, delay_ms}, state) do
+    Process.send_after(self(), {:delete_message, channel_id, message_id}, delay_ms)
+    {:noreply, state}
+  end
+
+  def handle_cast({:schedule_interaction, app_id, token, delay_ms}, state) do
+    Process.send_after(self(), {:delete_interaction, app_id, token}, delay_ms)
     {:noreply, state}
   end
 
   @impl true
-  def handle_info({:delete, channel_id, message_id}, state) do
+  def handle_info({:delete_message, channel_id, message_id}, state) do
     Task.Supervisor.start_child(EDA.Gateway.TaskSupervisor, fn ->
       case EDA.API.Message.delete(channel_id, message_id) do
         :ok ->
@@ -73,6 +99,20 @@ defmodule EDA.AutoDelete do
           Logger.debug(
             "AutoDelete: failed to delete #{message_id} in #{channel_id}: #{inspect(reason)}"
           )
+      end
+    end)
+
+    {:noreply, state}
+  end
+
+  def handle_info({:delete_interaction, app_id, token}, state) do
+    Task.Supervisor.start_child(EDA.Gateway.TaskSupervisor, fn ->
+      case EDA.API.Interaction.delete_response(app_id, token) do
+        :ok ->
+          :ok
+
+        {:error, reason} ->
+          Logger.debug("AutoDelete: failed to delete interaction response: #{inspect(reason)}")
       end
     end)
 

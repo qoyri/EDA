@@ -277,16 +277,26 @@ defmodule EDA.Interaction do
   end
 
   def respond(interaction, opts) when is_list(opts) do
+    {delete_after, opts} = Keyword.pop(opts, :delete_after)
     {files, opts} = Keyword.pop(opts, :files, [])
     data = build_message_data(opts)
     payload = %{type: 4, data: data}
 
-    EDA.API.Interaction.respond(
-      interaction["id"],
-      interaction["token"],
-      payload,
-      files
-    )
+    result =
+      EDA.API.Interaction.respond(
+        interaction["id"],
+        interaction["token"],
+        payload,
+        files
+      )
+
+    if result == :ok and is_integer(delete_after) do
+      app_id = interaction["application_id"] || app_id()
+      token = interaction["token"]
+      EDA.AutoDelete.schedule_interaction_response(app_id, token, delete_after)
+    end
+
+    result
   end
 
   @doc """
@@ -374,30 +384,36 @@ defmodule EDA.Interaction do
   @doc """
   Deletes the message that triggered a component interaction.
 
-  When a user clicks a button or select menu, the interaction contains
-  a reference to the source message. This helper deletes that message —
-  useful in multi-step workflows where the previous step is no longer relevant.
+  Works for both ephemeral and non-ephemeral messages. Uses Discord's
+  type 6 (DEFERRED_UPDATE_MESSAGE) to claim ownership of the source message,
+  then deletes it via `delete_response`.
+
+  **Important:** After calling `delete_source/1`, the interaction is already
+  acknowledged. Use `followup/2` instead of `respond/2` for any reply:
+
+      # Correct pattern:
+      delete_source(interaction)
+      followup(interaction, content: "Done!", ephemeral: true)
+
+      # WRONG — will fail because interaction is already acknowledged:
+      delete_source(interaction)
+      respond(interaction, "Done!")
 
   ## Examples
 
-      # User clicks "Confirm" button → delete the prompt, show result
+      # User clicks "Confirm" button → delete the prompt, show next step
       EDA.Interaction.delete_source(interaction)
-      EDA.Interaction.respond(interaction, "Done!")
+      EDA.Interaction.followup(interaction, content: "Next step...", components: [select_menu])
   """
   @spec delete_source(interaction()) :: :ok | {:error, term()}
   def delete_source(interaction) do
-    channel_id = interaction["channel_id"] || Map.get(interaction, :channel_id)
+    id = interaction["id"] || Map.get(interaction, :id)
+    token = interaction["token"] || Map.get(interaction, :token)
 
-    message_id =
-      case interaction do
-        %{message: %{"id" => id}} -> id
-        %{"message" => %{"id" => id}} -> id
-        %{message: %{id: id}} -> id
-        _ -> nil
+    if id && token do
+      with :ok <- EDA.API.Interaction.respond(id, token, %{type: 6}) do
+        delete_response(interaction)
       end
-
-    if channel_id && message_id do
-      EDA.API.Message.delete(channel_id, message_id)
     else
       {:error, :no_source_message}
     end
