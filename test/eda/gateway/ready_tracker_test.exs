@@ -18,6 +18,9 @@ defmodule EDA.Gateway.ReadyTrackerTest do
     # Reset the existing tracker's internal state and clear ETS
     :ets.delete_all_objects(:eda_pending_guilds)
 
+    # Synchronous state reset — flush any pending GenServer messages first
+    _ = :sys.get_state(ReadyTracker)
+
     :sys.replace_state(ReadyTracker, fn _old ->
       %EDA.Gateway.ReadyTracker{
         pending_counts: %{},
@@ -32,6 +35,9 @@ defmodule EDA.Gateway.ReadyTrackerTest do
         start_time: System.monotonic_time(:millisecond)
       }
     end)
+
+    # Ensure persistent_term reflects the reset
+    :persistent_term.put(:eda_globally_ready, false)
 
     on_exit(fn ->
       Application.delete_env(:eda, :consumer)
@@ -56,7 +62,7 @@ defmodule EDA.Gateway.ReadyTrackerTest do
       :persistent_term.put(:eda_total_shards, 1)
 
       ReadyTracker.shard_ready(0, ["g1", "g2"])
-      Process.sleep(20)
+      Process.sleep(50)
 
       refute ReadyTracker.ready?()
       assert ReadyTracker.loading?("g1")
