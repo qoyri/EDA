@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-04-04
+
+### Installation
+
+```elixir
+def deps do
+  [
+    {:eda, "~> 0.2.0"}
+  ]
+end
+```
+
+### Added
+
+- **EDA.Collector** — Discord.js-style `await` patterns for messages, reactions, components with filters, timeouts, and max count ([#4](https://github.com/qoyri/EDA/pull/4))
+- **EDA.AutoDelete** — Timer-based auto-deletion using BEAM timer wheel. `delete_after:` option on `Message.create`, `Interaction.respond`, `Interaction.followup`
+- **EDA.Color** — 30 named colors with individual functions, crypto-random generation (`Color.random()`), hex parsing, `:random` support in `Embed.color/2`
+- **EDA.Mention** — User, channel, role, emoji, and timestamp formatting helpers
+- **EDA.OAuth2** — Bot invite URL generator with permission atoms and scopes
+- **EDA.API.SKU** / **Entitlement** / **Subscription** — Monetization API endpoints (beta)
+- **Webhook** — `get_message/3`, `edit_message/4`, `delete_message/3`, `wait: true` option on `execute/3`
+- **Thread** — `remove_member/2`, `get_member/2`, `list_members/1`
+- **Message** — `forward/3` (message forwarding), `reply/2` (auto message_reference)
+- **Command/Option** — `localize/3` for multi-language name/description translations
+- **Component** — `disable_all/1` to recursively disable all buttons/selects
+- **Embed** — `error/1` and `success/1` pre-styled presets
+- **Interaction** — `selected_values/1`, `component_type/1`, `delete_source/1`, `defer_and_edit/3`
+- **Member** — `move_voice/3` helper
+- **Guild** — `icon_url/1` CDN helper
+- **EDA.latency/1** — Gateway heartbeat latency shortcut
+- **EDA.await_message/2**, **await_reaction/2**, **await_component/2** — Convenience wrappers
+
+### Fixed
+
+- **Ban.create** — `reason:` now sent as `X-Audit-Log-Reason` header instead of JSON body
+- **Modal.get_values** — handles atom keys from parsed interaction structs
+- **Component.section** — raises if `:accessory` is missing (Discord requires it)
+- **parse_error** — includes Discord's `errors` field for validation details (50035)
+- **Cache.me()** — returns `%EDA.User{}` struct instead of raw map
+- **File.from_binary** — accepts byte lists for NIF `Vec<u8>` compatibility
+- **User helpers** — `mention/1`, `avatar_url/1`, `display_name/1`, `bot?/1` accept raw maps from cache
+- **ReadyTracker test** — stabilized flaky test with synchronous state reset
+- **Interaction.respond** — `delete_after:` schedules deletion via interaction token
+- **Interaction.delete_source** — works on ephemeral messages (uses type 6 DEFERRED_UPDATE_MESSAGE)
+
 ## [0.1.3] - 2026-03-07
 
 ### Installation

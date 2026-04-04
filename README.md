@@ -5,18 +5,19 @@
 [![Hex Docs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/eda)
 [![License: MIT](https://img.shields.io/hexpm/l/eda.svg)](https://opensource.org/licenses/MIT)
 
-A complete, production-grade Discord library for Elixir. 21 API modules, 68+ event types, full voice with E2EE, automatic sharding, and 1200+ tests.
+A complete, production-grade Discord library for Elixir. 24 API modules, 68+ event types, full voice with DAVE E2EE, automatic sharding, and 1300+ tests.
 
 ## Why EDA?
 
-- **Full Discord API coverage** — 21 resource-based REST modules: messages, guilds, channels, members, roles, commands, interactions, webhooks, threads, stages, polls, stickers, emojis, scheduled events, auto-moderation, and more
+- **Full Discord API coverage** — 24 resource-based REST modules: messages, guilds, channels, members, roles, commands, interactions, webhooks, threads, stages, polls, stickers, emojis, scheduled events, auto-moderation, monetization (SKU/entitlements/subscriptions), and more
 - **Typed event structs** — 68+ gateway events across 7 categories (Guild, Message, Channel, Voice, Thread, Stage, Invite) with pattern matching, not raw maps
-- **Voice with encryption** — Opus audio send/receive, OGG playback, AES-256-GCM and XChaCha20-Poly1305 encryption, plus experimental DAVE (Discord E2EE) via Rust NIF
+- **Voice with DAVE E2EE** — Opus audio send/receive, OGG playback, AES-256-GCM and XChaCha20-Poly1305 transport encryption, plus mandatory DAVE (Discord E2EE) via Rust NIF with DirtyCpu scheduling
 - **Smart sharding** — Auto shard count from `/gateway/bot`, staggered startup respecting `max_concurrency`, per-shard ready tracking, exponential backoff with jitter
 - **Configurable cache** — ETS-backed O(1) lookups for 7 entity types (guilds, channels, users, members, roles, presences, voice states) with admission policies and LRW eviction
 - **ETF + zlib** — Binary ETF encoding and zlib-stream compression for lower bandwidth and faster deserialization
-- **23 entity structs** — First-class structs with `Access` behaviour for all Discord objects
-- **Telemetry built-in** — Instrument gateway, HTTP, and cache operations out of the box
+- **DX helpers** — Event collectors (`await_message`, `await_component`), auto-delete messages, `Embed.error/success`, `Component.disable_all`, `Interaction.delete_source/defer_and_edit`, `Mention` formatting, `Color.random()`, and more
+- **25 entity structs** — First-class structs with `Access` behaviour for all Discord objects
+- **Telemetry built-in** — Instrument gateway, HTTP, cache, and DAVE operations out of the box
 - **OTP-native** — Supervised GenServers, DynamicSupervisors, and proper fault tolerance
 
 ## Installation
@@ -24,7 +25,7 @@ A complete, production-grade Discord library for Elixir. 21 API modules, 68+ eve
 ```elixir
 def deps do
   [
-    {:eda, "~> 0.1.3"}
+    {:eda, "~> 0.2.0"}
   ]
 end
 ```
@@ -88,6 +89,41 @@ EDA.API.Command.create_global(app_id, %{name: "ping", description: "Pong!"})
 # Reactions, threads, webhooks...
 EDA.API.Reaction.create(channel_id, message_id, "🔥")
 EDA.API.Thread.create(channel_id, %{name: "Discussion", auto_archive_duration: 1440})
+```
+
+## DX Helpers
+
+```elixir
+# Collectors — await events with filters
+{:ok, reply} = EDA.await_message(fn msg ->
+  msg.channel_id == channel_id and msg.author["id"] == user_id
+end, timeout: 30_000)
+
+# Auto-delete messages after a delay
+EDA.API.Message.create(channel_id, content: "Temporary!", delete_after: 10_000)
+
+# Pre-styled embeds
+EDA.Embed.error("Something went wrong")
+EDA.Embed.success("User banned successfully")
+
+# Interaction workflows
+EDA.Interaction.delete_source(interaction)  # Delete the button message
+EDA.Interaction.defer_and_edit(interaction, fn -> do_work(); "Done!" end)
+EDA.Interaction.respond(interaction, content: "Bye!", delete_after: 5_000)
+
+# Disable all buttons after interaction
+disabled = EDA.Component.disable_all(message["components"])
+
+# Reply to a message
+EDA.API.Message.reply(msg, "Got it!")
+
+# Mentions & formatting
+EDA.Mention.user("123")                #=> "<@123>"
+EDA.Mention.timestamp(unix, :R)        #=> "<t:1700000000:R>"
+
+# Colors
+EDA.Color.random()                     #=> 0xA3F29C (crypto-random)
+EDA.Embed.new() |> EDA.Embed.color(:random)
 ```
 
 ## Cache
@@ -156,10 +192,14 @@ EDA.Application
 │   ├── EDA.Cache.VoiceState (ETS)
 │   └── EDA.Cache.Evictor
 ├── EDA.HTTP.RateLimiter
+├── EDA.Voice.Supervisor
+├── EDA.Collector              (event await patterns)
+├── EDA.AutoDelete             (timer-based message cleanup)
+├── Task.Supervisor            (async event dispatch)
+├── EDA.Gateway.MemberChunker
+├── EDA.Gateway.ReadyTracker
 └── EDA.Gateway.ShardSupervisor
     ├── EDA.Gateway.ShardManager
-    ├── EDA.Gateway.ReadyTracker
-    ├── EDA.Gateway.MemberChunker
     └── EDA.Gateway.Connection (per shard)
 ```
 
