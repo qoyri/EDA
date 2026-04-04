@@ -99,15 +99,27 @@ defmodule EDA.ComponentTest do
   # ── Section ────────────────────────────────────────────────────────
 
   describe "section/2" do
-    test "creates a section with single text" do
-      s = section(text_display("Hello"))
+    test "creates a section with single text and accessory" do
+      s = section(text_display("Hello"), accessory: thumbnail("https://example.com/img.png"))
       assert s.type == 9
       assert length(s.components) == 1
+      assert s.accessory.type == 11
     end
 
-    test "creates a section with multiple texts" do
-      s = section([text_display("A"), text_display("B"), text_display("C")])
+    test "creates a section with multiple texts and accessory" do
+      s =
+        section([text_display("A"), text_display("B"), text_display("C")],
+          accessory: button("Click", custom_id: "btn")
+        )
+
       assert length(s.components) == 3
+      assert s.accessory.type == 2
+    end
+
+    test "raises when accessory is missing" do
+      assert_raise ArgumentError, ~r/section requires an :accessory/, fn ->
+        section(text_display("Hello"))
+      end
     end
 
     test "accepts thumbnail accessory" do
@@ -561,6 +573,76 @@ defmodule EDA.ComponentTest do
       decoded = Jason.decode!(json)
       assert decoded["type"] == 17
       assert length(decoded["components"]) == 2
+    end
+  end
+
+  # ── disable_all ──────────────────────────────────────────────────────
+
+  describe "disable_all/1" do
+    test "disables buttons in action row" do
+      row =
+        action_row([
+          button("A", custom_id: "a"),
+          button("B", custom_id: "b")
+        ])
+
+      [disabled_row] = disable_all([row])
+      assert Enum.all?(disabled_row.components, &(&1.disabled == true))
+    end
+
+    test "disables select menus" do
+      row =
+        action_row([
+          string_select("select1", [
+            select_option("Option 1", "1"),
+            select_option("Option 2", "2")
+          ])
+        ])
+
+      [disabled_row] = disable_all([row])
+      [select] = disabled_row.components
+      assert select.disabled == true
+    end
+
+    test "preserves non-interactive components" do
+      text = text_display("Hello")
+      sep = separator()
+
+      result = disable_all([text, sep])
+      assert result == [text, sep]
+    end
+
+    test "handles string-keyed components from Discord API" do
+      row = %{
+        "type" => 1,
+        "components" => [
+          %{"type" => 2, "label" => "Click", "custom_id" => "btn1"},
+          %{"type" => 3, "custom_id" => "sel1", "options" => []}
+        ]
+      }
+
+      [disabled_row] = disable_all([row])
+      assert Enum.all?(disabled_row["components"], &(&1["disabled"] == true))
+    end
+
+    test "handles deeply nested components" do
+      components = [
+        action_row([
+          button("A", custom_id: "a"),
+          button("B", custom_id: "b")
+        ]),
+        action_row([
+          string_select("s1", [select_option("X", "x")])
+        ])
+      ]
+
+      result = disable_all(components)
+
+      Enum.each(result, fn row ->
+        Enum.each(row.components, fn c ->
+          assert c.disabled == true
+        end)
+      end)
     end
   end
 end

@@ -172,4 +172,48 @@ defmodule EDA.API.ThreadTest do
                )
     end
   end
+
+  # ── remove_thread_member ─────────────────────────────────────────────
+
+  describe "remove_member/2" do
+    test "DELETE /channels/:id/thread-members/:user_id", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "DELETE", "/channels/111/thread-members/222", fn conn ->
+        Plug.Conn.resp(conn, 204, "")
+      end)
+
+      assert :ok = Thread.remove_member("111", "222")
+    end
+  end
+
+  # ── get_thread_member ────────────────────────────────────────────────
+
+  describe "get_member/2" do
+    test "GET /channels/:id/thread-members/:user_id", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "GET", "/channels/111/thread-members/222", fn conn ->
+        json(conn, %{
+          "id" => "222",
+          "user_id" => "222",
+          "join_timestamp" => "2026-01-01T00:00:00Z"
+        })
+      end)
+
+      assert {:ok, %{"user_id" => "222"}} = Thread.get_member("111", "222")
+    end
+  end
+
+  # ── list_thread_members ──────────────────────────────────────────────
+
+  describe "list_members/1" do
+    test "GET /channels/:id/thread-members", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "GET", "/channels/111/thread-members", fn conn ->
+        json(conn, [
+          %{"user_id" => "222", "join_timestamp" => "2026-01-01T00:00:00Z"},
+          %{"user_id" => "333", "join_timestamp" => "2026-01-02T00:00:00Z"}
+        ])
+      end)
+
+      assert {:ok, members} = Thread.list_members("111")
+      assert length(members) == 2
+    end
+  end
 end

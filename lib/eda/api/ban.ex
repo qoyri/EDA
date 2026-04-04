@@ -20,16 +20,25 @@ defmodule EDA.API.Ban do
     EDA.HTTP.Client.get("/guilds/#{guild_id}/bans/#{user_id}")
   end
 
-  @doc "Bans a user from a guild."
+  @doc """
+  Bans a user from a guild.
+
+  ## Options
+
+    * `:delete_message_seconds` — seconds of message history to delete (0-604800)
+    * `:reason` — audit log reason (sent as `X-Audit-Log-Reason` header)
+  """
   @spec create(String.t() | integer(), String.t() | integer(), keyword()) ::
           :ok | {:error, term()}
   def create(guild_id, user_id, opts \\ []) do
+    {reason, opts} = Keyword.pop(opts, :reason)
+
     body =
       opts
       |> Enum.reject(fn {_, v} -> is_nil(v) end)
       |> Map.new()
 
-    case put("/guilds/#{guild_id}/bans/#{user_id}", body, priority: :urgent) do
+    case put("/guilds/#{guild_id}/bans/#{user_id}", body, priority: :urgent, reason: reason) do
       {:ok, _} -> :ok
       error -> error
     end

@@ -17,7 +17,10 @@ defmodule EDA.Cache.Guild do
   end
 
   @doc """
-  Gets a guild from the cache.
+  Gets a guild from the cache as a raw map (string keys).
+
+  This is the low-level cache accessor. For a typed `%EDA.Guild{}` struct,
+  use `EDA.Guild.fetch/1` instead which parses the raw map automatically.
   """
   @spec get(String.t() | integer()) :: map() | nil
   def get(guild_id) do

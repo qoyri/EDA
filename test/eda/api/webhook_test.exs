@@ -119,4 +119,55 @@ defmodule EDA.API.WebhookTest do
       assert {:ok, _} = Webhook.execute("555", "tok-123", %{content: "webhook msg"})
     end
   end
+
+  # ── get_message ──────────────────────────────────────────────────────
+
+  describe "get_message/3" do
+    test "GET /webhooks/:id/:token/messages/:msg_id", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "GET", "/webhooks/555/tok-123/messages/999", fn conn ->
+        json(conn, %{"id" => "999", "content" => "hello"})
+      end)
+
+      assert {:ok, %{"id" => "999", "content" => "hello"}} =
+               Webhook.get_message("555", "tok-123", "999")
+    end
+  end
+
+  # ── edit_message ─────────────────────────────────────────────────────
+
+  describe "edit_message/4" do
+    test "PATCH /webhooks/:id/:token/messages/:msg_id with map", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "PATCH", "/webhooks/555/tok-123/messages/999", fn conn ->
+        {body, conn} = read_json_body(conn)
+        assert body["content"] == "edited"
+        json(conn, %{"id" => "999", "content" => "edited"})
+      end)
+
+      assert {:ok, %{"content" => "edited"}} =
+               Webhook.edit_message("555", "tok-123", "999", %{content: "edited"})
+    end
+
+    test "PATCH /webhooks/:id/:token/messages/:msg_id with keyword", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "PATCH", "/webhooks/555/tok-123/messages/999", fn conn ->
+        {body, conn} = read_json_body(conn)
+        assert body["content"] == "keyword edit"
+        json(conn, %{"id" => "999", "content" => "keyword edit"})
+      end)
+
+      assert {:ok, %{"content" => "keyword edit"}} =
+               Webhook.edit_message("555", "tok-123", "999", content: "keyword edit")
+    end
+  end
+
+  # ── delete_message ───────────────────────────────────────────────────
+
+  describe "delete_message/3" do
+    test "DELETE /webhooks/:id/:token/messages/:msg_id", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "DELETE", "/webhooks/555/tok-123/messages/999", fn conn ->
+        Plug.Conn.resp(conn, 204, "")
+      end)
+
+      assert :ok = Webhook.delete_message("555", "tok-123", "999")
+    end
+  end
 end

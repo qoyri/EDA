@@ -42,7 +42,9 @@ defmodule EDA.Command.Option do
     max_value: nil,
     min_length: nil,
     max_length: nil,
-    autocomplete: nil
+    autocomplete: nil,
+    name_localizations: nil,
+    description_localizations: nil
   ]
 
   @type t :: %__MODULE__{
@@ -196,6 +198,36 @@ defmodule EDA.Command.Option do
     build(11, name, description, opts, [:required])
   end
 
+  @doc """
+  Adds localized name and/or description for a given locale.
+
+  ## Examples
+
+      string("query", "Search query")
+      |> localize("fr", name: "requête", description: "Requête de recherche")
+  """
+  @spec localize(t(), String.t(), keyword()) :: t()
+  def localize(%__MODULE__{} = opt, locale, opts) when is_binary(locale) do
+    opt =
+      case Keyword.get(opts, :name) do
+        nil ->
+          opt
+
+        name ->
+          names = Map.put(opt.name_localizations || %{}, locale, name)
+          %{opt | name_localizations: names}
+      end
+
+    case Keyword.get(opts, :description) do
+      nil ->
+        opt
+
+      desc ->
+        descs = Map.put(opt.description_localizations || %{}, locale, desc)
+        %{opt | description_localizations: descs}
+    end
+  end
+
   # ── Serialization ───────────────────────────────────────────────────
 
   @doc "Converts the option struct to a plain map for the Discord API."
@@ -213,6 +245,8 @@ defmodule EDA.Command.Option do
     |> put_if(:min_length, opt.min_length)
     |> put_if(:max_length, opt.max_length)
     |> put_if(:autocomplete, opt.autocomplete)
+    |> put_if(:name_localizations, opt.name_localizations)
+    |> put_if(:description_localizations, opt.description_localizations)
   end
 
   # ── Private ─────────────────────────────────────────────────────────

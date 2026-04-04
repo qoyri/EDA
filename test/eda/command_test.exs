@@ -246,4 +246,69 @@ defmodule EDA.CommandTest do
       assert [%{"type" => 3, "name" => "q", "required" => true}] = json["options"]
     end
   end
+
+  # ── Localization ───────────────────────────────────────────────────
+
+  describe "localize/3" do
+    test "adds name and description localizations to command" do
+      cmd =
+        slash("ping", "Pings the bot")
+        |> EDA.Command.localize("fr", name: "ping", description: "Ping le bot")
+        |> EDA.Command.localize("de", description: "Pingt den Bot")
+
+      map = EDA.Command.to_map(cmd)
+
+      assert map.name_localizations == %{"fr" => "ping"}
+      assert map.description_localizations == %{"fr" => "Ping le bot", "de" => "Pingt den Bot"}
+    end
+
+    test "omits localizations from to_map when not set" do
+      map = slash("ping", "Pong") |> EDA.Command.to_map()
+
+      refute Map.has_key?(map, :name_localizations)
+      refute Map.has_key?(map, :description_localizations)
+    end
+
+    test "localizes option name and description" do
+      opt =
+        string("query", "Search query")
+        |> EDA.Command.Option.localize("fr", name: "requête", description: "Requête de recherche")
+        |> EDA.Command.Option.localize("ja", description: "検索クエリ")
+
+      map = EDA.Command.Option.to_map(opt)
+
+      assert map.name_localizations == %{"fr" => "requête"}
+
+      assert map.description_localizations == %{
+               "fr" => "Requête de recherche",
+               "ja" => "検索クエリ"
+             }
+    end
+
+    test "option without localizations omits fields" do
+      map = string("q", "Query") |> EDA.Command.Option.to_map()
+
+      refute Map.has_key?(map, :name_localizations)
+      refute Map.has_key?(map, :description_localizations)
+    end
+
+    test "localizations survive JSON roundtrip" do
+      json =
+        slash("greet", "Greet someone")
+        |> EDA.Command.localize("es-ES", name: "saludar", description: "Saluda a alguien")
+        |> option(
+          string("message", "The greeting")
+          |> EDA.Command.Option.localize("es-ES", name: "mensaje", description: "El saludo")
+        )
+        |> Jason.encode!()
+        |> Jason.decode!()
+
+      assert json["name_localizations"] == %{"es-ES" => "saludar"}
+      assert json["description_localizations"] == %{"es-ES" => "Saluda a alguien"}
+
+      [opt] = json["options"]
+      assert opt["name_localizations"] == %{"es-ES" => "mensaje"}
+      assert opt["description_localizations"] == %{"es-ES" => "El saludo"}
+    end
+  end
 end

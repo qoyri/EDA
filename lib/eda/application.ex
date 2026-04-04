@@ -42,6 +42,12 @@ defmodule EDA.Application do
       # Voice supervisor - manages voice connections
       EDA.Voice.Supervisor,
 
+      # Event collector for await patterns
+      EDA.Collector,
+
+      # Auto-delete message scheduler
+      EDA.AutoDelete,
+
       # Task supervisor for event dispatch
       {Task.Supervisor, name: EDA.Gateway.TaskSupervisor},
 

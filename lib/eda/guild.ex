@@ -144,4 +144,18 @@ defmodule EDA.Guild do
       {:error, _} = err -> err
     end
   end
+
+  @discord_cdn "https://cdn.discordapp.com"
+
+  @doc """
+  Returns the CDN URL for the guild's icon, or `nil` if the guild has no icon.
+
+  ## Examples
+
+      EDA.Guild.icon_url(guild)
+      #=> "https://cdn.discordapp.com/icons/123/abc.png"
+  """
+  @spec icon_url(t()) :: String.t() | nil
+  def icon_url(%__MODULE__{icon: nil}), do: nil
+  def icon_url(%__MODULE__{id: id, icon: icon}), do: "#{@discord_cdn}/icons/#{id}/#{icon}.png"
 end

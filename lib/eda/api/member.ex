@@ -111,4 +111,23 @@ defmodule EDA.API.Member do
       error -> error
     end
   end
+
+  @doc """
+  Moves a member to a different voice channel.
+
+  Pass `nil` as `channel_id` to disconnect the user from voice.
+
+  ## Examples
+
+      EDA.API.Member.move_voice(guild_id, user_id, new_channel_id)
+      EDA.API.Member.move_voice(guild_id, user_id, nil)  # disconnect
+  """
+  @spec move_voice(
+          String.t() | integer(),
+          String.t() | integer(),
+          String.t() | integer() | nil
+        ) :: {:ok, map()} | {:error, term()}
+  def move_voice(guild_id, user_id, channel_id) do
+    modify(guild_id, user_id, %{channel_id: channel_id})
+  end
 end

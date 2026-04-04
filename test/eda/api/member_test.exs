@@ -157,4 +157,28 @@ defmodule EDA.API.MemberTest do
       assert Member.stream("111") |> Enum.to_list() == []
     end
   end
+
+  # ── move_voice ───────────────────────────────────────────────────────
+
+  describe "move_voice/3" do
+    test "PATCH /guilds/:id/members/:id with channel_id", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "PATCH", "/guilds/111/members/222", fn conn ->
+        {body, conn} = read_json_body(conn)
+        assert body["channel_id"] == "333"
+        json(conn, %{"user" => %{"id" => "222"}})
+      end)
+
+      assert {:ok, _} = Member.move_voice("111", "222", "333")
+    end
+
+    test "PATCH with nil disconnects from voice", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "PATCH", "/guilds/111/members/222", fn conn ->
+        {body, conn} = read_json_body(conn)
+        assert body["channel_id"] == nil
+        json(conn, %{"user" => %{"id" => "222"}})
+      end)
+
+      assert {:ok, _} = Member.move_voice("111", "222", nil)
+    end
+  end
 end

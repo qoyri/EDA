@@ -448,4 +448,34 @@ defmodule EDA.EmbedTest do
       assert {:ok, ^embed} = validate(embed)
     end
   end
+
+  # ── Presets ────────────────────────────────────────────────────────
+
+  describe "error/1" do
+    test "creates red embed with description" do
+      embed = error("Something went wrong")
+      assert embed.color == 0xED4245
+      assert embed.description == "Something went wrong"
+    end
+
+    test "is pipeable" do
+      embed = error("Oops") |> title("Error")
+      assert embed.title == "Error"
+      assert embed.description == "Oops"
+    end
+  end
+
+  describe "success/1" do
+    test "creates green embed with description" do
+      embed = success("User banned")
+      assert embed.color == 0x57F287
+      assert embed.description == "User banned"
+    end
+
+    test "is pipeable" do
+      embed = success("Done") |> footer("All clear")
+      assert embed.footer.text == "All clear"
+      assert embed.description == "Done"
+    end
+  end
 end

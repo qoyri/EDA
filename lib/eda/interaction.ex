@@ -1,4 +1,6 @@
 defmodule EDA.Interaction do
+  require Logger
+
   @moduledoc """
   Helpers for working with Discord interactions.
 
@@ -222,6 +224,42 @@ defmodule EDA.Interaction do
   def custom_id(%{"data" => %{"custom_id" => id}}), do: id
   def custom_id(_), do: nil
 
+  @doc """
+  Returns the selected values from a select menu interaction.
+
+  Returns an empty list if the interaction is not a select menu.
+
+  ## Examples
+
+      values = EDA.Interaction.selected_values(interaction)
+      # => ["option_1", "option_2"]
+  """
+  @spec selected_values(interaction()) :: [String.t()]
+  def selected_values(%{data: %{"values" => values}}) when is_list(values), do: values
+  def selected_values(%{"data" => %{"values" => values}}) when is_list(values), do: values
+  def selected_values(_), do: []
+
+  @doc """
+  Returns the component type for a message component interaction.
+
+  Returns `nil` if not a component interaction.
+
+  Common types: `2` = button, `3` = string select, `5` = user select,
+  `6` = role select, `7` = mentionable select, `8` = channel select.
+
+  ## Examples
+
+      case EDA.Interaction.component_type(interaction) do
+        2 -> handle_button(interaction)
+        3 -> handle_select(interaction)
+        _ -> :ignore
+      end
+  """
+  @spec component_type(interaction()) :: non_neg_integer() | nil
+  def component_type(%{data: %{"component_type" => t}}), do: t
+  def component_type(%{"data" => %{"component_type" => t}}), do: t
+  def component_type(_), do: nil
+
   # ── Response Helpers ────────────────────────────────────────────────
 
   @doc """
@@ -239,16 +277,26 @@ defmodule EDA.Interaction do
   end
 
   def respond(interaction, opts) when is_list(opts) do
+    {delete_after, opts} = Keyword.pop(opts, :delete_after)
     {files, opts} = Keyword.pop(opts, :files, [])
     data = build_message_data(opts)
     payload = %{type: 4, data: data}
 
-    EDA.API.Interaction.respond(
-      interaction["id"],
-      interaction["token"],
-      payload,
-      files
-    )
+    result =
+      EDA.API.Interaction.respond(
+        interaction["id"],
+        interaction["token"],
+        payload,
+        files
+      )
+
+    if result == :ok and is_integer(delete_after) do
+      app_id = interaction["application_id"] || app_id()
+      token = interaction["token"]
+      EDA.AutoDelete.schedule_interaction_response(app_id, token, delete_after)
+    end
+
+    result
   end
 
   @doc """
@@ -310,10 +358,19 @@ defmodule EDA.Interaction do
 
   def followup(interaction, opts) when is_list(opts) do
     app_id = interaction["application_id"] || app_id()
+    {delete_after, opts} = Keyword.pop(opts, :delete_after)
     {files, opts} = Keyword.pop(opts, :files, [])
     data = build_message_data(opts)
 
-    EDA.API.Interaction.create_followup(app_id, interaction["token"], data, files)
+    result = EDA.API.Interaction.create_followup(app_id, interaction["token"], data, files)
+
+    with {:ok, %{"id" => msg_id}} <- result,
+         true <- is_integer(delete_after) do
+      channel_id = interaction["channel_id"] || Map.get(interaction, :channel_id)
+      EDA.AutoDelete.schedule(to_string(channel_id), msg_id, delete_after)
+    end
+
+    result
   end
 
   @doc "Deletes the original interaction response."
@@ -322,6 +379,81 @@ defmodule EDA.Interaction do
     app_id = interaction["application_id"] || app_id()
 
     EDA.API.Interaction.delete_response(app_id, interaction["token"])
+  end
+
+  @doc """
+  Deletes the message that triggered a component interaction.
+
+  Works for both ephemeral and non-ephemeral messages. Uses Discord's
+  type 6 (DEFERRED_UPDATE_MESSAGE) to claim ownership of the source message,
+  then deletes it via `delete_response`.
+
+  **Important:** After calling `delete_source/1`, the interaction is already
+  acknowledged. Use `followup/2` instead of `respond/2` for any reply:
+
+      # Correct pattern:
+      delete_source(interaction)
+      followup(interaction, content: "Done!", ephemeral: true)
+
+      # WRONG — will fail because interaction is already acknowledged:
+      delete_source(interaction)
+      respond(interaction, "Done!")
+
+  ## Examples
+
+      # User clicks "Confirm" button → delete the prompt, show next step
+      EDA.Interaction.delete_source(interaction)
+      EDA.Interaction.followup(interaction, content: "Next step...", components: [select_menu])
+  """
+  @spec delete_source(interaction()) :: :ok | {:error, term()}
+  def delete_source(interaction) do
+    id = interaction["id"] || Map.get(interaction, :id)
+    token = interaction["token"] || Map.get(interaction, :token)
+
+    if id && token do
+      with :ok <- EDA.API.Interaction.respond(id, token, %{type: 6}) do
+        delete_response(interaction)
+      end
+    else
+      {:error, :no_source_message}
+    end
+  end
+
+  @doc """
+  Defers the interaction, runs the given function, then edits the response.
+
+  Wraps the common `defer → do work → edit_response` pattern in a single call.
+  The function receives no arguments and should return a string or keyword list
+  suitable for `edit_response/2`.
+
+  ## Options
+
+    * `:ephemeral` — if `true`, the thinking indicator and response are ephemeral
+
+  ## Examples
+
+      EDA.Interaction.defer_and_edit(interaction, fn ->
+        result = do_heavy_work()
+        "Result: \#{result}"
+      end)
+
+      EDA.Interaction.defer_and_edit(interaction, fn ->
+        data = fetch_data()
+        [content: "Here's your data", embeds: [build_embed(data)]]
+      end, ephemeral: true)
+  """
+  @spec defer_and_edit(interaction(), (-> String.t() | keyword()), keyword()) ::
+          {:ok, map()} | {:error, term()}
+  def defer_and_edit(interaction, fun, opts \\ []) when is_function(fun, 0) do
+    with :ok <- defer(interaction, opts) do
+      try do
+        edit_response(interaction, fun.())
+      rescue
+        e ->
+          Logger.error("defer_and_edit callback crashed: #{Exception.message(e)}")
+          edit_response(interaction, "An error occurred.")
+      end
+    end
   end
 
   @doc """
@@ -432,7 +564,8 @@ defmodule EDA.Interaction do
 
   defp app_id do
     case EDA.Cache.me() do
-      %{"id" => id} -> id
+      %EDA.User{id: id} when not is_nil(id) -> id
+      %{"id" => id} when not is_nil(id) -> id
       _ -> raise "application_id not available, bot not connected"
     end
   end

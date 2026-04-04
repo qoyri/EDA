@@ -33,13 +33,23 @@ defmodule EDA.File do
   @doc """
   Creates a file from binary data.
 
+  Accepts both Elixir binaries (`<<...>>`) and byte lists (`[0, 1, 2, ...]`).
+  Lists are automatically converted — this is useful when receiving data from
+  Rust NIFs that return `Vec<u8>` (Rustler converts these to Erlang lists).
+
   ## Options
 
     * `:description` - Alt text for the file (max 1024 chars)
     * `:spoiler` - If `true`, prefixes the filename with `SPOILER_`
   """
-  @spec from_binary(binary(), String.t(), keyword()) :: t()
-  def from_binary(data, name, opts \\ []) when is_binary(data) and is_binary(name) do
+  @spec from_binary(binary() | list(), String.t(), keyword()) :: t()
+  def from_binary(data, name, opts \\ [])
+
+  def from_binary(data, name, opts) when is_list(data) do
+    from_binary(:erlang.list_to_binary(data), name, opts)
+  end
+
+  def from_binary(data, name, opts) when is_binary(data) and is_binary(name) do
     validate_name!(name)
     description = opts[:description]
     if description, do: validate_description!(description)
