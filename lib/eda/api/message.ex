@@ -126,10 +126,76 @@ defmodule EDA.API.Message do
 
   # ── Pins ──
 
-  @doc "Gets pinned messages in a channel."
-  @spec pinned(String.t() | integer()) :: {:ok, [map()]} | {:error, term()}
-  def pinned(channel_id) do
-    EDA.HTTP.Client.get("/channels/#{channel_id}/pins")
+  @doc """
+  Gets one page of a channel's pins.
+
+  Returns Discord's raw envelope: `%{"items" => [pin], "has_more" => boolean}`,
+  where each pin is `%{"pinned_at" => iso8601, "message" => message}`.
+
+  ## Options
+
+  - `:before` - ISO8601 timestamp, get pins pinned before this (use the
+    `pinned_at` of the last item of the previous page)
+  - `:limit` - pins per page (1-50, default 50)
+  """
+  @spec pins(String.t() | integer(), keyword()) :: {:ok, map()} | {:error, term()}
+  def pins(channel_id, opts \\ []) do
+    EDA.HTTP.Client.get(with_query("/channels/#{channel_id}/messages/pins", opts))
+  end
+
+  @doc """
+  Gets pinned messages in a channel, paginating automatically.
+
+  Returns message objects. Use `pins/2` if you need the `pinned_at` timestamps
+  or want to drive the pagination yourself.
+
+  ## Options
+
+  - `:limit` - maximum number of messages to return (default `:infinity`)
+
+  ## Examples
+
+      {:ok, msgs} = EDA.API.Message.pinned(channel_id)
+      {:ok, msgs} = EDA.API.Message.pinned(channel_id, limit: 10)
+  """
+  @spec pinned(String.t() | integer(), keyword()) :: {:ok, [map()]} | {:error, term()}
+  def pinned(channel_id, opts \\ []) do
+    case Keyword.get(opts, :limit, :infinity) do
+      limit when is_integer(limit) and limit <= 0 -> {:ok, []}
+      limit -> fetch_pin_pages(channel_id, limit, [], nil)
+    end
+  end
+
+  defp fetch_pin_pages(channel_id, remaining, acc, cursor) do
+    query = [limit: pin_page_size(remaining)] ++ if cursor, do: [before: cursor], else: []
+
+    case pins(channel_id, query) do
+      {:ok, %{"items" => []}} ->
+        {:ok, acc}
+
+      {:ok, %{"items" => items} = page} ->
+        continue_pin_pages(channel_id, remaining, acc, items, page["has_more"])
+
+      {:ok, _unexpected} ->
+        {:ok, acc}
+
+      error ->
+        if acc == [], do: error, else: {:ok, acc}
+    end
+  end
+
+  defp pin_page_size(:infinity), do: 50
+  defp pin_page_size(remaining), do: min(remaining, 50)
+
+  defp continue_pin_pages(channel_id, remaining, acc, items, has_more) do
+    acc = acc ++ Enum.map(items, & &1["message"])
+    remaining = if remaining == :infinity, do: :infinity, else: remaining - length(items)
+
+    if has_more != true or remaining == 0 do
+      {:ok, acc}
+    else
+      fetch_pin_pages(channel_id, remaining, acc, List.last(items)["pinned_at"])
+    end
   end
 
   @doc "Pins a message in a channel."
