@@ -5,6 +5,14 @@ defmodule EDA.Gateway.MemberChunker do
   Supports fire-and-forget caching, synchronous awaiting, prefix search, and
   fetching by user IDs. Chunks are tracked by nonce and requests are cleaned up
   on timeout.
+
+  Discord rate limits requests for *all* members of a guild (`query: ""` and
+  `limit: 0`) to one per guild every 30 seconds. Those requests are throttled
+  here: a request made during the cooldown is queued and sent when the window
+  opens, so callers never silently lose a request. Prefix searches and
+  `user_ids` lookups are exempt and always go out immediately.
+
+  The cooldown can be tuned with `config :eda, member_chunk_cooldown_ms: 30_000`.
   """
 
   use GenServer
@@ -13,6 +21,7 @@ defmodule EDA.Gateway.MemberChunker do
 
   @timeout_ms 15_000
   @cleanup_interval 5_000
+  @cooldown_ms 30_000
 
   defmodule ChunkRequest do
     @moduledoc false
@@ -22,9 +31,15 @@ defmodule EDA.Gateway.MemberChunker do
       :caller,
       :chunk_count,
       :started_at,
+      :opts,
       chunks_received: 0,
       members: []
     ]
+  end
+
+  defmodule Pending do
+    @moduledoc false
+    defstruct [:guild_id, :opts, :caller]
   end
 
   # ── Public API ──────────────────────────────────────────────────────
@@ -38,7 +53,7 @@ defmodule EDA.Gateway.MemberChunker do
   @doc "Requests all members and blocks until all chunks arrive."
   @spec await(String.t() | integer(), keyword()) :: {:ok, [map()]} | {:error, :timeout}
   def await(guild_id, opts \\ []) do
-    GenServer.call(__MODULE__, {:request, to_string(guild_id), opts}, @timeout_ms + 5_000)
+    GenServer.call(__MODULE__, {:request, to_string(guild_id), opts}, call_timeout())
   end
 
   @doc "Searches members by username prefix (max 100 results)."
@@ -46,7 +61,7 @@ defmodule EDA.Gateway.MemberChunker do
           {:ok, [map()]} | {:error, :timeout}
   def search(guild_id, query, opts \\ []) do
     opts = Keyword.merge([query: query, limit: min(Keyword.get(opts, :limit, 100), 100)], opts)
-    GenServer.call(__MODULE__, {:request, to_string(guild_id), opts}, @timeout_ms + 5_000)
+    GenServer.call(__MODULE__, {:request, to_string(guild_id), opts}, call_timeout())
   end
 
   @doc "Fetches specific members by user IDs (max 100)."
@@ -55,7 +70,7 @@ defmodule EDA.Gateway.MemberChunker do
   def fetch(guild_id, user_ids, opts \\ []) do
     ids = user_ids |> Enum.take(100) |> Enum.map(&to_string/1)
     opts = Keyword.put(opts, :user_ids, ids)
-    GenServer.call(__MODULE__, {:request, to_string(guild_id), opts}, @timeout_ms + 5_000)
+    GenServer.call(__MODULE__, {:request, to_string(guild_id), opts}, call_timeout())
   end
 
   @doc "Called by Events when a GUILD_MEMBERS_CHUNK arrives."
@@ -73,37 +88,17 @@ defmodule EDA.Gateway.MemberChunker do
   @impl true
   def init(_) do
     schedule_cleanup()
-    {:ok, %{requests: %{}}}
+    {:ok, %{requests: %{}, cooldowns: %{}, pending: %{}}}
   end
 
   @impl true
   def handle_call({:request, guild_id, opts}, from, state) do
-    nonce = generate_nonce()
-    send_op8(guild_id, nonce, opts)
-
-    request = %ChunkRequest{
-      nonce: nonce,
-      guild_id: guild_id,
-      caller: from,
-      started_at: System.monotonic_time(:millisecond)
-    }
-
-    {:noreply, put_in(state, [:requests, nonce], request)}
+    {:noreply, dispatch_or_queue(state, guild_id, opts, from)}
   end
 
   @impl true
   def handle_cast({:request, guild_id, nil, opts}, state) do
-    nonce = generate_nonce()
-    send_op8(guild_id, nonce, opts)
-
-    request = %ChunkRequest{
-      nonce: nonce,
-      guild_id: guild_id,
-      caller: nil,
-      started_at: System.monotonic_time(:millisecond)
-    }
-
-    {:noreply, put_in(state, [:requests, nonce], request)}
+    {:noreply, dispatch_or_queue(state, guild_id, opts, nil)}
   end
 
   def handle_cast({:chunk, data}, state) do
@@ -139,7 +134,96 @@ defmodule EDA.Gateway.MemberChunker do
     {:noreply, %{state | requests: remaining}}
   end
 
+  def handle_info({:drain, guild_id}, state) do
+    now = System.monotonic_time(:millisecond)
+    ready_at = Map.get(state.cooldowns, guild_id, now)
+
+    case Map.get(state.pending, guild_id, []) do
+      [] ->
+        {:noreply, state}
+
+      [next | rest] when now >= ready_at ->
+        state =
+          state
+          |> send_now(guild_id, next.opts, next.caller, now)
+          |> put_pending(guild_id, rest)
+
+        if rest != [], do: Process.send_after(self(), {:drain, guild_id}, cooldown_ms())
+        {:noreply, state}
+
+      _still_cooling ->
+        Process.send_after(self(), {:drain, guild_id}, ready_at - now)
+        {:noreply, state}
+    end
+  end
+
   def handle_info(_msg, state), do: {:noreply, state}
+
+  # ── OP 8 throttle ────────────────────────────────────────────────────
+  #
+  # Discord rate limits "all members" requests (query="" and limit=0) to one
+  # per guild per 30 seconds. Prefix searches and user_ids lookups are exempt.
+
+  defp all_members?(opts) do
+    opts = opts || []
+
+    is_nil(Keyword.get(opts, :user_ids)) and
+      Keyword.get(opts, :query, "") == "" and
+      Keyword.get(opts, :limit, 0) == 0
+  end
+
+  defp dispatch_or_queue(state, guild_id, opts, caller) do
+    # Monotonic time can be negative, so an absent cooldown defaults to `now`
+    # (ready) rather than to zero.
+    now = System.monotonic_time(:millisecond)
+    ready_at = Map.get(state.cooldowns, guild_id, now)
+
+    cond do
+      not all_members?(opts) -> send_now(state, guild_id, opts, caller, now)
+      now >= ready_at -> send_now(state, guild_id, opts, caller, now)
+      true -> enqueue(state, guild_id, opts, caller, ready_at - now)
+    end
+  end
+
+  defp send_now(state, guild_id, opts, caller, now) do
+    nonce = generate_nonce()
+    send_op8(guild_id, nonce, opts)
+
+    request = %ChunkRequest{
+      nonce: nonce,
+      guild_id: guild_id,
+      caller: caller,
+      started_at: now,
+      opts: opts
+    }
+
+    state = put_in(state, [:requests, nonce], request)
+
+    if all_members?(opts) do
+      put_in(state, [:cooldowns, guild_id], now + cooldown_ms())
+    else
+      state
+    end
+  end
+
+  defp enqueue(state, guild_id, opts, caller, delay) do
+    queue = Map.get(state.pending, guild_id, [])
+
+    # A duplicate fire-and-forget is the same request: drop it rather than
+    # let a GUILD_CREATE burst pile up. Callers awaiting a reply are kept.
+    if is_nil(caller) and Enum.any?(queue, &is_nil(&1.caller)) do
+      state
+    else
+      Process.send_after(self(), {:drain, guild_id}, max(delay, 0))
+      pending = %Pending{guild_id: guild_id, opts: opts, caller: caller}
+      put_pending(state, guild_id, queue ++ [pending])
+    end
+  end
+
+  defp put_pending(state, guild_id, []),
+    do: %{state | pending: Map.delete(state.pending, guild_id)}
+
+  defp put_pending(state, guild_id, queue), do: put_in(state, [:pending, guild_id], queue)
 
   # ── Chunk processing ─────────────────────────────────────────────────
 
@@ -182,6 +266,10 @@ defmodule EDA.Gateway.MemberChunker do
   end
 
   # ── Internals ───────────────────────────────────────────────────────
+
+  defp cooldown_ms, do: Application.get_env(:eda, :member_chunk_cooldown_ms, @cooldown_ms)
+
+  defp call_timeout, do: @timeout_ms + cooldown_ms() + 5_000
 
   defp generate_nonce do
     :crypto.strong_rand_bytes(8) |> Base.hex_encode32(case: :lower, padding: false)
