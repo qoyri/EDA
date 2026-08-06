@@ -257,4 +257,36 @@ defmodule EDA.Gateway.EventsTest do
       assert true
     end
   end
+
+  describe "VOICE_CHANNEL_STATUS_UPDATE cache" do
+    test "merges the new status into the cached channel, preserving other fields" do
+      EDA.Cache.Channel.create(%{
+        "id" => "vcs_cache_1",
+        "guild_id" => "vg_status_1",
+        "type" => 2,
+        "name" => "vc"
+      })
+
+      Events.dispatch("VOICE_CHANNEL_STATUS_UPDATE", %{
+        "id" => "vcs_cache_1",
+        "guild_id" => "vg_status_1",
+        "status" => "movie night"
+      })
+
+      cached = EDA.Cache.Channel.get("vcs_cache_1")
+      assert cached["status"] == "movie night"
+      assert cached["name"] == "vc"
+    end
+
+    test "is a no-op when the channel is not cached" do
+      assert :ok =
+               Events.dispatch("VOICE_CHANNEL_STATUS_UPDATE", %{
+                 "id" => "vcs_uncached_1",
+                 "guild_id" => "vg_status_1",
+                 "status" => "x"
+               })
+
+      assert EDA.Cache.Channel.get("vcs_uncached_1") == nil
+    end
+  end
 end
