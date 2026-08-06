@@ -198,19 +198,31 @@ defmodule EDA.API.Message do
     end
   end
 
-  @doc "Pins a message in a channel."
-  @spec pin(String.t() | integer(), String.t() | integer()) :: :ok | {:error, term()}
-  def pin(channel_id, message_id) do
-    case put("/channels/#{channel_id}/pins/#{message_id}", %{}) do
+  @doc """
+  Pins a message in a channel.
+
+  ## Options
+
+  - `:reason` - Audit log reason
+  """
+  @spec pin(String.t() | integer(), String.t() | integer(), keyword()) :: :ok | {:error, term()}
+  def pin(channel_id, message_id, opts \\ []) do
+    case put("/channels/#{channel_id}/messages/pins/#{message_id}", %{}, opts) do
       {:ok, _} -> :ok
       error -> error
     end
   end
 
-  @doc "Unpins a message from a channel."
-  @spec unpin(String.t() | integer(), String.t() | integer()) :: :ok | {:error, term()}
-  def unpin(channel_id, message_id) do
-    case EDA.HTTP.Client.delete("/channels/#{channel_id}/pins/#{message_id}") do
+  @doc """
+  Unpins a message from a channel.
+
+  ## Options
+
+  - `:reason` - Audit log reason
+  """
+  @spec unpin(String.t() | integer(), String.t() | integer(), keyword()) :: :ok | {:error, term()}
+  def unpin(channel_id, message_id, opts \\ []) do
+    case EDA.HTTP.Client.delete("/channels/#{channel_id}/messages/pins/#{message_id}", opts) do
       {:ok, _} -> :ok
       error -> error
     end

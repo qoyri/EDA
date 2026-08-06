@@ -130,13 +130,32 @@ defmodule EDA.MessageTest do
     end
   end
 
-  describe "pin/1" do
+  describe "pin/2" do
     test "pins a message", %{bypass: bypass} do
-      Bypass.expect_once(bypass, "PUT", "/channels/ch1/pins/msg1", fn conn ->
+      Bypass.expect_once(bypass, "PUT", "/channels/ch1/messages/pins/msg1", fn conn ->
         Plug.Conn.resp(conn, 204, "")
       end)
 
       assert :ok = Message.pin(sample_msg())
+    end
+
+    test "forwards the audit log reason", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "PUT", "/channels/ch1/messages/pins/msg1", fn conn ->
+        assert {"x-audit-log-reason", "why"} in conn.req_headers
+        Plug.Conn.resp(conn, 204, "")
+      end)
+
+      assert :ok = Message.pin(sample_msg(), reason: "why")
+    end
+  end
+
+  describe "unpin/2" do
+    test "unpins a message", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "DELETE", "/channels/ch1/messages/pins/msg1", fn conn ->
+        Plug.Conn.resp(conn, 204, "")
+      end)
+
+      assert :ok = Message.unpin(sample_msg())
     end
   end
 

@@ -273,23 +273,41 @@ defmodule EDA.API.MessageTest do
     end
   end
 
-  describe "pin/2" do
-    test "PUT /channels/:id/pins/:id", %{bypass: bypass} do
-      Bypass.expect_once(bypass, "PUT", "/channels/111/pins/222", fn conn ->
+  describe "pin/3" do
+    test "PUT /channels/:id/messages/pins/:id", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "PUT", "/channels/111/messages/pins/222", fn conn ->
         Plug.Conn.resp(conn, 204, "")
       end)
 
       assert :ok = Message.pin("111", "222")
     end
+
+    test "sends the audit log reason", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "PUT", "/channels/111/messages/pins/222", fn conn ->
+        assert {"x-audit-log-reason", "important"} in conn.req_headers
+        Plug.Conn.resp(conn, 204, "")
+      end)
+
+      assert :ok = Message.pin("111", "222", reason: "important")
+    end
   end
 
-  describe "unpin/2" do
-    test "DELETE /channels/:id/pins/:id", %{bypass: bypass} do
-      Bypass.expect_once(bypass, "DELETE", "/channels/111/pins/222", fn conn ->
+  describe "unpin/3" do
+    test "DELETE /channels/:id/messages/pins/:id", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "DELETE", "/channels/111/messages/pins/222", fn conn ->
         Plug.Conn.resp(conn, 204, "")
       end)
 
       assert :ok = Message.unpin("111", "222")
+    end
+
+    test "sends the audit log reason", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "DELETE", "/channels/111/messages/pins/222", fn conn ->
+        assert {"x-audit-log-reason", "cleanup"} in conn.req_headers
+        Plug.Conn.resp(conn, 204, "")
+      end)
+
+      assert :ok = Message.unpin("111", "222", reason: "cleanup")
     end
   end
 
