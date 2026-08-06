@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **EDA.API.Message.pins/2** — one page of a channel's pins, with `pinned_at` timestamps and `has_more`
+- **EDA.API.Channel.set_voice_status/3** / **EDA.Channel.set_voice_status/3** — set or clear a voice channel's status, plus the `VOICE_CHANNEL_STATUS_UPDATE` event and the `:status` field on `EDA.Channel`
+- **EDA.Event.RateLimited** — gateway rate limit notifications (`opcode`, `retry_after`, `guild_id`, `nonce`), previously swallowed by `EDA.Event.Raw`
+- `:reason` (audit log) on `EDA.API.Message.pin/3` and `unpin/3`, and on `EDA.Message.pin/2` and `unpin/2`
+
+### Changed
+
+- **Pins** now use `/channels/{id}/messages/pins`; the deprecated `/channels/{id}/pins` routes are gone. `EDA.API.Message.pinned/2` keeps returning `{:ok, [message]}` but paginates past the old 50-pin ceiling
+- **EDA.Gateway.MemberChunker** throttles all-members OP 8 requests to one per guild per 30 seconds, queueing them instead of letting Discord drop them. Prefix searches and `user_ids` lookups are exempt. Configurable with `config :eda, member_chunk_cooldown_ms: 30_000`
+
 ## [0.2.0] - 2026-04-04
 
 ### Installation
