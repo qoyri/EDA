@@ -293,6 +293,12 @@ defmodule EDA.Gateway.Events do
     EDA.Cache.Channel.update(data["id"], %{"status" => data["status"]})
   end
 
+  # ── Gateway rate limits ────────────────────────────────────────────
+
+  defp update_cache("RATE_LIMITED", %{"opcode" => 8} = data) do
+    EDA.Gateway.MemberChunker.handle_rate_limited(data)
+  end
+
   # ── Catch-all ──────────────────────────────────────────────────────
 
   defp update_cache(_event_type, _data), do: :ok

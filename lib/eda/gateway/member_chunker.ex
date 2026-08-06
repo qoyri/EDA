@@ -79,6 +79,12 @@ defmodule EDA.Gateway.MemberChunker do
     GenServer.cast(__MODULE__, {:chunk, data})
   end
 
+  @doc "Called by Events when Discord answers an OP 8 with a RATE_LIMITED dispatch."
+  @spec handle_rate_limited(map()) :: :ok
+  def handle_rate_limited(data) do
+    GenServer.cast(__MODULE__, {:rate_limited, data})
+  end
+
   # ── GenServer ───────────────────────────────────────────────────────
 
   def start_link(_opts \\ []) do
@@ -99,6 +105,27 @@ defmodule EDA.Gateway.MemberChunker do
   @impl true
   def handle_cast({:request, guild_id, nil, opts}, state) do
     {:noreply, dispatch_or_queue(state, guild_id, opts, nil)}
+  end
+
+  def handle_cast({:rate_limited, data}, state) do
+    meta = data["meta"] || %{}
+    guild_id = meta["guild_id"]
+
+    if is_nil(guild_id) do
+      {:noreply, state}
+    else
+      # Discord is the authority: its retry_after wins over the local counter,
+      # which can drift across restarts or shards.
+      delay = round((data["retry_after"] || 0) * 1000)
+      now = System.monotonic_time(:millisecond)
+      state = put_in(state, [:cooldowns, guild_id], now + delay)
+
+      Logger.debug(
+        "MemberChunker: OP 8 rate limited for guild #{guild_id}, retrying in #{delay}ms"
+      )
+
+      {:noreply, requeue_rejected(state, guild_id, meta["nonce"], delay)}
+    end
   end
 
   def handle_cast({:chunk, data}, state) do
@@ -217,6 +244,22 @@ defmodule EDA.Gateway.MemberChunker do
       Process.send_after(self(), {:drain, guild_id}, max(delay, 0))
       pending = %Pending{guild_id: guild_id, opts: opts, caller: caller}
       put_pending(state, guild_id, queue ++ [pending])
+    end
+  end
+
+  # A rejected request goes back to the *head* of the queue: it arrived before
+  # anything still waiting.
+  defp requeue_rejected(state, guild_id, nonce, delay) do
+    case nonce && Map.fetch(state.requests, nonce) do
+      {:ok, request} ->
+        state = %{state | requests: Map.delete(state.requests, nonce)}
+        queue = Map.get(state.pending, guild_id, [])
+        pending = %Pending{guild_id: guild_id, opts: request.opts, caller: request.caller}
+        Process.send_after(self(), {:drain, guild_id}, delay)
+        put_pending(state, guild_id, [pending | queue])
+
+      _ ->
+        state
     end
   end
 

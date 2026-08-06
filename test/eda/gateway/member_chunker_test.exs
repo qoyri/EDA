@@ -504,6 +504,68 @@ defmodule EDA.Gateway.MemberChunkerTest do
     end
   end
 
+  describe "handle_rate_limited/1" do
+    setup do
+      Application.put_env(:eda, :member_chunk_cooldown_ms, 120)
+      on_exit(fn -> Application.delete_env(:eda, :member_chunk_cooldown_ms) end)
+      :ok
+    end
+
+    test "arms the cooldown from retry_after, overriding the local one" do
+      guild = "rl_g1"
+      MemberChunker.request(guild)
+      Process.sleep(20)
+      local = chunker_state().cooldowns[guild]
+
+      MemberChunker.handle_rate_limited(%{
+        "opcode" => 8,
+        "retry_after" => 5.0,
+        "meta" => %{"guild_id" => guild}
+      })
+
+      Process.sleep(20)
+      assert chunker_state().cooldowns[guild] > local
+    end
+
+    test "requeues the rejected request, preserving its caller" do
+      guild = "rl_g2"
+      MemberChunker.request(guild)
+      Process.sleep(20)
+
+      {nonce, request} =
+        Enum.find(chunker_state().requests, fn {_n, r} -> r.guild_id == guild end)
+
+      assert request.caller == nil
+
+      MemberChunker.handle_rate_limited(%{
+        "opcode" => 8,
+        "retry_after" => 0.05,
+        "meta" => %{"guild_id" => guild, "nonce" => nonce}
+      })
+
+      Process.sleep(20)
+      state = chunker_state()
+      refute Map.has_key?(state.requests, nonce)
+      assert [%{guild_id: ^guild}] = Map.get(state.pending, guild, [])
+    end
+
+    test "an unknown nonce only arms the cooldown" do
+      guild = "rl_g3"
+
+      MemberChunker.handle_rate_limited(%{
+        "opcode" => 8,
+        "retry_after" => 1.0,
+        "meta" => %{"guild_id" => guild, "nonce" => "nope"}
+      })
+
+      Process.sleep(20)
+      state = chunker_state()
+      assert Map.has_key?(state.cooldowns, guild)
+      assert Map.get(state.pending, guild, []) == []
+      assert Process.alive?(Process.whereis(MemberChunker))
+    end
+  end
+
   # ── Helpers ──────────────────────────────────────────────────────────
 
   defp chunker_state, do: :sys.get_state(MemberChunker)
