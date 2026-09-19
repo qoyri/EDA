@@ -241,6 +241,16 @@ defmodule EDA.Permission do
      c. Member-specific overwrite (highest priority)
   5. Access gate: no VIEW_CHANNEL → 0
   6. Access gate: voice/stage channel + no CONNECT → 0
+
+  ## Obfuscated channels
+
+  Returns `{:error, :channel_obfuscated}` for a channel Discord has redacted because
+  the bot cannot view it (see `EDA.Channel.obfuscated?/1`). Such a channel carries a
+  single synthetic overwrite denying `VIEW_CHANNEL` to `@everyone`, which is
+  indistinguishable from a real one — computing from it would return a confident but
+  meaningless answer, so the ambiguity is surfaced to the caller instead.
+
+  `has_permission?/4` maps this to `false`, like any other error.
   """
   @spec in_channel(String.t(), String.t(), String.t()) :: {:ok, bitset()} | {:error, term()}
   def in_channel(guild_id, user_id, channel_id) do
@@ -251,12 +261,14 @@ defmodule EDA.Permission do
     with {:guild, guild} when guild != nil <- {:guild, EDA.Cache.get_guild(guild_id)},
          {:member, member} when member != nil <-
            {:member, EDA.Cache.get_member(guild_id, user_id)},
-         {:channel, channel} when channel != nil <- {:channel, EDA.Cache.get_channel(channel_id)} do
+         {:channel, channel} when channel != nil <- {:channel, EDA.Cache.get_channel(channel_id)},
+         {:obfuscated, false} <- {:obfuscated, EDA.Channel.obfuscated?(channel)} do
       {:ok, compute_channel_permissions(guild, member, channel)}
     else
       {:guild, nil} -> {:error, :guild_not_found}
       {:member, nil} -> {:error, :member_not_found}
       {:channel, nil} -> {:error, :channel_not_found}
+      {:obfuscated, true} -> {:error, :channel_obfuscated}
     end
   end
 

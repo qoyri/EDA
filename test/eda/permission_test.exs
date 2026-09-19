@@ -15,6 +15,7 @@ defmodule EDA.PermissionTest do
   @user_id "3"
   @channel_id "100"
   @voice_channel_id "200"
+  @obfuscated_channel_id "perm_obf_300"
   @role_a_id "10"
   @role_b_id "20"
 
@@ -187,6 +188,65 @@ defmodule EDA.PermissionTest do
 
     test "returns error for missing channel" do
       assert {:error, :channel_not_found} = Permission.in_channel(@guild_id, @user_id, "nope")
+    end
+  end
+
+  describe "in_channel/3 — obfuscated channel" do
+    setup :setup_guild
+
+    setup do
+      # Exactly what Discord dispatches for a channel the bot cannot view: the real
+      # metadata is stripped and a single @everyone VIEW_CHANNEL deny is injected.
+      EDA.Cache.Channel.create(%{
+        "id" => @obfuscated_channel_id,
+        "guild_id" => @guild_id,
+        "type" => 0,
+        "name" => EDA.Channel.obfuscated_name(),
+        "flags" => EDA.Channel.flag_obfuscated(),
+        "permission_overwrites" => [
+          %{
+            "id" => @guild_id,
+            "type" => 0,
+            "allow" => "0",
+            "deny" => to_string(Permission.to_bit(:view_channel))
+          }
+        ]
+      })
+
+      :ok
+    end
+
+    test "reports :channel_obfuscated rather than computing from the synthetic overwrite" do
+      assert {:error, :channel_obfuscated} =
+               Permission.in_channel(@guild_id, @user_id, @obfuscated_channel_id)
+    end
+
+    test "applies to privileged members too — the bot cannot see the channel either way" do
+      assert {:error, :channel_obfuscated} =
+               Permission.in_channel(@guild_id, @owner_id, @obfuscated_channel_id)
+
+      assert {:error, :channel_obfuscated} =
+               Permission.in_channel(@guild_id, @admin_id, @obfuscated_channel_id)
+    end
+
+    test "has_permission?/4 is false, like any other error" do
+      refute Permission.has_permission?(
+               @guild_id,
+               @user_id,
+               @obfuscated_channel_id,
+               :view_channel
+             )
+
+      refute Permission.has_permission?(
+               @guild_id,
+               @user_id,
+               @obfuscated_channel_id,
+               :send_messages
+             )
+    end
+
+    test "channels without the flag are unaffected" do
+      assert {:ok, _perms} = Permission.in_channel(@guild_id, @user_id, @channel_id)
     end
   end
 
