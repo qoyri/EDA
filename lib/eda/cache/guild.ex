@@ -24,14 +24,14 @@ defmodule EDA.Cache.Guild do
   """
   @spec get(String.t() | integer()) :: map() | nil
   def get(guild_id) do
-    case :ets.lookup(@table, to_string(guild_id)) do
-      [{_, guild}] ->
-        :telemetry.execute([:eda, :cache, :hit], %{count: 1}, %{cache: @cache_name})
-        guild
-
-      [] ->
+    case adapter().get(@table, to_string(guild_id)) do
+      nil ->
         :telemetry.execute([:eda, :cache, :miss], %{count: 1}, %{cache: @cache_name})
         nil
+
+      guild ->
+        :telemetry.execute([:eda, :cache, :hit], %{count: 1}, %{cache: @cache_name})
+        guild
     end
   end
 
@@ -40,8 +40,7 @@ defmodule EDA.Cache.Guild do
   """
   @spec all() :: [map()]
   def all do
-    :ets.tab2list(@table)
-    |> Enum.map(fn {_, guild} -> guild end)
+    adapter().all(@table)
   end
 
   @doc """
@@ -53,7 +52,7 @@ defmodule EDA.Cache.Guild do
 
     case EDA.Cache.Policy.check(EDA.Cache.Config.policy(@cache_name), :guild, guild_id, guild) do
       :cache ->
-        :ets.insert(@table, {guild_id, guild})
+        adapter().put(@table, guild_id, guild)
         EDA.Cache.Evictor.touch(@table, guild_id)
         :telemetry.execute([:eda, :cache, :write], %{count: 1}, %{cache: @cache_name})
         guild
@@ -77,7 +76,7 @@ defmodule EDA.Cache.Guild do
 
       existing ->
         updated = Map.merge(existing, updates)
-        :ets.insert(@table, {guild_id, updated})
+        adapter().put(@table, guild_id, updated)
         updated
     end
   end
@@ -88,7 +87,7 @@ defmodule EDA.Cache.Guild do
   @spec delete(String.t() | integer()) :: :ok
   def delete(guild_id) do
     key = to_string(guild_id)
-    :ets.delete(@table, key)
+    adapter().delete(@table, key)
     EDA.Cache.Evictor.remove(@table, key)
     :ok
   end
@@ -98,14 +97,16 @@ defmodule EDA.Cache.Guild do
   """
   @spec count() :: non_neg_integer()
   def count do
-    :ets.info(@table, :size)
+    adapter().count(@table)
   end
 
   # Server Callbacks
 
   @impl true
   def init(_opts) do
-    table = :ets.new(@table, [:set, :public, :named_table, read_concurrency: true])
-    {:ok, %{table: table}}
+    :ok = adapter().init(@table, [])
+    {:ok, %{table: @table}}
   end
+
+  defp adapter, do: EDA.Cache.Adapter.current()
 end

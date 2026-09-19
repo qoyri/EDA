@@ -137,7 +137,7 @@ defmodule EDA.Cache.Evictor do
   end
 
   defp evict_if_needed(main_table, ts_table, ord_table, max_size) do
-    current_size = :ets.info(main_table, :size)
+    current_size = adapter().count(main_table)
 
     if current_size > max_size do
       to_evict = current_size - max_size
@@ -161,30 +161,30 @@ defmodule EDA.Cache.Evictor do
         :ets.delete(ord_table, ord_key)
         :ets.delete(ts_table, key)
 
-        case :ets.lookup(main_table, key) do
-          [{_, _}] ->
-            delete_from_main(main_table, key)
-            do_evict(main_table, ts_table, ord_table, remaining - 1, evicted + 1)
-
-          [] ->
+        case adapter().get(main_table, key) do
+          nil ->
             # Orphaned shadow entry, don't count as eviction
             do_evict(main_table, ts_table, ord_table, remaining, evicted)
+
+          _entry ->
+            delete_from_main(main_table, key)
+            do_evict(main_table, ts_table, ord_table, remaining - 1, evicted + 1)
         end
     end
   end
 
   defp delete_from_main(main_table, key) do
-    :ets.delete(main_table, key)
+    adapter().delete(main_table, key)
 
     # Clean up index tables for Channel and Role
     case main_table do
       :eda_channels ->
         {_guild_id, channel_id} = key
-        :ets.delete(:eda_channels_index, channel_id)
+        adapter().delete(:eda_channels_index, channel_id)
 
       :eda_roles ->
         {_guild_id, role_id} = key
-        :ets.delete(:eda_roles_index, role_id)
+        adapter().delete(:eda_roles_index, role_id)
 
       _ ->
         :ok
@@ -199,4 +199,10 @@ defmodule EDA.Cache.Evictor do
   defp table_to_cache_name(:eda_voice_states), do: :voice_states
   defp table_to_cache_name(:eda_presences), do: :presences
   defp table_to_cache_name(other), do: other
+
+  # The eviction bookkeeping (timestamps and the LRW ordering index) stays in local ETS
+  # on purpose: it is the evictor's own structure, not cached entities, and each node
+  # bounds the memory it actually holds. Only operations on the cache itself go through
+  # the adapter, so eviction works with any backend.
+  defp adapter, do: EDA.Cache.Adapter.current()
 end

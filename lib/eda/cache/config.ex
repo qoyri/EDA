@@ -24,6 +24,9 @@ defmodule EDA.Cache.Config do
   @doc "Resolves application config and stores in persistent_term. Idempotent."
   @spec setup() :: :ok
   def setup do
+    adapter = Application.get_env(:eda, :cache_adapter, EDA.Cache.Adapter.ETS)
+    :persistent_term.put(:eda_cache_adapter, adapter)
+
     app_config = Application.get_env(:eda, :cache, [])
 
     for key <- @cache_keys do
@@ -52,4 +55,12 @@ defmodule EDA.Cache.Config do
   @doc "Returns all cache key names."
   @spec cache_keys() :: [atom()]
   def cache_keys, do: @cache_keys
+
+  @doc """
+  The configured storage adapter.
+
+  See `EDA.Cache.Adapter`. Defaults to `EDA.Cache.Adapter.ETS`.
+  """
+  @spec adapter() :: module()
+  def adapter, do: EDA.Cache.Adapter.current()
 end
