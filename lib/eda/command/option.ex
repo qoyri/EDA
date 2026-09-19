@@ -379,8 +379,8 @@ defmodule EDA.Command.Option do
   defp put_if(map, _key, nil), do: map
   defp put_if(map, key, value), do: Map.put(map, key, value)
 
-  defp type_name(1), do: "SUB_COMMAND"
-  defp type_name(2), do: "SUB_COMMAND_GROUP"
+  # Only reached from build/5, which handles value types. sub_command/3 and
+  # sub_command_group/3 build their structs directly, so types 1 and 2 never arrive here.
   defp type_name(3), do: "STRING"
   defp type_name(4), do: "INTEGER"
   defp type_name(5), do: "BOOLEAN"
