@@ -36,6 +36,81 @@ defmodule EDA.API.Member do
     patch("/guilds/#{guild_id}/members/#{user_id}", payload, opts)
   end
 
+  @doc """
+  Modifies the bot's own member in a guild — its per-guild profile.
+
+  `PATCH /guilds/{guild_id}/members/@me`. This is a different endpoint from `modify/4`, and
+  the only one that can set the bot's avatar, banner and bio *for one guild*. The bot keeps
+  its account-wide identity from `EDA.API.User.modify_me/1`; what is set here overrides it
+  in this guild alone.
+
+  ## Options
+
+    * `:nick` - guild nickname. The only field that needs a permission: `CHANGE_NICKNAME`
+    * `:avatar` - guild avatar, as image data
+    * `:banner` - guild banner, as image data
+    * `:bio` - guild bio
+    * `:reason` - audit log reason
+
+  Pass `nil` for any of them to clear it and fall back to the account-wide value. Fields
+  you leave out are untouched, so setting a bio alone keeps the avatar and banner.
+
+  `bio` is echoed by this endpoint's own response but is **not** part of the guild member
+  object Discord returns from `get/2` — reading the member back will not give it to you.
+
+  ## Images
+
+  `:avatar` and `:banner` are *image data*, a base64 data URI rather than a file upload.
+  A path or raw bytes is converted for you, and the media type comes from the bytes rather
+  than the extension — see `EDA.ImageData`:
+
+      EDA.API.Member.modify_me(guild_id,
+        nick: "EDA",
+        avatar: "priv/avatar.png",
+        bio: "Built on OTP",
+        reason: "profile refresh"
+      )
+
+      # clears the guild avatar, restoring the account-wide one
+      EDA.API.Member.modify_me(guild_id, avatar: nil)
+
+  """
+  @spec modify_me(String.t() | integer(), map() | keyword()) :: {:ok, map()} | {:error, term()}
+  def modify_me(guild_id, opts \\ [])
+
+  def modify_me(guild_id, opts) when is_list(opts) do
+    {reason, opts} = Keyword.pop(opts, :reason)
+
+    payload =
+      opts
+      |> Keyword.take([:nick, :avatar, :banner, :bio])
+      |> Enum.map(&coerce_profile_field/1)
+      |> Map.new()
+
+    patch("/guilds/#{guild_id}/members/@me", payload, reason_opts(reason))
+  end
+
+  def modify_me(guild_id, payload) when is_map(payload) do
+    {reason, payload} = Map.pop(payload, :reason)
+
+    payload =
+      payload
+      |> Enum.map(&coerce_profile_field/1)
+      |> Map.new()
+
+    patch("/guilds/#{guild_id}/members/@me", payload, reason_opts(reason))
+  end
+
+  # Only the image fields need coercion; a nil stays nil, because Discord reads it as "clear".
+  defp coerce_profile_field({key, value}) when key in [:avatar, :banner, "avatar", "banner"] do
+    {key, EDA.ImageData.coerce(value)}
+  end
+
+  defp coerce_profile_field(pair), do: pair
+
+  defp reason_opts(nil), do: []
+  defp reason_opts(reason), do: [reason: reason]
+
   @doc "Removes a member from a guild (kick)."
   @spec remove(String.t() | integer(), String.t() | integer(), keyword()) ::
           :ok | {:error, term()}
