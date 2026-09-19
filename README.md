@@ -141,10 +141,21 @@ Configure cache admission per entity:
 
 ```elixir
 config :eda, :cache,
-  policy: :all,           # :all | :none | MyPolicy | fn/3
-  max_size: 10_000,       # Enable LRW eviction
-  evict_interval: 60_000  # Eviction check interval (ms)
+  guilds: [],
+  users: [max_size: 100_000],   # LRW eviction once the table exceeds this size
+  members: [policy: :none],     # :all (default) | :none | MyPolicy | fn/3
+  presences: [policy: :none],
+  channels: [
+    policy: fn _entity, _key, ch ->
+      if ch["type"] in [0, 2, 5], do: :cache, else: :skip
+    end
+  ]
 ```
+
+Options are set **per entity**, not globally. The configurable caches are `:guilds`, `:users`,
+`:channels`, `:members`, `:roles`, `:voice_states` and `:presences`; each accepts `:policy` and
+`:max_size`. Caches left out use the defaults (`policy: :all`, no size limit). The eviction sweep
+interval is fixed and not configurable.
 
 ## Events
 
@@ -167,15 +178,17 @@ Plus 60+ more — see [HexDocs](https://hexdocs.pm/eda) for the full list.
 config :eda,
   intents: [:guilds, :guild_messages, :message_content],
   # or :all, :nonprivileged
-  encoding: :etf,      # :json (default) or :etf for binary encoding
-  compress: true        # zlib transport compression
+  gateway_encoding: :etf   # :etf (default, binary) or :json
 ```
+
+zlib-stream transport compression is always enabled and has no configuration option.
 
 Sharding is automatic. EDA fetches the recommended shard count from Discord, launches shards with staggered timing, and tracks per-shard readiness. Override with:
 
 ```elixir
-config :eda, :gateway,
-  shard_count: 4  # Fixed shard count
+config :eda, shards: :auto        # Discord's recommended count (default)
+config :eda, shards: 4            # Fixed count — this node runs shards 0..3
+config :eda, shards: {0..1, 4}    # This node runs shards 0 and 1 out of 4 total
 ```
 
 ## Architecture

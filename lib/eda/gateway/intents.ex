@@ -19,7 +19,10 @@ defmodule EDA.Gateway.Intents do
   Or use shortcuts:
 
       config :eda, intents: :all              # All intents
-      config :eda, intents: :nonprivileged    # All non-privileged intents (default)
+      config :eda, intents: :nonprivileged    # All non-privileged intents
+
+  When `:intents` is not configured at all, EDA falls back to `[:guilds]`
+  (see `EDA.intents/0`) — not `:nonprivileged`.
   """
 
   import Bitwise
