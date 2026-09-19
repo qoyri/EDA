@@ -25,12 +25,12 @@ defmodule EDA.Cache.Member do
   def get(guild_id, user_id) do
     key = {to_string(guild_id), to_string(user_id)}
 
-    case :ets.lookup(@table, key) do
-      [{_, member}] ->
+    case adapter().get(@table, key) do
+      member when not is_nil(member) ->
         :telemetry.execute([:eda, :cache, :hit], %{count: 1}, %{cache: @cache_name})
         member
 
-      [] ->
+      nil ->
         :telemetry.execute([:eda, :cache, :miss], %{count: 1}, %{cache: @cache_name})
         nil
     end
@@ -43,8 +43,7 @@ defmodule EDA.Cache.Member do
   def for_guild(guild_id) do
     guild_id = to_string(guild_id)
 
-    :ets.match_object(@table, {{guild_id, :_}, :_})
-    |> Enum.map(fn {_, member} -> member end)
+    adapter().match_prefix(@table, guild_id)
   end
 
   @doc """
@@ -64,7 +63,7 @@ defmodule EDA.Cache.Member do
            member_with_guild
          ) do
       :cache ->
-        :ets.insert(@table, {key, member_with_guild})
+        adapter().put(@table, key, member_with_guild)
         EDA.Cache.Evictor.touch(@table, key)
         :telemetry.execute([:eda, :cache, :write], %{count: 1}, %{cache: @cache_name})
         member_with_guild
@@ -82,13 +81,13 @@ defmodule EDA.Cache.Member do
   def update(guild_id, user_id, updates) do
     key = {to_string(guild_id), to_string(user_id)}
 
-    case :ets.lookup(@table, key) do
-      [{_, existing}] ->
+    case adapter().get(@table, key) do
+      existing when not is_nil(existing) ->
         updated = Map.merge(existing, updates)
-        :ets.insert(@table, {key, updated})
+        adapter().put(@table, key, updated)
         updated
 
-      [] ->
+      nil ->
         nil
     end
   end
@@ -99,7 +98,7 @@ defmodule EDA.Cache.Member do
   @spec delete(String.t() | integer(), String.t() | integer()) :: :ok
   def delete(guild_id, user_id) do
     key = {to_string(guild_id), to_string(user_id)}
-    :ets.delete(@table, key)
+    adapter().delete(@table, key)
     EDA.Cache.Evictor.remove(@table, key)
     :ok
   end
@@ -110,7 +109,7 @@ defmodule EDA.Cache.Member do
   @spec delete_guild(String.t() | integer()) :: :ok
   def delete_guild(guild_id) do
     guild_id = to_string(guild_id)
-    :ets.match_delete(@table, {{guild_id, :_}, :_})
+    adapter().delete_prefix(@table, guild_id)
     :ok
   end
 
@@ -127,12 +126,14 @@ defmodule EDA.Cache.Member do
   """
   @spec count() :: non_neg_integer()
   def count do
-    :ets.info(@table, :size)
+    adapter().count(@table)
   end
 
   @impl true
   def init(_opts) do
-    table = :ets.new(@table, [:set, :public, :named_table, read_concurrency: true])
-    {:ok, %{table: table}}
+    :ok = adapter().init(@table, [])
+    {:ok, %{table: @table}}
   end
+
+  defp adapter, do: EDA.Cache.Adapter.current()
 end

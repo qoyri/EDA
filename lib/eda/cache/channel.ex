@@ -28,21 +28,21 @@ defmodule EDA.Cache.Channel do
   def get(channel_id) do
     channel_id = to_string(channel_id)
 
-    case :ets.lookup(@index, channel_id) do
-      [{_, guild_id}] ->
-        case :ets.lookup(@table, {guild_id, channel_id}) do
-          [{_, channel}] ->
-            :telemetry.execute([:eda, :cache, :hit], %{count: 1}, %{cache: @cache_name})
-            channel
-
-          [] ->
-            :telemetry.execute([:eda, :cache, :miss], %{count: 1}, %{cache: @cache_name})
-            nil
-        end
-
-      [] ->
+    case adapter().get(@index, channel_id) do
+      nil ->
         :telemetry.execute([:eda, :cache, :miss], %{count: 1}, %{cache: @cache_name})
         nil
+
+      key ->
+        case adapter().get(@table, key) do
+          nil ->
+            :telemetry.execute([:eda, :cache, :miss], %{count: 1}, %{cache: @cache_name})
+            nil
+
+          channel ->
+            :telemetry.execute([:eda, :cache, :hit], %{count: 1}, %{cache: @cache_name})
+            channel
+        end
     end
   end
 
@@ -51,8 +51,7 @@ defmodule EDA.Cache.Channel do
   """
   @spec all() :: [map()]
   def all do
-    :ets.tab2list(@table)
-    |> Enum.map(fn {_, channel} -> channel end)
+    adapter().all(@table)
   end
 
   @doc """
@@ -62,8 +61,7 @@ defmodule EDA.Cache.Channel do
   def for_guild(guild_id) do
     guild_id = to_string(guild_id)
 
-    :ets.match_object(@table, {{guild_id, :_}, :_})
-    |> Enum.map(fn {_, channel} -> channel end)
+    adapter().match_prefix(@table, guild_id)
   end
 
   @doc """
@@ -77,8 +75,8 @@ defmodule EDA.Cache.Channel do
 
     case EDA.Cache.Policy.check(EDA.Cache.Config.policy(@cache_name), :channel, key, channel) do
       :cache ->
-        :ets.insert(@table, {key, channel})
-        :ets.insert(@index, {channel_id, guild_id})
+        adapter().put(@table, key, channel)
+        adapter().put(@index, channel_id, key)
         EDA.Cache.Evictor.touch(@table, key)
         :telemetry.execute([:eda, :cache, :write], %{count: 1}, %{cache: @cache_name})
         channel
@@ -112,15 +110,14 @@ defmodule EDA.Cache.Channel do
   def delete(channel_id) do
     channel_id = to_string(channel_id)
 
-    case :ets.lookup(@index, channel_id) do
-      [{_, guild_id}] ->
-        key = {guild_id, channel_id}
-        :ets.delete(@table, key)
-        :ets.delete(@index, channel_id)
-        EDA.Cache.Evictor.remove(@table, key)
-
-      [] ->
+    case adapter().get(@index, channel_id) do
+      nil ->
         :ok
+
+      key ->
+        adapter().delete(@table, key)
+        adapter().delete(@index, channel_id)
+        EDA.Cache.Evictor.remove(@table, key)
     end
 
     :ok
@@ -133,14 +130,12 @@ defmodule EDA.Cache.Channel do
   def delete_guild(guild_id) do
     guild_id = to_string(guild_id)
 
-    # Get all channel IDs for this guild, then clean up index
-    channels = :ets.match(@table, {{guild_id, :"$1"}, :_})
-
-    for [channel_id] <- channels do
-      :ets.delete(@index, channel_id)
+    # delete_prefix returns the removed sub-keys, so the index is cleaned
+    # without a second scan.
+    for channel_id <- adapter().delete_prefix(@table, guild_id) do
+      adapter().delete(@index, channel_id)
     end
 
-    :ets.match_delete(@table, {{guild_id, :_}, :_})
     :ok
   end
 
@@ -149,15 +144,17 @@ defmodule EDA.Cache.Channel do
   """
   @spec count() :: non_neg_integer()
   def count do
-    :ets.info(@table, :size)
+    adapter().count(@table)
   end
 
   # Server Callbacks
 
   @impl true
   def init(_opts) do
-    :ets.new(@table, [:set, :public, :named_table, read_concurrency: true])
-    :ets.new(@index, [:set, :public, :named_table, read_concurrency: true])
+    :ok = adapter().init(@table, [])
+    :ok = adapter().init(@index, [])
     {:ok, %{}}
   end
+
+  defp adapter, do: EDA.Cache.Adapter.current()
 end
