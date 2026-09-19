@@ -6,6 +6,7 @@ defmodule EDA.Role do
     :id,
     :name,
     :color,
+    :colors,
     :hoist,
     :icon,
     :unicode_emoji,
@@ -20,6 +21,7 @@ defmodule EDA.Role do
           id: String.t() | nil,
           name: String.t() | nil,
           color: integer() | nil,
+          colors: EDA.Role.Colors.t() | nil,
           hoist: boolean() | nil,
           icon: String.t() | nil,
           unicode_emoji: String.t() | nil,
@@ -36,6 +38,7 @@ defmodule EDA.Role do
       id: raw["id"],
       name: raw["name"],
       color: raw["color"],
+      colors: EDA.Role.Colors.from_raw(raw["colors"]),
       hoist: raw["hoist"],
       icon: raw["icon"],
       unicode_emoji: raw["unicode_emoji"],
@@ -46,6 +49,41 @@ defmodule EDA.Role do
       tags: raw["tags"]
     }
   end
+
+  @doc """
+  The role's primary colour, preferring the newer `colors` object.
+
+  Discord deprecated the single `color` field in favour of `colors`; on a real
+  guild the two agreed, but `colors.primary_color` is the field to trust. Falls
+  back to `color` when `colors` is absent.
+
+  ## Examples
+
+      iex> EDA.Role.primary_color(%EDA.Role{color: 1, colors: %EDA.Role.Colors{primary_color: 2}})
+      2
+
+      iex> EDA.Role.primary_color(%EDA.Role{color: 1})
+      1
+  """
+  @spec primary_color(t()) :: integer() | nil
+  def primary_color(%__MODULE__{colors: %EDA.Role.Colors{primary_color: c}}) when not is_nil(c),
+    do: c
+
+  def primary_color(%__MODULE__{color: color}), do: color
+
+  @doc """
+  Returns `true` when the role uses a gradient colour.
+
+  ## Examples
+
+      iex> EDA.Role.gradient?(%EDA.Role{colors: %EDA.Role.Colors{secondary_color: 2}})
+      true
+
+      iex> EDA.Role.gradient?(%EDA.Role{color: 1})
+      false
+  """
+  @spec gradient?(t()) :: boolean()
+  def gradient?(%__MODULE__{colors: colors}), do: EDA.Role.Colors.gradient?(colors)
 
   @doc "Returns a mention string like `<@&id>`."
   @spec mention(t()) :: String.t()

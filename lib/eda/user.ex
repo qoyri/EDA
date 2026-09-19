@@ -15,7 +15,8 @@ defmodule EDA.User do
     :bot,
     :system,
     :banner,
-    :global_name
+    :global_name,
+    :primary_guild
   ]
 
   @type t :: %__MODULE__{
@@ -29,7 +30,8 @@ defmodule EDA.User do
           bot: boolean() | nil,
           system: boolean() | nil,
           banner: String.t() | nil,
-          global_name: String.t() | nil
+          global_name: String.t() | nil,
+          primary_guild: EDA.User.PrimaryGuild.t() | nil
         }
 
   @spec from_raw(map()) :: t()
@@ -45,7 +47,8 @@ defmodule EDA.User do
       bot: raw["bot"],
       system: raw["system"],
       banner: raw["banner"],
-      global_name: raw["global_name"]
+      global_name: raw["global_name"],
+      primary_guild: EDA.User.PrimaryGuild.from_raw(raw["primary_guild"])
     }
   end
 
@@ -69,6 +72,28 @@ defmodule EDA.User do
 
   def avatar_url(%{"avatar" => a, "id" => id}) when is_binary(a),
     do: "#{@discord_cdn}/avatars/#{id}/#{a}.png"
+
+  @doc """
+  The server tag the user is currently displaying, or `nil`.
+
+  Returns `nil` when there is no primary guild, or when the tag exists but is not
+  being shown — `identity_enabled` is tri-state, see `EDA.User.PrimaryGuild`.
+
+  ## Examples
+
+      iex> EDA.User.server_tag(%EDA.User{primary_guild: %EDA.User.PrimaryGuild{identity_enabled: true, tag: "DISC"}})
+      "DISC"
+
+      iex> EDA.User.server_tag(%EDA.User{primary_guild: %EDA.User.PrimaryGuild{identity_enabled: false, tag: "DISC"}})
+      nil
+
+      iex> EDA.User.server_tag(%EDA.User{})
+      nil
+  """
+  @spec server_tag(t()) :: String.t() | nil
+  def server_tag(%__MODULE__{primary_guild: pg}) do
+    if EDA.User.PrimaryGuild.displayed?(pg), do: pg.tag
+  end
 
   @doc """
   Returns the display name (global_name if set, otherwise username).

@@ -119,9 +119,11 @@ defmodule EDA.MixProject do
           EDA.Presence,
           EDA.Reaction,
           EDA.Role,
+          EDA.Role.Colors,
           EDA.Sticker,
           EDA.Sticker.Pack,
           EDA.User,
+          EDA.User.PrimaryGuild,
           EDA.VoiceState,
           EDA.Webhook
         ],
