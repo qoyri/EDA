@@ -211,6 +211,172 @@ defmodule EDA.Interaction do
   def resolved(_, _, _), do: nil
 
   @doc """
+  Returns the resolved channel with this ID, as an `EDA.Channel` struct.
+
+  Resolved channels are partial: Discord sends `id`, `name`, `type`, `permissions`,
+  `app_permissions`, `parent_id`, `guild_id`, `flags`, `nsfw`, `position`, `topic`,
+  `rate_limit_per_user`, `last_message_id` and `last_pin_timestamp`, and nothing else.
+  Everything absent is `nil` on the struct rather than missing.
+
+      channel_id = get_option(interaction, "destination")
+      channel = EDA.Interaction.resolved_channel(interaction, channel_id)
+  """
+  @spec resolved_channel(interaction(), String.t()) :: EDA.Channel.t() | nil
+  def resolved_channel(interaction, channel_id) do
+    case resolved(interaction, "channels", channel_id) do
+      nil -> nil
+      raw -> EDA.Channel.from_raw(raw)
+    end
+  end
+
+  @doc """
+  Returns every resolved channel as an `EDA.Channel` struct.
+
+  Empty when the command took no channel option.
+  """
+  @spec resolved_channels(interaction()) :: [EDA.Channel.t()]
+  def resolved_channels(interaction) do
+    interaction
+    |> resolved_map("channels")
+    |> Map.values()
+    |> Enum.map(&EDA.Channel.from_raw/1)
+  end
+
+  @doc """
+  Returns the permissions the **bot** holds, as a bitset.
+
+  With one argument, this is what Discord computed for the channel the interaction came
+  from. With a channel id, it is the bot's permissions in that *resolved* channel — the one
+  a `CHANNEL` option named — which is usually a different channel from the one the command
+  was typed in.
+
+  Discord computes both and sends them with the interaction, so this answers "may I post
+  there?" with no REST call and no permission arithmetic. `EDA.Permission.in_channel/3` remains
+  the answer for a channel Discord did not resolve.
+
+      # the channel the user picked, not the one they typed in
+      destination = get_option(interaction, "destination")
+
+      if EDA.Interaction.can?(interaction, destination, :send_messages) do
+        EDA.API.Message.create(destination, content: "Posted!")
+      else
+        respond(interaction, "I cannot post there.", ephemeral: true)
+      end
+
+  Returns `nil` when the field is absent — an interaction from a context where Discord did
+  not send it, or a channel that was not resolved.
+  """
+  @spec app_permissions(interaction()) :: integer() | nil
+  def app_permissions(%{app_permissions: value}), do: parse_bitset(value)
+  def app_permissions(%{"app_permissions" => value}), do: parse_bitset(value)
+  def app_permissions(_interaction), do: nil
+
+  @doc "Returns the bot's permissions in a resolved channel, as a bitset. See `app_permissions/1`."
+  @spec app_permissions(interaction(), String.t()) :: integer() | nil
+  def app_permissions(interaction, channel_id) do
+    interaction
+    |> resolved("channels", channel_id)
+    |> extract_bitset("app_permissions")
+  end
+
+  @doc """
+  Returns the permissions the **invoking user** holds in a resolved channel, as a bitset.
+
+  Discord computes this alongside the bot's, which is what makes "you cannot do that here"
+  answerable without fetching the member and their roles.
+
+      if EDA.Interaction.user_can?(interaction, destination, :manage_messages) do
+        # ...
+      end
+  """
+  @spec user_permissions(interaction(), String.t()) :: integer() | nil
+  def user_permissions(interaction, channel_id) do
+    interaction
+    |> resolved("channels", channel_id)
+    |> extract_bitset("permissions")
+  end
+
+  @doc """
+  Returns `true` if the bot holds a permission.
+
+  `can?/2` asks about the channel the interaction came from, `can?/3` about a resolved
+  channel. An absent bitset is `false`: not being told is not permission.
+
+  ## Examples
+
+      can?(interaction, :embed_links)
+      can?(interaction, channel_id, :send_messages)
+  """
+  @spec can?(interaction(), EDA.Permission.flag()) :: boolean()
+  def can?(interaction, flag) do
+    holds?(app_permissions(interaction), flag)
+  end
+
+  @doc "Returns `true` if the bot holds a permission in a resolved channel. See `can?/2`."
+  @spec can?(interaction(), String.t(), EDA.Permission.flag()) :: boolean()
+  def can?(interaction, channel_id, flag) do
+    holds?(app_permissions(interaction, channel_id), flag)
+  end
+
+  @doc """
+  Returns `true` if the invoking user holds a permission in a resolved channel.
+
+  See `user_permissions/2`.
+  """
+  @spec user_can?(interaction(), String.t(), EDA.Permission.flag()) :: boolean()
+  def user_can?(interaction, channel_id, flag) do
+    holds?(user_permissions(interaction, channel_id), flag)
+  end
+
+  @doc """
+  Names every permission the bot holds, for the interaction's channel or a resolved one.
+
+  Handy in an error message or a log line, where the bitset says nothing.
+
+  ## Examples
+
+      permission_list(interaction)
+      permission_list(interaction, channel_id)
+  """
+  @spec permission_list(interaction()) :: [EDA.Permission.flag()]
+  def permission_list(interaction), do: list_of(app_permissions(interaction))
+
+  @doc "Names the bot's permissions in a resolved channel. See `permission_list/1`."
+  @spec permission_list(interaction(), String.t()) :: [EDA.Permission.flag()]
+  def permission_list(interaction, channel_id),
+    do: list_of(app_permissions(interaction, channel_id))
+
+  defp resolved_map(%{data: %{"resolved" => resolved}}, key) when is_map(resolved),
+    do: Map.get(resolved, key) || %{}
+
+  defp resolved_map(%{"data" => %{"resolved" => resolved}}, key) when is_map(resolved),
+    do: Map.get(resolved, key) || %{}
+
+  defp resolved_map(_interaction, _key), do: %{}
+
+  defp extract_bitset(nil, _key), do: nil
+  defp extract_bitset(raw, key) when is_map(raw), do: parse_bitset(raw[key])
+
+  # Discord sends permission bitsets as strings, because they exceed 53 bits.
+  defp parse_bitset(nil), do: nil
+  defp parse_bitset(value) when is_integer(value), do: value
+
+  defp parse_bitset(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {bitset, ""} -> bitset
+      _other -> nil
+    end
+  end
+
+  defp parse_bitset(_other), do: nil
+
+  defp holds?(nil, _flag), do: false
+  defp holds?(bitset, flag), do: EDA.Permission.has?(bitset, flag)
+
+  defp list_of(nil), do: []
+  defp list_of(bitset), do: EDA.Permission.to_list(bitset)
+
+  @doc """
   Returns the target ID for user/message context menu commands.
   """
   @spec target_id(interaction()) :: String.t() | nil
