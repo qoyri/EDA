@@ -188,6 +188,186 @@ defmodule EDA.Permission do
   @spec all() :: bitset()
   def all, do: @all_permissions
 
+  # ── Classification ────────────────────────────────────────────────
+  #
+  # Generated from Discord's own Bitwise Permission Flags table
+  # (discord-api-docs, developers/topics/permissions.mdx) rather than transcribed by
+  # hand: the "Channel Type" column marks each permission T (text), V (voice) and/or
+  # S (stage). An empty list means the permission only has meaning at guild level and
+  # is inert in a channel overwrite.
+  @channel_types %{
+    create_instant_invite: [:text, :voice, :stage],
+    kick_members: [],
+    ban_members: [],
+    administrator: [],
+    manage_channels: [:text, :voice, :stage],
+    manage_guild: [],
+    add_reactions: [:text, :voice, :stage],
+    view_audit_log: [],
+    priority_speaker: [:voice],
+    stream: [:voice, :stage],
+    view_channel: [:text, :voice, :stage],
+    send_messages: [:text, :voice, :stage],
+    send_tts_messages: [:text, :voice, :stage],
+    manage_messages: [:text, :voice, :stage],
+    embed_links: [:text, :voice, :stage],
+    attach_files: [:text, :voice, :stage],
+    read_message_history: [:text, :voice, :stage],
+    mention_everyone: [:text, :voice, :stage],
+    use_external_emojis: [:text, :voice, :stage],
+    view_guild_insights: [],
+    connect: [:voice, :stage],
+    speak: [:voice],
+    mute_members: [:voice, :stage],
+    deafen_members: [:voice],
+    move_members: [:voice, :stage],
+    use_vad: [:voice],
+    change_nickname: [],
+    manage_nicknames: [],
+    manage_roles: [:text, :voice, :stage],
+    manage_webhooks: [:text, :voice, :stage],
+    manage_guild_expressions: [],
+    use_application_commands: [:text, :voice, :stage],
+    request_to_speak: [:stage],
+    manage_events: [:voice, :stage],
+    manage_threads: [:text],
+    create_public_threads: [:text],
+    create_private_threads: [:text],
+    use_external_stickers: [:text, :voice, :stage],
+    send_messages_in_threads: [:text],
+    use_embedded_activities: [:text, :voice],
+    moderate_members: [],
+    view_creator_monetization_analytics: [],
+    use_soundboard: [:voice],
+    create_guild_expressions: [],
+    create_events: [:voice, :stage],
+    use_external_sounds: [:voice],
+    send_voice_messages: [:text, :voice, :stage],
+    set_voice_channel_status: [:voice],
+    send_polls: [:text, :voice, :stage],
+    use_external_apps: [:text, :voice, :stage],
+    pin_messages: [:text],
+    bypass_slowmode: [:text, :voice, :stage]
+  }
+
+  @typedoc "A channel category a permission can apply to."
+  @type channel_kind :: :text | :voice | :stage
+
+  @doc """
+  The channel kinds a permission applies to.
+
+  An empty list means the permission is guild-level only — setting it in a channel
+  overwrite has no effect.
+
+  ## Examples
+
+      iex> EDA.Permission.channel_types(:send_messages)
+      [:text, :voice, :stage]
+
+      iex> EDA.Permission.channel_types(:kick_members)
+      []
+
+      iex> EDA.Permission.channel_types(:request_to_speak)
+      [:stage]
+  """
+  @spec channel_types(flag()) :: [channel_kind()]
+  def channel_types(flag) when is_map_key(@channel_types, flag),
+    do: Map.fetch!(@channel_types, flag)
+
+  @doc """
+  Returns `true` for a permission that only has meaning at guild level.
+
+  ## Examples
+
+      iex> EDA.Permission.guild_only?(:kick_members)
+      true
+
+      iex> EDA.Permission.guild_only?(:send_messages)
+      false
+  """
+  @spec guild_only?(flag()) :: boolean()
+  def guild_only?(flag), do: channel_types(flag) == []
+
+  @doc """
+  Returns `true` for a permission that can meaningfully appear in a channel overwrite.
+
+  ## Examples
+
+      iex> EDA.Permission.channel?(:send_messages)
+      true
+
+      iex> EDA.Permission.channel?(:administrator)
+      false
+  """
+  @spec channel?(flag()) :: boolean()
+  def channel?(flag), do: channel_types(flag) != []
+
+  @doc """
+  Returns `true` if the permission applies to the given channel.
+
+  The second argument is a channel kind (`:text`, `:voice`, `:stage`), a raw Discord
+  channel type integer, or a channel struct or map. Categories accept every kind, since
+  their overwrites cascade to children of any type.
+
+  ## Examples
+
+      iex> EDA.Permission.applies_to?(:request_to_speak, :stage)
+      true
+
+      iex> EDA.Permission.applies_to?(:request_to_speak, :text)
+      false
+
+      iex> EDA.Permission.applies_to?(:kick_members, :text)
+      false
+  """
+  @spec applies_to?(flag(), channel_kind() | integer() | map()) :: boolean()
+  def applies_to?(flag, kind) when kind in [:text, :voice, :stage],
+    do: kind in channel_types(flag)
+
+  def applies_to?(flag, %{"type" => type}), do: applies_to?(flag, type)
+  def applies_to?(flag, %{type: type}) when is_integer(type), do: applies_to?(flag, type)
+
+  def applies_to?(flag, type) when is_integer(type) do
+    case channel_kind(type) do
+      :any -> channel?(flag)
+      nil -> false
+      kind -> kind in channel_types(flag)
+    end
+  end
+
+  def applies_to?(_flag, _channel), do: false
+
+  @doc """
+  Lists the permissions in a bitset that have **no effect** in the given channel.
+
+  Use it to catch a meaningless overwrite before sending it — Discord accepts
+  `KICK_MEMBERS` in a channel overwrite and silently ignores it. Neither JDA nor
+  Nostrum offers this check.
+
+  ## Examples
+
+      iex> bitset = EDA.Permission.to_bitset([:send_messages, :kick_members])
+      iex> EDA.Permission.inapplicable(bitset, :text)
+      [:kick_members]
+
+      iex> EDA.Permission.inapplicable(EDA.Permission.to_bitset([:send_messages]), :text)
+      []
+  """
+  @spec inapplicable(bitset(), channel_kind() | integer() | map()) :: [flag()]
+  def inapplicable(bitset, channel) when is_integer(bitset) do
+    bitset
+    |> to_list()
+    |> Enum.reject(&applies_to?(&1, channel))
+    |> Enum.sort()
+  end
+
+  # Category overwrites cascade to children of any type, so nothing is inert there.
+  defp channel_kind(4), do: :any
+  defp channel_kind(2), do: :voice
+  defp channel_kind(13), do: :stage
+  defp channel_kind(type) when type in [0, 5, 10, 11, 12, 15, 16], do: :text
+  defp channel_kind(_type), do: nil
+
   @doc "Returns all known permission flag atoms."
   @spec all_flags() :: [flag()]
   def all_flags, do: Map.keys(@flags)

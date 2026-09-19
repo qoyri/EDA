@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Permission classification** — `EDA.Permission.channel_types/1`, `guild_only?/1`, `channel?/1`,
+  `applies_to?/2` and `inapplicable/2`. The table is generated from Discord's own Bitwise Permission
+  Flags reference rather than transcribed, so the twelve guild-level permissions and the text/voice/
+  stage split come from the source. `inapplicable/2` lists the permissions in a bitset that have no
+  effect in a given channel — Discord accepts `KICK_MEMBERS` in a channel overwrite and silently
+  ignores it. JDA classifies permissions but offers no such check; Nostrum does neither
 - **`EDA.Permission.explain/3`** — returns *how* a member's channel permissions were derived, not
   just the result: `:base` role permissions, the ordered `:steps` (each overwrite tier with the
   `:allow`/`:deny` it applied and the running result), which `:gates` fired, and `:denied_by` naming
