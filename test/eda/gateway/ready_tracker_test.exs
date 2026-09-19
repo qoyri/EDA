@@ -21,7 +21,14 @@ defmodule EDA.Gateway.ReadyTrackerTest do
     # Synchronous state reset — flush any pending GenServer messages first
     _ = :sys.get_state(ReadyTracker)
 
-    :sys.replace_state(ReadyTracker, fn _old ->
+    :sys.replace_state(ReadyTracker, fn old ->
+      # shard_ready/2 arms a {:guild_timeout, shard_id} timer in the tracker's OWN
+      # process. Replacing the state drops the refs but does NOT cancel the timers, so
+      # one armed by a previous test fires mid-test and force-marks a shard ready —
+      # which is what made "decrements correctly and becomes ready" flaky. This runs
+      # inside the tracker process, so the timers can be cancelled here.
+      Enum.each(old.shard_timers, fn {_shard_id, ref} -> Process.cancel_timer(ref) end)
+
       %EDA.Gateway.ReadyTracker{
         pending_counts: %{},
         guild_to_shard: %{},
@@ -35,6 +42,9 @@ defmodule EDA.Gateway.ReadyTrackerTest do
         start_time: System.monotonic_time(:millisecond)
       }
     end)
+
+    # A timer may have fired between the flush above and the cancel; drain it.
+    _ = :sys.get_state(ReadyTracker)
 
     # Ensure persistent_term reflects the reset
     :persistent_term.put(:eda_globally_ready, false)

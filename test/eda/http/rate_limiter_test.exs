@@ -253,7 +253,10 @@ defmodule EDA.HTTP.RateLimiterTest do
 
       RateLimiter.queue(:get, "/test/telemetry-acquire", fn -> {:ok, "ok"} end)
 
-      assert_receive {:acquire_telemetry, %{queue_depth: _}}, 500
+      # Generous: the RateLimiter is a single GenServer shared by the whole suite, and a
+      # preceding test can leave it globally blocked, so acquire may legitimately take a
+      # while. What is under test is that the event fires with queue_depth, not how fast.
+      assert_receive {:acquire_telemetry, %{queue_depth: _}}, 5_000
     end
 
     test "emits rate_limited telemetry on 429 retry" do
@@ -281,7 +284,7 @@ defmodule EDA.HTTP.RateLimiterTest do
         end
       end)
 
-      assert_receive {:rl_telemetry, %{retry_after_ms: 10}}, 500
+      assert_receive {:rl_telemetry, %{retry_after_ms: 10}}, 5_000
     end
   end
 end
