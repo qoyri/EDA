@@ -26,8 +26,16 @@ defmodule EDA.Gateway.Capabilities do
       guild's `@everyone` role,
     * the channel's `flags` carry `CHANNEL_OBFUSCATED` (`1 <<< 17`).
 
-  `GET /guilds/{guild.id}/channels` omits them entirely instead. Interaction payloads
-  are built through a separate path and are never obfuscated.
+  Interaction payloads are built through a separate path and are never obfuscated.
+
+  > #### REST is not obfuscated {: .info}
+  >
+  > Discord's changelog states `GET /guilds/{guild.id}/channels` omits inaccessible
+  > channels. **That is not the observed behaviour.** Probed against a real guild on
+  > 2026-09-19 with this capability enabled: all 44 obfuscated channels were returned
+  > by REST, with their real `name`, `flags: 0` and their genuine permission
+  > overwrites — only the gateway payloads were redacted. Treat the two sources as
+  > disagreeing, and do not rely on either to hide a channel.
 
   The same opt-in is available as the "Private Channel Obfuscation" toggle in the
   Developer Portal; this option is the programmatic equivalent.
@@ -35,8 +43,9 @@ defmodule EDA.Gateway.Capabilities do
   > #### Cache and permissions {: .warning}
   >
   > Obfuscated channels are cached like any other, so `EDA.Cache.channels_for_guild/1`
-  > will return `"___hidden___"` entries, and `EDA.Permission` will treat the synthetic
-  > `@everyone` overwrite as a real one. Handle both before enabling this in production.
+  > returns `"___hidden___"` entries — reject them with `EDA.Channel.obfuscated?/1` before
+  > showing a channel list. `EDA.Permission.in_channel/3` already refuses to compute from
+  > the synthetic overwrite and returns `{:error, :channel_obfuscated}`.
   """
 
   import Bitwise
