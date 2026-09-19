@@ -16,8 +16,16 @@ defmodule EDA.PermissionTest do
   @channel_id "100"
   @voice_channel_id "200"
   @obfuscated_channel_id "perm_obf_300"
+  @timed_out_id "perm_timeout_4"
   @role_a_id "10"
   @role_b_id "20"
+
+  defp role_ids_of(user_id) do
+    case EDA.Cache.get_member(@guild_id, user_id) do
+      nil -> []
+      member -> member["roles"] || []
+    end
+  end
 
   defp setup_guild(_context) do
     # Clean up any previous test data
@@ -61,6 +69,14 @@ defmodule EDA.PermissionTest do
     EDA.Cache.Member.create(@guild_id, %{
       "user" => %{"id" => @user_id},
       "roles" => [@role_a_id]
+    })
+
+    # Timed out member — same roles as @user_id, so only the timeout differs
+    EDA.Cache.Member.create(@guild_id, %{
+      "user" => %{"id" => @timed_out_id},
+      "roles" => [@role_a_id],
+      "communication_disabled_until" =>
+        DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.to_iso8601()
     })
 
     # Text channel — no overwrites
@@ -188,6 +204,161 @@ defmodule EDA.PermissionTest do
 
     test "returns error for missing channel" do
       assert {:error, :channel_not_found} = Permission.in_channel(@guild_id, @user_id, "nope")
+    end
+  end
+
+  describe "in_channel/3 — timed out member" do
+    setup :setup_guild
+
+    test "keeps at most VIEW_CHANNEL and READ_MESSAGE_HISTORY" do
+      assert {:ok, perms} = Permission.in_channel(@guild_id, @timed_out_id, @channel_id)
+
+      # The gate restricts, so the result is the intersection of what the member had
+      # with the two retained permissions — never more.
+      assert Permission.to_list(perms) -- [:view_channel, :read_message_history] == []
+
+      assert Permission.has?(perms, :view_channel)
+      refute Permission.has?(perms, :send_messages)
+      refute Permission.has?(perms, :manage_messages)
+    end
+
+    test "the gate cannot grant a permission the member never had" do
+      # @everyone in this fixture does not grant read_message_history, so the timeout
+      # must not conjure it.
+      {:ok, before} = Permission.in_channel(@guild_id, @user_id, @channel_id)
+      {:ok, muted} = Permission.in_channel(@guild_id, @timed_out_id, @channel_id)
+
+      refute Permission.has?(before, :read_message_history)
+      refute Permission.has?(muted, :read_message_history)
+      assert Bitwise.band(muted, before) == muted
+    end
+
+    test "an identical member without the timeout keeps everything" do
+      {:ok, normal} = Permission.in_channel(@guild_id, @user_id, @channel_id)
+      {:ok, muted} = Permission.in_channel(@guild_id, @timed_out_id, @channel_id)
+
+      assert Permission.has?(normal, :send_messages)
+      refute Permission.has?(muted, :send_messages)
+    end
+
+    test "has_permission?/4 answers false, which is the point" do
+      refute Permission.has_permission?(@guild_id, @timed_out_id, @channel_id, :send_messages)
+      assert Permission.has_permission?(@guild_id, @timed_out_id, @channel_id, :view_channel)
+    end
+
+    test "an expired timeout is not a timeout" do
+      EDA.Cache.Member.create(@guild_id, %{
+        "user" => %{"id" => "perm_expired_5"},
+        "roles" => [@role_a_id],
+        "communication_disabled_until" =>
+          DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.to_iso8601()
+      })
+
+      assert Permission.has_permission?(@guild_id, "perm_expired_5", @channel_id, :send_messages)
+    end
+
+    test "owner and admin are exempt — Discord refuses to time them out at all" do
+      for id <- [@owner_id, @admin_id] do
+        EDA.Cache.Member.create(@guild_id, %{
+          "user" => %{"id" => id},
+          "roles" => role_ids_of(id),
+          "communication_disabled_until" =>
+            DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.to_iso8601()
+        })
+
+        assert {:ok, perms} = Permission.in_channel(@guild_id, id, @channel_id)
+        assert perms == Permission.all()
+      end
+    end
+
+    test "voice: a timed out member loses CONNECT and is gated to zero" do
+      assert {:ok, 0} = Permission.in_channel(@guild_id, @timed_out_id, @voice_channel_id)
+    end
+  end
+
+  describe "explain/3" do
+    setup :setup_guild
+
+    test "agrees with in_channel/3 on the effective result" do
+      {:ok, perms} = Permission.in_channel(@guild_id, @user_id, @channel_id)
+      {:ok, why} = Permission.explain(@guild_id, @user_id, @channel_id)
+
+      assert why.effective == perms
+    end
+
+    test "lists the derivation in order" do
+      {:ok, why} = Permission.explain(@guild_id, @user_id, @channel_id)
+
+      assert Enum.map(why.steps, & &1.stage) == [
+               :role_base,
+               :everyone_overwrite,
+               :role_overwrites,
+               :member_overwrite
+             ]
+
+      assert why.base == why.steps |> hd() |> Map.fetch!(:result)
+    end
+
+    test "names the gate that denied access" do
+      {:ok, why} = Permission.explain(@guild_id, @timed_out_id, @voice_channel_id)
+
+      assert why.denied_by == :no_connect
+      assert :timed_out in why.gates
+      assert why.effective == 0
+    end
+
+    test "records the timeout gate and what survived it" do
+      {:ok, why} = Permission.explain(@guild_id, @timed_out_id, @channel_id)
+
+      assert why.gates == [:timed_out]
+      assert why.denied_by == nil
+
+      gate = Enum.find(why.steps, &(&1[:gate] == :timed_out))
+
+      assert Permission.has?(gate.result, :view_channel)
+      refute Permission.has?(gate.result, :send_messages)
+    end
+
+    test "owner and admin short-circuit in a single step" do
+      {:ok, owner} = Permission.explain(@guild_id, @owner_id, @channel_id)
+      {:ok, admin} = Permission.explain(@guild_id, @admin_id, @channel_id)
+
+      assert Enum.map(owner.steps, & &1.stage) == [:owner]
+      assert Enum.map(admin.steps, & &1.stage) == [:administrator]
+      assert owner.effective == Permission.all()
+      assert admin.effective == Permission.all()
+    end
+
+    test "surfaces what an overwrite denied" do
+      EDA.Cache.Channel.create(%{
+        "id" => "perm_explain_ch",
+        "guild_id" => @guild_id,
+        "type" => 0,
+        "permission_overwrites" => [
+          %{
+            "id" => @guild_id,
+            "type" => 0,
+            "allow" => "0",
+            "deny" => to_string(Permission.to_bit(:send_messages))
+          }
+        ]
+      })
+
+      {:ok, why} = Permission.explain(@guild_id, @user_id, "perm_explain_ch")
+
+      denied =
+        why.steps
+        |> Enum.find(&(&1.stage == :everyone_overwrite))
+        |> Map.fetch!(:deny)
+        |> Permission.to_list()
+
+      assert :send_messages in denied
+      refute Permission.has?(why.effective, :send_messages)
+    end
+
+    test "propagates the same errors as in_channel/3" do
+      assert {:error, :channel_not_found} = Permission.explain(@guild_id, @user_id, "nope")
+      assert {:error, :member_not_found} = Permission.explain(@guild_id, "nobody", @channel_id)
     end
   end
 

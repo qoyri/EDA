@@ -272,6 +272,86 @@ defmodule EDA.Permission do
     end
   end
 
+  @typedoc """
+  A step in a permission derivation.
+
+  `:stage` is `:owner`, `:administrator`, `:role_base`, `:everyone_overwrite`,
+  `:role_overwrites`, `:member_overwrite` or `:gate`. Overwrite stages carry the
+  `:allow` and `:deny` bitsets that were applied; gate stages carry `:gate`.
+  `:result` is the running permission bitset after that step.
+  """
+  @type step :: %{
+          required(:stage) => atom(),
+          required(:result) => bitset(),
+          optional(:allow) => bitset(),
+          optional(:deny) => bitset(),
+          optional(:gate) => atom()
+        }
+
+  @typedoc "A full permission derivation, as returned by `explain/3`."
+  @type explanation :: %{
+          effective: bitset(),
+          base: bitset(),
+          steps: [step()],
+          gates: [atom()],
+          denied_by: atom() | nil
+        }
+
+  @doc """
+  Explains **how** a member's channel permissions were derived.
+
+  `in_channel/3` answers *what* a member may do; this answers *why*. Neither JDA nor
+  Nostrum exposes the derivation, and "why can't my bot post here" is usually answered
+  by guesswork against an opaque integer.
+
+  Returns the same `:effective` bitset as `in_channel/3`, plus:
+
+    * `:base` — guild-level permissions from the member's roles, before overwrites;
+    * `:steps` — the derivation in order, each with the running `:result`. Overwrite
+      steps carry the `:allow`/`:deny` bitsets that were applied;
+    * `:gates` — which access gates fired (`:timed_out`, `:no_view_channel`, `:no_connect`);
+    * `:denied_by` — the gate that reduced the result to zero, or `nil`.
+
+  Owner and administrator short-circuit to every permission, and say so in a single step.
+
+  ## Examples
+
+      {:ok, why} = EDA.Permission.explain(guild_id, user_id, channel_id)
+
+      why.denied_by
+      #=> :no_view_channel
+
+      Enum.map(why.steps, & &1.stage)
+      #=> [:role_base, :everyone_overwrite, :role_overwrites, :member_overwrite, :gate]
+
+      # what the @everyone overwrite took away
+      why.steps
+      |> Enum.find(&(&1.stage == :everyone_overwrite))
+      |> Map.fetch!(:deny)
+      |> EDA.Permission.to_list()
+      #=> [:send_messages]
+  """
+  @spec explain(String.t(), String.t(), String.t()) ::
+          {:ok, explanation()} | {:error, term()}
+  def explain(guild_id, user_id, channel_id) do
+    guild_id = to_string(guild_id)
+    user_id = to_string(user_id)
+    channel_id = to_string(channel_id)
+
+    with {:guild, guild} when guild != nil <- {:guild, EDA.Cache.get_guild(guild_id)},
+         {:member, member} when member != nil <-
+           {:member, EDA.Cache.get_member(guild_id, user_id)},
+         {:channel, channel} when channel != nil <- {:channel, EDA.Cache.get_channel(channel_id)},
+         {:obfuscated, false} <- {:obfuscated, EDA.Channel.obfuscated?(channel)} do
+      {:ok, trace_channel_permissions(guild, member, channel)}
+    else
+      {:guild, nil} -> {:error, :guild_not_found}
+      {:member, nil} -> {:error, :member_not_found}
+      {:channel, nil} -> {:error, :channel_not_found}
+      {:obfuscated, true} -> {:error, :channel_obfuscated}
+    end
+  end
+
   @doc """
   Checks if a member has a specific permission in a channel.
 
@@ -329,34 +409,73 @@ defmodule EDA.Permission do
 
   @doc false
   def compute_channel_permissions(guild, member, channel) do
+    trace_channel_permissions(guild, member, channel).effective
+  end
+
+  @doc false
+  @spec trace_channel_permissions(map(), map(), map()) :: explanation()
+  def trace_channel_permissions(guild, member, channel) do
     user_id = get_user_id(member)
+    base = compute_guild_permissions(guild, member)
 
     cond do
       guild["owner_id"] == user_id ->
-        @all_permissions
+        %{
+          effective: @all_permissions,
+          base: base,
+          steps: [%{stage: :owner, result: @all_permissions}],
+          gates: [],
+          denied_by: nil
+        }
 
-      admin?(compute_guild_permissions(guild, member)) ->
-        @all_permissions
+      admin?(base) ->
+        %{
+          effective: @all_permissions,
+          base: base,
+          steps: [%{stage: :administrator, result: @all_permissions}],
+          gates: [],
+          denied_by: nil
+        }
 
       true ->
-        base = compute_guild_permissions(guild, member)
-        perms = apply_overwrites(base, guild, member, channel)
-        apply_access_gates(perms, channel)
+        {after_overwrites, overwrite_steps} = trace_overwrites(base, guild, member, channel)
+        {effective, gate_steps, gates, denied_by} = trace_gates(after_overwrites, member, channel)
+
+        %{
+          effective: effective,
+          base: base,
+          steps: [%{stage: :role_base, result: base} | overwrite_steps] ++ gate_steps,
+          gates: gates,
+          denied_by: denied_by
+        }
     end
   end
 
   defp admin?(bitset), do: (bitset &&& @flags.administrator) == @flags.administrator
 
-  defp apply_access_gates(perms, channel) do
+  @timeout_retained @flags.view_channel ||| @flags.read_message_history
+
+  defp trace_gates(perms, member, channel) do
+    {perms, steps, gates} =
+      if EDA.Member.timed_out?(member) do
+        restricted = perms &&& @timeout_retained
+
+        {restricted, [%{stage: :gate, gate: :timed_out, result: restricted}], [:timed_out]}
+      else
+        {perms, [], []}
+      end
+
     cond do
       (perms &&& @flags.view_channel) != @flags.view_channel ->
-        0
+        {0, steps ++ [%{stage: :gate, gate: :no_view_channel, result: 0}],
+         gates ++ [:no_view_channel], :no_view_channel}
 
       (channel["type"] || 0) in @voice_types and (perms &&& @flags.connect) != @flags.connect ->
-        0
+        {0, steps ++ [%{stage: :gate, gate: :no_connect, result: 0}], gates ++ [:no_connect],
+         :no_connect}
 
       true ->
-        perms
+        {perms, steps, gates, nil}
     end
   end
 
@@ -369,7 +488,7 @@ defmodule EDA.Permission do
   #
   # We apply each tier sequentially so member overwrites always win.
 
-  defp apply_overwrites(base, guild, member, channel) do
+  defp trace_overwrites(base, guild, member, channel) do
     overwrites = channel["permission_overwrites"] || []
     everyone_role_id = to_string(guild["id"])
     user_id = get_user_id(member)
@@ -379,11 +498,14 @@ defmodule EDA.Permission do
     overwrite_map = Map.new(overwrites, fn ow -> {to_string(ow["id"]), ow} end)
 
     # Tier 1: @everyone overwrite
-    {allow, deny} =
+    {e_allow, e_deny} =
       case Map.get(overwrite_map, everyone_role_id) do
         nil -> {0, 0}
         ow -> {parse_permissions(ow["allow"]), parse_permissions(ow["deny"])}
       end
+
+    {allow, deny} = {e_allow, e_deny}
+    after_everyone = (base &&& bnot(e_deny)) ||| e_allow
 
     # Tier 2: Role overwrites (merged via OR, then cascade over tier 1)
     {role_allow, role_deny} =
@@ -401,22 +523,27 @@ defmodule EDA.Permission do
     allow = (allow &&& bnot(role_deny)) ||| role_allow
     deny = (deny &&& bnot(role_allow)) ||| role_deny
 
+    after_roles = (base &&& bnot(deny)) ||| allow
+
     # Tier 3: Member-specific overwrite
-    {allow, deny} =
+    {member_allow, member_deny} =
       case Map.get(overwrite_map, user_id) do
-        nil ->
-          {allow, deny}
-
-        ow ->
-          member_allow = parse_permissions(ow["allow"])
-          member_deny = parse_permissions(ow["deny"])
-
-          {(allow &&& bnot(member_deny)) ||| member_allow,
-           (deny &&& bnot(member_allow)) ||| member_deny}
+        nil -> {0, 0}
+        ow -> {parse_permissions(ow["allow"]), parse_permissions(ow["deny"])}
       end
 
-    # Apply: strip denied, grant allowed
-    (base &&& bnot(deny)) ||| allow
+    allow = (allow &&& bnot(member_deny)) ||| member_allow
+    deny = (deny &&& bnot(member_allow)) ||| member_deny
+
+    final = (base &&& bnot(deny)) ||| allow
+
+    steps = [
+      %{stage: :everyone_overwrite, allow: e_allow, deny: e_deny, result: after_everyone},
+      %{stage: :role_overwrites, allow: role_allow, deny: role_deny, result: after_roles},
+      %{stage: :member_overwrite, allow: member_allow, deny: member_deny, result: final}
+    ]
+
+    {final, steps}
   end
 
   # ── Helpers ───────────────────────────────────────────────────────

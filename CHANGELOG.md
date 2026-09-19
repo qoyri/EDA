@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`EDA.Permission.explain/3`** — returns *how* a member's channel permissions were derived, not
+  just the result: `:base` role permissions, the ordered `:steps` (each overwrite tier with the
+  `:allow`/`:deny` it applied and the running result), which `:gates` fired, and `:denied_by` naming
+  the gate that reduced the result to zero. Neither JDA nor Nostrum exposes the derivation
+- **`EDA.Member.timed_out?/1`** and **`time_out_end/1`** — mirroring JDA's `isTimedOut()` /
+  `getTimeOutEnd()`. Discord leaves `communication_disabled_until` populated after expiry, so
+  `time_out_end/1` may return a past date while `timed_out?/1` answers `false`. Both accept a struct
+  or a raw member map
+
 - **`EDA.API.Role.member_counts/1`** — `GET /guilds/{id}/roles/member-counts`, returning a map of
   role ID to member count, mirroring discord.js's `guild.roles.fetchMemberCounts()`. The `@everyone`
   role is absent from the result (every member carries it), and the counts overlap — a member with
@@ -70,6 +79,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`EDA.Permission.in_channel/3` now accounts for member timeouts.** Discord removes every
+  permission except `VIEW_CHANNEL` and `READ_MESSAGE_HISTORY` from a timed-out member; EDA was
+  reporting them as able to send messages, so a bot gating an action on `has_permission?/4` would
+  wrongly allow a silenced member. Neither Nostrum nor JDA applies this — JDA documents the rule but
+  leaves enforcement to the caller. The gate restricts and never grants, and guild owners and
+  administrators are exempt, since Discord refuses to time them out at all
 - **`EDA.Permission.in_channel/3` returns `{:error, :channel_obfuscated}`** for a channel Discord has
   redacted. The synthetic `@everyone` `VIEW_CHANNEL` deny is indistinguishable from a real overwrite,
   so computing from it would return a confident but meaningless answer; the ambiguity is surfaced to
