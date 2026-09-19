@@ -26,11 +26,11 @@ end
   Flags reference rather than transcribed, so the twelve guild-level permissions and the text/voice/
   stage split come from the source. `inapplicable/2` lists the permissions in a bitset that have no
   effect in a given channel — Discord accepts `KICK_MEMBERS` in a channel overwrite and silently
-  ignores it. JDA classifies permissions but offers no such check; Nostrum does neither
+  ignores it, so nothing upstream flags the overwrite as pointless
 - **`EDA.Permission.explain/3`** — returns *how* a member's channel permissions were derived, not
   just the result: `:base` role permissions, the ordered `:steps` (each overwrite tier with the
   `:allow`/`:deny` it applied and the running result), which `:gates` fired, and `:denied_by` naming
-  the gate that reduced the result to zero. Neither JDA nor Nostrum exposes the derivation
+  the gate that reduced the result to zero
 - **`EDA.Member.timed_out?/1`** and **`time_out_end/1`** — mirroring JDA's `isTimedOut()` /
   `getTimeOutEnd()`. Discord leaves `communication_disabled_until` populated after expiry, so
   `time_out_end/1` may return a past date while `timed_out?/1` answers `false`. Both accept a struct
@@ -100,8 +100,7 @@ end
 - **`EDA.Permission.in_channel/3` now accounts for member timeouts.** Discord removes every
   permission except `VIEW_CHANNEL` and `READ_MESSAGE_HISTORY` from a timed-out member; EDA was
   reporting them as able to send messages, so a bot gating an action on `has_permission?/4` would
-  wrongly allow a silenced member. Neither Nostrum nor JDA applies this — JDA documents the rule but
-  leaves enforcement to the caller. The gate restricts and never grants, and guild owners and
+  wrongly allow a silenced member. The gate restricts and never grants, and guild owners and
   administrators are exempt, since Discord refuses to time them out at all
 - **`EDA.Permission.in_channel/3` returns `{:error, :channel_obfuscated}`** for a channel Discord has
   redacted. The synthetic `@everyone` `VIEW_CHANNEL` deny is indistinguishable from a real overwrite,

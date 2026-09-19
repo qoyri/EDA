@@ -341,8 +341,8 @@ defmodule EDA.Permission do
   Lists the permissions in a bitset that have **no effect** in the given channel.
 
   Use it to catch a meaningless overwrite before sending it — Discord accepts
-  `KICK_MEMBERS` in a channel overwrite and silently ignores it. Neither JDA nor
-  Nostrum offers this check.
+  `KICK_MEMBERS` in a channel overwrite and silently ignores it, so nothing upstream
+  tells you the overwrite was pointless.
 
   ## Examples
 
@@ -480,9 +480,8 @@ defmodule EDA.Permission do
   @doc """
   Explains **how** a member's channel permissions were derived.
 
-  `in_channel/3` answers *what* a member may do; this answers *why*. Neither JDA nor
-  Nostrum exposes the derivation, and "why can't my bot post here" is usually answered
-  by guesswork against an opaque integer.
+  `in_channel/3` answers *what* a member may do; this answers *why*. "Why can't my bot
+  post here" is otherwise answered by guesswork against an opaque integer.
 
   Returns the same `:effective` bitset as `in_channel/3`, plus:
 
