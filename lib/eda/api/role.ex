@@ -48,6 +48,48 @@ defmodule EDA.API.Role do
     post("/guilds/#{guild_id}/roles", body, opts)
   end
 
+  @doc """
+  Sets a role's colours.
+
+  Accepts an `EDA.Role.Colors` struct or a plain map. Sends only the `colors` object,
+  never the deprecated `color` field — matching discord.js, whose `setColors` builds
+  the same payload.
+
+  Discord enforces the holographic triple whenever `tertiary_color` is present, so
+  build that case with `EDA.Role.Colors.holographic/0` rather than by hand.
+
+  > #### Requires an eligible guild {: .warning}
+  >
+  > Setting anything other than a solid colour returns **HTTP 403 with code 670006,
+  > "Missing guild feature"** (`EDA.Error.missing_guild_feature/0`) on a guild that is not
+  > eligible — observed on a boost-tier-0 guild, 2026-09-19. There is nothing to check
+  > first: `ENHANCED_ROLE_COLORS` was absent from the `features` array of **every** guild
+  > probed, including one that already had seven gradient roles. Attempt the call and
+  > handle 670006.
+
+  ## Options
+
+  - `:reason` — audit log reason
+
+  ## Examples
+
+      EDA.API.Role.set_colors(guild_id, role_id, EDA.Role.Colors.gradient(0xFF0000, 0x00FF00))
+      EDA.API.Role.set_colors(guild_id, role_id, EDA.Role.Colors.holographic(), reason: "event")
+      EDA.API.Role.set_colors(guild_id, role_id, %{primary_color: 0x5865F2})
+  """
+  @spec set_colors(
+          String.t() | integer(),
+          String.t() | integer(),
+          EDA.Role.Colors.t() | map(),
+          keyword()
+        ) :: {:ok, map()} | {:error, term()}
+  def set_colors(guild_id, role_id, colors, opts \\ []) do
+    modify(guild_id, role_id, %{colors: normalize_colors(colors)}, opts)
+  end
+
+  defp normalize_colors(%EDA.Role.Colors{} = colors), do: EDA.Role.Colors.to_map(colors)
+  defp normalize_colors(colors) when is_map(colors), do: colors
+
   @doc "Modifies a guild role."
   @spec modify(String.t() | integer(), String.t() | integer(), map(), keyword()) ::
           {:ok, map()} | {:error, term()}

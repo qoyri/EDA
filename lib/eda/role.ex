@@ -72,18 +72,81 @@ defmodule EDA.Role do
   def primary_color(%__MODULE__{color: color}), do: color
 
   @doc """
-  Returns `true` when the role uses a gradient colour.
+  The role's colour style: `:solid`, `:gradient` or `:holographic`.
 
   ## Examples
 
-      iex> EDA.Role.gradient?(%EDA.Role{colors: %EDA.Role.Colors{secondary_color: 2}})
+      iex> EDA.Role.style(%EDA.Role{colors: %EDA.Role.Colors{primary_color: 1, secondary_color: 2}})
+      :gradient
+
+      iex> EDA.Role.style(%EDA.Role{color: 1})
+      :solid
+  """
+  @spec style(t()) :: EDA.Role.Colors.style()
+  def style(%__MODULE__{colors: colors}), do: EDA.Role.Colors.style(colors)
+
+  @doc """
+  Returns `true` when the role uses a two-colour gradient.
+
+  **Not** true for holographic roles — use `holographic?/1` for those. Discord treats
+  the two as distinct styles, as do JDA and discord.js.
+
+  ## Examples
+
+      iex> EDA.Role.gradient?(%EDA.Role{colors: %EDA.Role.Colors{primary_color: 1, secondary_color: 2}})
       true
+
+      iex> EDA.Role.gradient?(%EDA.Role{colors: EDA.Role.Colors.holographic()})
+      false
 
       iex> EDA.Role.gradient?(%EDA.Role{color: 1})
       false
   """
   @spec gradient?(t()) :: boolean()
   def gradient?(%__MODULE__{colors: colors}), do: EDA.Role.Colors.gradient?(colors)
+
+  @doc """
+  Returns `true` when the role uses the holographic style.
+
+  ## Examples
+
+      iex> EDA.Role.holographic?(%EDA.Role{colors: EDA.Role.Colors.holographic()})
+      true
+
+      iex> EDA.Role.holographic?(%EDA.Role{color: 1})
+      false
+  """
+  @spec holographic?(t()) :: boolean()
+  def holographic?(%__MODULE__{colors: colors}), do: EDA.Role.Colors.holographic?(colors)
+
+  @doc """
+  Sets this role's colours, returning the updated `%EDA.Role{}`.
+
+  Accepts a role struct or a role ID, like `modify/4`.
+
+  ## Options
+
+  - `:reason` — audit log reason
+
+  ## Examples
+
+      EDA.Role.set_colors(guild_id, role, EDA.Role.Colors.gradient(0xFF0000, 0x00FF00))
+      EDA.Role.set_colors(guild_id, role_id, EDA.Role.Colors.holographic())
+  """
+  @spec set_colors(
+          String.t() | integer(),
+          t() | String.t() | integer(),
+          EDA.Role.Colors.t() | map(),
+          keyword()
+        ) :: {:ok, t()} | {:error, term()}
+  def set_colors(guild_id, role, colors, opts \\ [])
+
+  def set_colors(guild_id, %__MODULE__{id: id}, colors, opts),
+    do: set_colors(guild_id, id, colors, opts)
+
+  def set_colors(guild_id, role_id, colors, opts) do
+    EDA.API.Role.set_colors(guild_id, role_id, colors, opts) |> parse_response()
+  end
 
   @doc "Returns a mention string like `<@&id>`."
   @spec mention(t()) :: String.t()

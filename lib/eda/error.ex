@@ -400,6 +400,9 @@ defmodule EDA.Error do
     # ── File Uploads (400xxx) ──
     400_001 => {:file_uploads_limited, "Access to file uploads has been limited for this guild"},
 
+    # ── Guild Features (670xxx) ──
+    670_006 => {:missing_guild_feature, "Missing guild feature"},
+
     # ── Bans (500xxx) ──
     500_000 => {:failed_to_ban_users, "Failed to ban users"},
 
@@ -1385,6 +1388,19 @@ defmodule EDA.Error do
   @doc "File uploads limited for this guild (400001)."
   @spec file_uploads_limited() :: 400_001
   def file_uploads_limited, do: 400_001
+
+  # ── Guild Features (670xxx) ──
+
+  @doc """
+  The guild lacks a feature required by the request (670006).
+
+  Returned as HTTP 403. Observed when setting gradient or holographic role colours on a
+  guild that is not eligible — see `EDA.Role.Colors`. The feature is **not** advertised in
+  the guild's `features` array, so there is nothing to check beforehand: attempt the call
+  and handle this code.
+  """
+  @spec missing_guild_feature() :: 670_006
+  def missing_guild_feature, do: 670_006
 
   # ── Bans (500xxx) ──
 

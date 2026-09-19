@@ -30,6 +30,72 @@ defmodule EDA.API.RoleTest do
 
   # ── get_guild_roles ────────────────────────────────────────────────
 
+  describe "set_colors/4" do
+    test "sends only the colors object, never the deprecated color field", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "PATCH", "/guilds/111/roles/222", fn conn ->
+        {:ok, raw, conn} = Plug.Conn.read_body(conn)
+        body = Jason.decode!(raw)
+
+        assert body == %{"colors" => %{"primary_color" => 1, "secondary_color" => 2}}
+        refute Map.has_key?(body, "color")
+
+        json(conn, %{"id" => "222", "colors" => body["colors"]})
+      end)
+
+      assert {:ok, _} = Role.set_colors("111", "222", EDA.Role.Colors.gradient(1, 2))
+    end
+
+    test "holographic sends the three enforced values", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "PATCH", "/guilds/111/roles/333", fn conn ->
+        {:ok, raw, conn} = Plug.Conn.read_body(conn)
+
+        assert Jason.decode!(raw)["colors"] == %{
+                 "primary_color" => 11_127_295,
+                 "secondary_color" => 16_759_788,
+                 "tertiary_color" => 16_761_760
+               }
+
+        json(conn, %{"id" => "333"})
+      end)
+
+      assert {:ok, _} = Role.set_colors("111", "333", EDA.Role.Colors.holographic())
+    end
+
+    test "a solid colour omits the other keys", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "PATCH", "/guilds/111/roles/444", fn conn ->
+        {:ok, raw, conn} = Plug.Conn.read_body(conn)
+
+        assert Jason.decode!(raw)["colors"] == %{"primary_color" => 255}
+
+        json(conn, %{"id" => "444"})
+      end)
+
+      assert {:ok, _} = Role.set_colors("111", "444", EDA.Role.Colors.solid(255))
+    end
+
+    test "accepts a plain map too", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "PATCH", "/guilds/111/roles/555", fn conn ->
+        {:ok, raw, conn} = Plug.Conn.read_body(conn)
+
+        assert Jason.decode!(raw)["colors"] == %{"primary_color" => 7}
+
+        json(conn, %{"id" => "555"})
+      end)
+
+      assert {:ok, _} = Role.set_colors("111", "555", %{primary_color: 7})
+    end
+
+    test "forwards :reason as an audit log header", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "PATCH", "/guilds/111/roles/666", fn conn ->
+        assert Plug.Conn.get_req_header(conn, "x-audit-log-reason") == ["event%20colours"]
+        json(conn, %{"id" => "666"})
+      end)
+
+      assert {:ok, _} =
+               Role.set_colors("111", "666", EDA.Role.Colors.solid(1), reason: "event colours")
+    end
+  end
+
   describe "member_counts/1" do
     test "GET /guilds/:id/roles/member-counts", %{bypass: bypass} do
       Bypass.expect_once(bypass, "GET", "/guilds/111/roles/member-counts", fn conn ->
