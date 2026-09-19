@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`config :eda, capabilities:`** — opt into gateway capabilities before Discord makes them
+  mandatory. Accepts a list of atoms, a single atom, or a raw bitfield so future capabilities need
+  no library update. Unset by default, in which case no `capabilities` field is sent and IDENTIFY is
+  unchanged. See `EDA.Gateway.Capabilities`
+- **`:channel_obfuscation`** (`1 <<< 15`) — opts into Discord's redaction of channels the bot cannot
+  see, which becomes **mandatory for every bot on 2026-11-16**. Obfuscated channels still arrive over
+  the gateway but with `name` set to `"___hidden___"`, sensitive fields nulled, a single
+  `@everyone` `VIEW_CHANNEL` deny in `permission_overwrites`, and `CHANNEL_OBFUSCATED` (`1 <<< 17`)
+  in `flags`; `GET /guilds/{id}/channels` omits them. Enabling it early lets a bot observe and handle
+  the change ahead of the deadline
+
 ## [0.3.0] - 2026-09-19
 
 ### Installation

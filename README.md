@@ -183,6 +183,17 @@ config :eda,
 
 zlib-stream transport compression is always enabled and has no configuration option.
 
+Gateway capabilities let you opt into a protocol change before Discord enforces it:
+
+```elixir
+config :eda, capabilities: [:channel_obfuscation]
+```
+
+`:channel_obfuscation` becomes mandatory for all bots on **2026-11-16**. Channels the bot cannot see
+are still dispatched, but redacted — `name` becomes `"___hidden___"` and `flags` carry
+`CHANNEL_OBFUSCATED` — while `GET /guilds/{id}/channels` omits them. Enabling it early lets you see
+the redacted payloads and adapt caching and permission checks before the deadline. Unset by default.
+
 Sharding is automatic. EDA fetches the recommended shard count from Discord, launches shards with staggered timing, and tracks per-shard readiness. Override with:
 
 ```elixir

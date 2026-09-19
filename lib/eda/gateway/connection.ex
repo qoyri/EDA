@@ -497,7 +497,7 @@ defmodule EDA.Gateway.Connection do
       shard: Tuple.to_list(state.shard)
     }
 
-    d = maybe_add_presence(d)
+    d = d |> maybe_add_presence() |> maybe_add_capabilities()
     payload = %{op: 2, d: d}
 
     Logger.debug(
@@ -547,6 +547,18 @@ defmodule EDA.Gateway.Connection do
   defp browser_string(:mobile_android), do: "Discord Android"
   defp browser_string(:web), do: "EDA Web"
   defp browser_string(custom) when is_binary(custom), do: custom
+
+  # Omitted entirely when nothing is configured, so the default IDENTIFY is byte
+  # identical to before. See EDA.Gateway.Capabilities.
+  # Public (but undocumented) so the test suite can exercise the real function
+  # rather than a copy of it.
+  @doc false
+  def maybe_add_capabilities(d) do
+    case EDA.capabilities() do
+      0 -> d
+      bitfield -> Map.put(d, :capabilities, bitfield)
+    end
+  end
 
   defp maybe_add_presence(d) do
     case Application.get_env(:eda, :presence) do

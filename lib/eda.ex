@@ -59,6 +59,19 @@ defmodule EDA do
   end
 
   @doc """
+  Returns the configured gateway capabilities as a bitfield.
+
+  Returns `0` when none are configured, in which case no `capabilities` field is
+  sent in IDENTIFY and gateway behaviour is unchanged. See
+  `EDA.Gateway.Capabilities`.
+  """
+  @spec capabilities() :: non_neg_integer()
+  def capabilities do
+    Application.get_env(:eda, :capabilities, [])
+    |> EDA.Gateway.Capabilities.to_bitfield()
+  end
+
+  @doc """
   Returns the configured consumer module.
   """
   @spec consumer() :: module() | nil
