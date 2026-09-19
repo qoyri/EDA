@@ -25,7 +25,7 @@ A complete, production-grade Discord library for Elixir. 24 API modules, 68+ eve
 ```elixir
 def deps do
   [
-    {:eda, "~> 0.3.0"}
+    {:eda, "~> 0.4.0"}
   ]
 end
 ```

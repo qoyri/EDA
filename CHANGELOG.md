@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-19
+
+### Installation
+
+```elixir
+def deps do
+  [
+    {:eda, "~> 0.4.0"}
+  ]
+end
+```
+
 ### Added
 
 - **Permission classification** — `EDA.Permission.channel_types/1`, `guild_only?/1`, `channel?/1`,
