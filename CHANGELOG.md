@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `EDA.Message.edit/2` accepts a keyword list, including `attachments: :keep` — shorthand for the
   attachments the struct already holds, which is what stops an upload from wiping them
 - `EDA.Attachment` gained the `title`, `flags`, `placeholder` and `placeholder_version` fields
+- JSON error codes `160009` (cannot reference without read message history), `160010` (NSFW channel
+  message reference) and `160014` (cannot forward a message whose content you cannot read)
 - **`EDA.Cache.Adapter`** — the cache storage backend is now a behaviour with swappable
   implementations, configured with `config :eda, cache_adapter: ...`. Ships
   `EDA.Cache.Adapter.ETS` (the default, unchanged behaviour) and `EDA.Cache.Adapter.NoOp`
@@ -147,6 +149,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a prefix you write yourself still works
 - `EDA.HTTP.Multipart.encode/2` keeps an `attachments` array already present in the payload and
   indexes uploads after it, instead of replacing it
+- `EDA.API.Message.forward/3` documents that Discord requires read access to the source message's
+  content, and which error says it was refused
 - **Breaking: an option a route does not define now raises `ArgumentError`, and nothing is
   sent.** 0.4.1 logged a warning and sent the request unchanged, as announced there. Discord
   ignores a field or query parameter it does not recognise, so a misspelt option never failed —

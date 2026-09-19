@@ -85,6 +85,35 @@ defmodule EDA.ErrorTest do
     end
   end
 
+  describe "the message-reference codes" do
+    # 160009, 160010 and 160014 all reject a message that points at another message, and
+    # they arrive as ordinary {:error, %{code: _}} tuples from any create/forward call.
+    test "forwarding a message the bot cannot read" do
+      assert Error.cannot_forward_unreadable_message() == 160_014
+      assert Error.name(160_014) == :cannot_forward_unreadable_message
+
+      assert Error.message(160_014) ==
+               "You cannot forward a message whose content you cannot read"
+    end
+
+    test "referencing without read message history" do
+      assert Error.cannot_reference_without_read_history() == 160_009
+      assert Error.name(160_009) == :cannot_reference_without_read_history
+    end
+
+    test "referencing a message from an NSFW channel" do
+      assert Error.nsfw_message_reference_not_allowed() == 160_010
+      assert Error.name(160_010) == :nsfw_message_reference_not_allowed
+    end
+
+    test "they round-trip like every other code" do
+      for code <- [160_009, 160_010, 160_014] do
+        assert Error.known?(code)
+        assert Error.code(Error.name(code)) == code
+      end
+    end
+  end
+
   describe "bidirectionality" do
     test "code(name(x)) == x for sample of codes" do
       sample = [
@@ -101,6 +130,7 @@ defmodule EDA.ErrorTest do
         130_000,
         150_006,
         160_005,
+        160_014,
         170_001,
         180_000,
         200_000,

@@ -64,6 +64,20 @@ defmodule EDA.API.Message do
 
   Creates a message reference with `type: 1` (forward) pointing to the original message.
 
+  ## The bot must be able to read the message it forwards
+
+  Forwarding is not a way to relay a message out of a channel the bot cannot see. Discord
+  checks read access to the **source** message's content at forward time and rejects the
+  request with code `160014` otherwise — typically a missing `view_channel` or
+  `read_message_history` in the source channel, or a source channel the bot is no longer in:
+
+      case EDA.API.Message.forward(target_id, source_id, message_id) do
+        {:ok, message} -> message
+        {:error, %{code: 160_014}} -> :cannot_read_source
+      end
+
+  `EDA.Error.cannot_forward_unreadable_message/0` names that code.
+
   ## Examples
 
       EDA.API.Message.forward(target_channel_id, source_channel_id, message_id)

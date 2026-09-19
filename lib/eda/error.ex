@@ -354,6 +354,14 @@ defmodule EDA.Error do
     160_006 => {:max_active_threads, "Maximum number of active threads reached"},
     160_007 =>
       {:max_active_announcement_threads, "Maximum number of active announcement threads reached"},
+    160_009 =>
+      {:cannot_reference_without_read_history,
+       "Cannot reference a message without permission to read message history"},
+    160_010 =>
+      {:nsfw_message_reference_not_allowed, "NSFW channel message reference not allowed"},
+    160_014 =>
+      {:cannot_forward_unreadable_message,
+       "You cannot forward a message whose content you cannot read"},
 
     # ── Sticker Validation (170xxx) ──
     170_001 => {:invalid_lottie_json, "Invalid JSON for uploaded Lottie file"},
@@ -1303,6 +1311,18 @@ defmodule EDA.Error do
   @doc "Maximum active announcement threads reached (160007)."
   @spec max_active_announcement_threads() :: 160_007
   def max_active_announcement_threads, do: 160_007
+
+  @doc "Cannot reference a message without read message history permission (160009)."
+  @spec cannot_reference_without_read_history() :: 160_009
+  def cannot_reference_without_read_history, do: 160_009
+
+  @doc "NSFW channel message reference not allowed (160010)."
+  @spec nsfw_message_reference_not_allowed() :: 160_010
+  def nsfw_message_reference_not_allowed, do: 160_010
+
+  @doc "Cannot forward a message whose content the bot cannot read (160014)."
+  @spec cannot_forward_unreadable_message() :: 160_014
+  def cannot_forward_unreadable_message, do: 160_014
 
   # ── Sticker Validation (170xxx) ──
 
