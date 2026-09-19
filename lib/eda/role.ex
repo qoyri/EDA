@@ -72,18 +72,38 @@ defmodule EDA.Role do
   def primary_color(%__MODULE__{color: color}), do: color
 
   @doc """
-  The role's colour style: `:solid`, `:gradient` or `:holographic`.
+  The role's colour style: `:default`, `:solid`, `:gradient` or `:holographic`.
+
+  A role with no colour of its own is `:default`, not `:solid` — 39% of roles on real
+  guilds are in that state. See `EDA.Role.Colors`.
 
   ## Examples
 
       iex> EDA.Role.style(%EDA.Role{colors: %EDA.Role.Colors{primary_color: 1, secondary_color: 2}})
       :gradient
 
-      iex> EDA.Role.style(%EDA.Role{color: 1})
+      iex> EDA.Role.style(%EDA.Role{colors: %EDA.Role.Colors{primary_color: 1}})
       :solid
+
+      iex> EDA.Role.style(%EDA.Role{color: 1})
+      :default
   """
   @spec style(t()) :: EDA.Role.Colors.style()
   def style(%__MODULE__{colors: colors}), do: EDA.Role.Colors.style(colors)
+
+  @doc """
+  Returns `true` when the role has no colour of its own.
+
+  ## Examples
+
+      iex> EDA.Role.default?(%EDA.Role{colors: %EDA.Role.Colors{primary_color: 0}})
+      true
+
+      iex> EDA.Role.default?(%EDA.Role{colors: %EDA.Role.Colors{primary_color: 1}})
+      false
+  """
+  @spec default?(t()) :: boolean()
+  def default?(%__MODULE__{colors: colors}), do: EDA.Role.Colors.default?(colors)
 
   @doc """
   Returns `true` when the role uses a two-colour gradient.

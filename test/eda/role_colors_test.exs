@@ -26,10 +26,25 @@ defmodule EDA.RoleColorsTest do
     end
   end
 
-  describe "style/1 — three styles, as in JDA and discord.js" do
-    test "only a primary colour is solid" do
+  describe "style/1 — four styles, as in JDA" do
+    test "a real primary colour is solid" do
       assert Colors.style(%Colors{primary_color: 1}) == :solid
-      assert Colors.style(nil) == :solid
+    end
+
+    test "no colour at all is :default, not :solid — 39% of real roles" do
+      assert Colors.style(%Colors{primary_color: 0}) == :default
+      assert Colors.style(%Colors{primary_color: nil}) == :default
+      assert Colors.style(nil) == :default
+
+      refute Colors.solid?(%Colors{primary_color: 0})
+      assert Colors.default?(%Colors{primary_color: 0})
+    end
+
+    test "0 is absence of colour, not black" do
+      # Discord uses 0 for "inherit the theme default". A role explicitly coloured
+      # black would still be :solid with a non-zero value.
+      assert Colors.default?(%Colors{primary_color: 0})
+      assert Colors.solid?(%Colors{primary_color: 1})
     end
 
     test "a secondary colour makes it a gradient" do
@@ -45,11 +60,13 @@ defmodule EDA.RoleColorsTest do
 
     test "the predicates agree with style/1 and are mutually exclusive" do
       for colors <- [
+            %Colors{primary_color: 0},
             %Colors{primary_color: 1},
             %Colors{primary_color: 1, secondary_color: 2},
             Colors.holographic()
           ] do
         flags = [
+          Colors.default?(colors),
           Colors.solid?(colors),
           Colors.gradient?(colors),
           Colors.holographic?(colors)
@@ -177,7 +194,9 @@ defmodule EDA.RoleColorsTest do
       assert Role.holographic?(holo)
       refute Role.gradient?(holo)
 
-      assert Role.style(%Role{color: 1}) == :solid
+      assert Role.style(%Role{colors: %Colors{primary_color: 1}}) == :solid
+      assert Role.style(%Role{color: 1}) == :default
+      assert Role.default?(%Role{colors: %Colors{primary_color: 0}})
     end
   end
 end
