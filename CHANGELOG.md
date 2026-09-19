@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`EDA.API.Role.member_counts/1`** — `GET /guilds/{id}/roles/member-counts`, returning a map of
+  role ID to member count. The `@everyone` role is absent from the result (every member carries it),
+  and the counts overlap — a member with three roles is counted in all three, so they sum to more
+  than the guild's `member_count`
+
+- **`EDA.Role.colors`** / **`EDA.Role.Colors`** — gradient role colours, which supersede the
+  deprecated single `color` field. `EDA.Role.primary_color/1` prefers `colors.primary_color` and
+  falls back to `color`; `EDA.Role.gradient?/1` and `EDA.Role.Colors.gradient?/1` report whether a
+  role uses a gradient. Observed on a real guild: every role carried all three keys, 7 of 57 used a
+  gradient, and the `ENHANCED_ROLE_COLORS` guild feature was **absent** despite gradients being in
+  use — so do not gate on that feature
+- **`EDA.User.primary_guild`** / **`EDA.User.PrimaryGuild`** — the user's server tag
+  (`identity_guild_id`, `identity_enabled`, `tag`, `badge`). `EDA.User.server_tag/1` returns the tag
+  only when it is actually displayed, and `EDA.User.PrimaryGuild.badge_url/2` builds the CDN URL.
+  `identity_enabled` is tri-state: `true` shown, `false` removed by the user, `nil` cleared by
+  Discord — `displayed?/1` handles all three
+
 - **`config :eda, capabilities:`** — opt into gateway capabilities before Discord makes them
   mandatory. Accepts a list of atoms, a single atom, or a raw bitfield so future capabilities need
   no library update. Unset by default, in which case no `capabilities` field is sent and IDENTIFY is

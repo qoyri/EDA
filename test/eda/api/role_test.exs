@@ -30,6 +30,40 @@ defmodule EDA.API.RoleTest do
 
   # ── get_guild_roles ────────────────────────────────────────────────
 
+  describe "member_counts/1" do
+    test "GET /guilds/:id/roles/member-counts", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "GET", "/guilds/111/roles/member-counts", fn conn ->
+        # Shape taken from a live guild: role_id => integer, @everyone absent.
+        json(conn, %{
+          "938496731396599808" => 179,
+          "964090281647542342" => 272,
+          "1174605032830812240" => 1
+        })
+      end)
+
+      assert {:ok, counts} = Role.member_counts("111")
+      assert counts["938496731396599808"] == 179
+      assert counts["1174605032830812240"] == 1
+      assert map_size(counts) == 3
+    end
+
+    test "accepts an integer guild id", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "GET", "/guilds/222/roles/member-counts", fn conn ->
+        json(conn, %{})
+      end)
+
+      assert {:ok, %{}} = Role.member_counts(222)
+    end
+
+    test "propagates errors", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "GET", "/guilds/333/roles/member-counts", fn conn ->
+        json(conn, %{"message" => "Missing Access", "code" => 50_001}, 403)
+      end)
+
+      assert {:error, _} = Role.member_counts("333")
+    end
+  end
+
   describe "list/1" do
     test "GET /guilds/:id/roles", %{bypass: bypass} do
       Bypass.expect_once(bypass, "GET", "/guilds/111/roles", fn conn ->

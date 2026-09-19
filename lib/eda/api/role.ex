@@ -13,6 +13,33 @@ defmodule EDA.API.Role do
     EDA.HTTP.Client.get("/guilds/#{guild_id}/roles")
   end
 
+  @doc """
+  Gets the number of members carrying each role in a guild.
+
+  Returns a map of role ID to member count.
+
+  Two things to know, both confirmed against a live guild (2026-09-19):
+
+    * the **`@everyone` role is absent** from the result — its ID equals the guild ID,
+      and every member carries it, so Discord omits it. Expect one fewer entry than
+      `list/1` returns;
+    * the counts **overlap**. A member holding three roles is counted in all three, so
+      the values sum to more than the guild's `member_count` (2739 against 528 on the
+      guild probed).
+
+  ## Examples
+
+      {:ok, counts} = EDA.API.Role.member_counts(guild_id)
+      #=> {:ok, %{"938496731396599808" => 179, "964090281647542342" => 272}}
+
+      Map.get(counts, role_id, 0)
+  """
+  @spec member_counts(String.t() | integer()) ::
+          {:ok, %{String.t() => non_neg_integer()}} | {:error, term()}
+  def member_counts(guild_id) do
+    EDA.HTTP.Client.get("/guilds/#{guild_id}/roles/member-counts")
+  end
+
   @doc "Creates a role in a guild."
   @spec create(String.t() | integer(), keyword() | map(), keyword()) ::
           {:ok, map()} | {:error, term()}
