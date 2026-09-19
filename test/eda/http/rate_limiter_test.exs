@@ -3,6 +3,22 @@ defmodule EDA.HTTP.RateLimiterTest do
 
   alias EDA.HTTP.RateLimiter
 
+  # The RateLimiter is a single GenServer shared by the whole suite, and its global
+  # budget (50 requests per 1s window) is spent by the ~1300 other tests. When it is
+  # exhausted, handle_call({:acquire, ..}) takes the {:wait, delay} branch: the caller
+  # is queued, the :acquire telemetry never fires, and timing assertions pick up a
+  # full window of delay. Every test here assumes a fresh budget, so give it one.
+  # Reading the defaults off a fresh struct avoids duplicating @global_limit.
+  setup do
+    defaults = %RateLimiter{}
+
+    :sys.replace_state(RateLimiter, fn state ->
+      %{state | global_remaining: defaults.global_remaining, global_blocked_until: nil}
+    end)
+
+    :ok
+  end
+
   describe "queue/4 basic" do
     test "single request executes immediately" do
       result = RateLimiter.queue(:get, "/test/basic", fn -> {:ok, "done"} end)
@@ -253,9 +269,8 @@ defmodule EDA.HTTP.RateLimiterTest do
 
       RateLimiter.queue(:get, "/test/telemetry-acquire", fn -> {:ok, "ok"} end)
 
-      # Generous: the RateLimiter is a single GenServer shared by the whole suite, and a
-      # preceding test can leave it globally blocked, so acquire may legitimately take a
-      # while. What is under test is that the event fires with queue_depth, not how fast.
+      # Generous on purpose: what is under test is that the event fires with
+      # queue_depth, not how quickly it arrives.
       assert_receive {:acquire_telemetry, %{queue_depth: _}}, 5_000
     end
 
