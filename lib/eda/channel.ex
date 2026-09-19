@@ -35,6 +35,8 @@ defmodule EDA.Channel do
   | `sort_creation_date/0`  | 1     | Creation date     |
   """
 
+  import Bitwise
+
   use EDA.Event.Access
 
   # ── Channel types ──
@@ -179,6 +181,150 @@ defmodule EDA.Channel do
 
   @doc "Returns `1` — Sort by creation date."
   def sort_creation_date, do: @sort_creation_date
+
+  # ── Flags ──
+
+  @flag_pinned 1 <<< 1
+  @flag_require_tag 1 <<< 4
+  @flag_hide_media_download_options 1 <<< 15
+  @flag_obfuscated 1 <<< 17
+  @flag_spoiler 1 <<< 21
+
+  @channel_flags %{
+    pinned: @flag_pinned,
+    require_tag: @flag_require_tag,
+    hide_media_download_options: @flag_hide_media_download_options,
+    obfuscated: @flag_obfuscated,
+    spoiler: @flag_spoiler
+  }
+
+  @obfuscated_name "___hidden___"
+
+  @typedoc "A channel flag name."
+  @type flag ::
+          :pinned | :require_tag | :hide_media_download_options | :obfuscated | :spoiler
+
+  @doc "Thread pinned in its parent forum or media channel (`1 <<< 1`)."
+  @spec flag_pinned() :: integer()
+  def flag_pinned, do: @flag_pinned
+
+  @doc "Threads in this forum or media channel require a tag (`1 <<< 4`)."
+  @spec flag_require_tag() :: integer()
+  def flag_require_tag, do: @flag_require_tag
+
+  @doc "Hides embedded media download options; media channels only (`1 <<< 15`)."
+  @spec flag_hide_media_download_options() :: integer()
+  def flag_hide_media_download_options, do: @flag_hide_media_download_options
+
+  @doc "The channel's metadata is obfuscated because the bot cannot view it (`1 <<< 17`)."
+  @spec flag_obfuscated() :: integer()
+  def flag_obfuscated, do: @flag_obfuscated
+
+  @doc "The channel requires opt-in viewing (`1 <<< 21`)."
+  @spec flag_spoiler() :: integer()
+  def flag_spoiler, do: @flag_spoiler
+
+  @doc """
+  The `name` Discord substitutes for an obfuscated channel.
+
+  ## Examples
+
+      iex> EDA.Channel.obfuscated_name()
+      "___hidden___"
+  """
+  @spec obfuscated_name() :: String.t()
+  def obfuscated_name, do: @obfuscated_name
+
+  @doc "Every flag name EDA knows about."
+  @spec all_flags() :: [flag()]
+  def all_flags, do: Map.keys(@channel_flags)
+
+  @doc """
+  Returns `true` if the given flag is set.
+
+  Accepts a `t:t/0`, a raw channel map as the cache stores it, a bitfield, or `nil`.
+
+  ## Examples
+
+      iex> EDA.Channel.has_flag?(%EDA.Channel{flags: 1 <<< 17}, :obfuscated)
+      true
+
+      iex> EDA.Channel.has_flag?(%{"flags" => 0}, :obfuscated)
+      false
+
+      iex> EDA.Channel.has_flag?(nil, :obfuscated)
+      false
+  """
+  @spec has_flag?(t() | map() | integer() | nil, flag()) :: boolean()
+  def has_flag?(channel, flag)
+
+  def has_flag?(%__MODULE__{flags: flags}, flag), do: has_flag?(flags, flag)
+  def has_flag?(%{"flags" => flags}, flag), do: has_flag?(flags, flag)
+
+  def has_flag?(bitfield, flag) when is_integer(bitfield) do
+    case Map.get(@channel_flags, flag) do
+      nil -> false
+      value -> (bitfield &&& value) == value
+    end
+  end
+
+  def has_flag?(_channel, _flag), do: false
+
+  @doc """
+  Returns the set flags as a list of names, ignoring bits EDA does not know.
+
+  ## Examples
+
+      iex> EDA.Channel.flag_list(%EDA.Channel{flags: (1 <<< 17) + (1 <<< 1)})
+      [:obfuscated, :pinned]
+
+      iex> EDA.Channel.flag_list(nil)
+      []
+  """
+  @spec flag_list(t() | map() | integer() | nil) :: [flag()]
+  def flag_list(channel)
+
+  def flag_list(%__MODULE__{flags: flags}), do: flag_list(flags)
+  def flag_list(%{"flags" => flags}), do: flag_list(flags)
+
+  def flag_list(bitfield) when is_integer(bitfield) do
+    @channel_flags
+    |> Enum.filter(fn {_name, value} -> (bitfield &&& value) == value end)
+    |> Enum.map(&elem(&1, 0))
+    |> Enum.sort()
+  end
+
+  def flag_list(_channel), do: []
+
+  @doc """
+  Returns `true` if Discord has obfuscated this channel because the bot cannot view it.
+
+  Obfuscated channels are still dispatched over the gateway, but their metadata is
+  redacted: `name` becomes `#{@obfuscated_name}`, sensitive fields are nulled, and
+  `permission_overwrites` holds a single overwrite denying `VIEW_CHANNEL` to the
+  guild's `@everyone` role. Treat them as "exists but invisible" — in particular do
+  not compute permissions from those overwrites, and consider filtering them out of
+  channel listings shown to users.
+
+  Mandatory for every bot from **2026-11-16**; before then it is opt-in via
+  `config :eda, capabilities: [:channel_obfuscation]` (see `EDA.Gateway.Capabilities`).
+
+  ## Examples
+
+      iex> EDA.Channel.obfuscated?(%EDA.Channel{flags: 1 <<< 17})
+      true
+
+      iex> EDA.Channel.obfuscated?(%EDA.Channel{flags: 0})
+      false
+
+      iex> EDA.Channel.obfuscated?(%{"flags" => 1 <<< 17})
+      true
+
+      iex> EDA.Channel.obfuscated?(nil)
+      false
+  """
+  @spec obfuscated?(t() | map() | integer() | nil) :: boolean()
+  def obfuscated?(channel), do: has_flag?(channel, :obfuscated)
 
   # ── Type helpers ──
 

@@ -19,6 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `@everyone` `VIEW_CHANNEL` deny in `permission_overwrites`, and `CHANNEL_OBFUSCATED` (`1 <<< 17`)
   in `flags`; `GET /guilds/{id}/channels` omits them. Enabling it early lets a bot observe and handle
   the change ahead of the deadline
+- **Channel flags** on `EDA.Channel` — `flag_pinned/0`, `flag_require_tag/0`,
+  `flag_hide_media_download_options/0`, `flag_obfuscated/0`, `flag_spoiler/0`, plus
+  `all_flags/0`, `has_flag?/2`, `flag_list/1` and `obfuscated_name/0`. `has_flag?/2` and
+  `flag_list/1` accept a `%EDA.Channel{}`, a raw channel map as the cache stores it, a bare
+  bitfield or `nil`
+- **`EDA.Channel.obfuscated?/1`** — whether Discord redacted a channel because the bot cannot view
+  it. Such channels still arrive over the gateway with `name` set to `"___hidden___"` and a single
+  synthetic `@everyone` `VIEW_CHANNEL` deny in `permission_overwrites`; do not compute permissions
+  from those overwrites
 
 ## [0.3.0] - 2026-09-19
 
