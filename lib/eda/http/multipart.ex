@@ -21,6 +21,7 @@ defmodule EDA.HTTP.Multipart do
     ".webm" => "video/webm",
     ".mov" => "video/quicktime",
     ".pdf" => "application/pdf",
+    ".csv" => "text/csv",
     ".txt" => "text/plain",
     ".json" => "application/json",
     ".zip" => "application/zip",
@@ -64,6 +65,32 @@ defmodule EDA.HTTP.Multipart do
   end
 
   @doc """
+  Encodes a payload and **named** file fields into multipart/form-data.
+
+  `encode/2` is for Discord's message attachments, which are always `files[n]` accompanied
+  by an `attachments` array. A handful of endpoints instead want a file under a name of its
+  own — `target_users_file` on invites — alongside the other params in `payload_json`.
+
+  `fields` is a list of `{field_name, filename, data}`. The payload is omitted when empty,
+  since these endpoints accept a file on its own.
+
+  Returns `{body_iodata, content_type}`.
+  """
+  @spec encode_named(map(), [{String.t(), String.t(), binary()}]) :: {iodata(), String.t()}
+  def encode_named(json_payload, fields) when is_map(json_payload) and is_list(fields) do
+    boundary = generate_boundary()
+
+    parts =
+      if map_size(json_payload) == 0,
+        do: [],
+        else: [json_part(boundary, json_payload)]
+
+    parts = parts ++ Enum.map(fields, &named_part(boundary, &1))
+
+    {parts ++ [closing_boundary(boundary)], "multipart/form-data; boundary=#{boundary}"}
+  end
+
+  @doc """
   Returns the MIME type for a filename based on its extension.
 
   Falls back to `application/octet-stream` for unknown extensions.
@@ -85,6 +112,20 @@ defmodule EDA.HTTP.Multipart do
       "Content-Type: application/json\r\n",
       "\r\n",
       Jason.encode!(payload),
+      "\r\n"
+    ]
+  end
+
+  defp named_part(boundary, {name, filename, data}) do
+    [
+      "--",
+      boundary,
+      "\r\n",
+      "Content-Disposition: form-data; name=\"#{escape_filename(name)}\"; " <>
+        "filename=\"#{escape_filename(filename)}\"\r\n",
+      "Content-Type: #{mime_type(filename)}\r\n",
+      "\r\n",
+      data,
       "\r\n"
     ]
   end
