@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`EDA.Cache.Adapter`** — the cache storage backend is now a behaviour with swappable
+  implementations, configured with `config :eda, cache_adapter: ...`. Ships
+  `EDA.Cache.Adapter.ETS` (the default, unchanged behaviour) and `EDA.Cache.Adapter.NoOp`
+  (stores nothing — useful for memory-constrained or stateless bots)
+- Admission policy, size limits, eviction and telemetry now live **above** the adapter rather
+  than inside it, so a third-party backend inherits all four for free — a backend only has to
+  answer where an entity lives
+
 ## [0.4.0] - 2026-09-19
 
 ### Installation
