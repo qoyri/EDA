@@ -145,33 +145,169 @@ defmodule EDA.API.MessageTest do
 
   # ── Pins ───────────────────────────────────────────────────────────
 
-  describe "pinned/1" do
-    test "GET /channels/:id/pins", %{bypass: bypass} do
-      Bypass.expect_once(bypass, "GET", "/channels/111/pins", fn conn ->
-        json(conn, [%{"id" => "1"}])
+  describe "pins/2" do
+    test "GET /channels/:id/messages/pins returns the raw envelope", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "GET", "/channels/111/messages/pins", fn conn ->
+        json(conn, %{
+          "items" => [%{"pinned_at" => "2026-08-01T10:00:00Z", "message" => %{"id" => "1"}}],
+          "has_more" => false
+        })
       end)
 
-      assert {:ok, [%{"id" => "1"}]} = Message.pinned("111")
+      assert {:ok, %{"items" => [item], "has_more" => false}} = Message.pins("111")
+      assert item["pinned_at"] == "2026-08-01T10:00:00Z"
+    end
+
+    test "forwards :before and :limit as query params", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "GET", "/channels/111/messages/pins", fn conn ->
+        conn = Plug.Conn.fetch_query_params(conn)
+        assert conn.query_params["before"] == "2026-08-01T10:00:00Z"
+        assert conn.query_params["limit"] == "10"
+        json(conn, %{"items" => [], "has_more" => false})
+      end)
+
+      assert {:ok, _} = Message.pins("111", before: "2026-08-01T10:00:00Z", limit: 10)
     end
   end
 
-  describe "pin/2" do
-    test "PUT /channels/:id/pins/:id", %{bypass: bypass} do
-      Bypass.expect_once(bypass, "PUT", "/channels/111/pins/222", fn conn ->
+  describe "pinned/2" do
+    test "unwraps a single page into message objects", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "GET", "/channels/111/messages/pins", fn conn ->
+        json(conn, %{
+          "items" => [
+            %{"pinned_at" => "2026-08-01T10:00:00Z", "message" => %{"id" => "1"}},
+            %{"pinned_at" => "2026-07-01T10:00:00Z", "message" => %{"id" => "2"}}
+          ],
+          "has_more" => false
+        })
+      end)
+
+      assert {:ok, [%{"id" => "1"}, %{"id" => "2"}]} = Message.pinned("111")
+    end
+
+    test "paginates on has_more using the last pinned_at as cursor", %{bypass: bypass} do
+      Bypass.expect(bypass, "GET", "/channels/111/messages/pins", fn conn ->
+        conn = Plug.Conn.fetch_query_params(conn)
+
+        case conn.query_params["before"] do
+          nil ->
+            items =
+              Enum.map(1..50, fn i ->
+                %{
+                  "pinned_at" => "2026-08-01T10:00:#{String.pad_leading("#{i}", 2, "0")}Z",
+                  "message" => %{"id" => "p#{i}"}
+                }
+              end)
+
+            json(conn, %{"items" => items, "has_more" => true})
+
+          "2026-08-01T10:00:50Z" ->
+            json(conn, %{
+              "items" => [
+                %{"pinned_at" => "2026-07-01T10:00:00Z", "message" => %{"id" => "p51"}}
+              ],
+              "has_more" => false
+            })
+        end
+      end)
+
+      assert {:ok, msgs} = Message.pinned("111")
+      assert length(msgs) == 51
+      assert List.last(msgs)["id"] == "p51"
+    end
+
+    test "stops on an empty page even when has_more is true", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "GET", "/channels/111/messages/pins", fn conn ->
+        json(conn, %{"items" => [], "has_more" => true})
+      end)
+
+      assert {:ok, []} = Message.pinned("111")
+    end
+
+    test "honours :limit smaller than a page with a single request", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "GET", "/channels/111/messages/pins", fn conn ->
+        conn = Plug.Conn.fetch_query_params(conn)
+        assert conn.query_params["limit"] == "2"
+
+        json(conn, %{
+          "items" => [
+            %{"pinned_at" => "2026-08-01T10:00:00Z", "message" => %{"id" => "1"}},
+            %{"pinned_at" => "2026-07-01T10:00:00Z", "message" => %{"id" => "2"}}
+          ],
+          "has_more" => true
+        })
+      end)
+
+      assert {:ok, [%{"id" => "1"}, %{"id" => "2"}]} = Message.pinned("111", limit: 2)
+    end
+
+    test "returns the error when the first page fails", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "GET", "/channels/111/messages/pins", fn conn ->
+        json(conn, %{"message" => "boom"}, 500)
+      end)
+
+      assert {:error, _} = Message.pinned("111")
+    end
+
+    test "returns partial results when a later page fails", %{bypass: bypass} do
+      Bypass.expect(bypass, "GET", "/channels/111/messages/pins", fn conn ->
+        conn = Plug.Conn.fetch_query_params(conn)
+
+        if conn.query_params["before"] do
+          json(conn, %{"message" => "boom"}, 500)
+        else
+          items =
+            Enum.map(1..50, fn i ->
+              %{
+                "pinned_at" => "2026-08-01T10:00:#{String.pad_leading("#{i}", 2, "0")}Z",
+                "message" => %{"id" => "p#{i}"}
+              }
+            end)
+
+          json(conn, %{"items" => items, "has_more" => true})
+        end
+      end)
+
+      assert {:ok, msgs} = Message.pinned("111")
+      assert length(msgs) == 50
+    end
+  end
+
+  describe "pin/3" do
+    test "PUT /channels/:id/messages/pins/:id", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "PUT", "/channels/111/messages/pins/222", fn conn ->
         Plug.Conn.resp(conn, 204, "")
       end)
 
       assert :ok = Message.pin("111", "222")
     end
+
+    test "sends the audit log reason", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "PUT", "/channels/111/messages/pins/222", fn conn ->
+        assert {"x-audit-log-reason", "important"} in conn.req_headers
+        Plug.Conn.resp(conn, 204, "")
+      end)
+
+      assert :ok = Message.pin("111", "222", reason: "important")
+    end
   end
 
-  describe "unpin/2" do
-    test "DELETE /channels/:id/pins/:id", %{bypass: bypass} do
-      Bypass.expect_once(bypass, "DELETE", "/channels/111/pins/222", fn conn ->
+  describe "unpin/3" do
+    test "DELETE /channels/:id/messages/pins/:id", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "DELETE", "/channels/111/messages/pins/222", fn conn ->
         Plug.Conn.resp(conn, 204, "")
       end)
 
       assert :ok = Message.unpin("111", "222")
+    end
+
+    test "sends the audit log reason", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "DELETE", "/channels/111/messages/pins/222", fn conn ->
+        assert {"x-audit-log-reason", "cleanup"} in conn.req_headers
+        Plug.Conn.resp(conn, 204, "")
+      end)
+
+      assert :ok = Message.unpin("111", "222", reason: "cleanup")
     end
   end
 

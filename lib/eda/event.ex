@@ -63,9 +63,11 @@ defmodule EDA.Event do
     "VOICE_SPEAKING_STOP" => EDA.Event.VoiceSpeakingStop,
     "VOICE_AUDIO" => EDA.Event.VoiceAudio,
     "VOICE_PLAYBACK_FINISHED" => EDA.Event.VoicePlaybackFinished,
+    "VOICE_CHANNEL_STATUS_UPDATE" => EDA.Event.VoiceChannelStatusUpdate,
     "GUILD_AVAILABLE" => EDA.Event.GuildCreate,
     "GUILD_UNAVAILABLE" => EDA.Event.GuildDelete,
     "GATEWAY_CLOSE" => EDA.Event.GatewayClose,
+    "RATE_LIMITED" => EDA.Event.RateLimited,
     "SESSION_RESUMED" => EDA.Event.SessionResumed,
     "SHARD_READY" => EDA.Event.ShardReady,
     "ALL_SHARDS_READY" => EDA.Event.AllShardsReady
@@ -133,6 +135,8 @@ defmodule EDA.Event do
           | EDA.Event.VoiceSpeakingStop.t()
           | EDA.Event.VoiceAudio.t()
           | EDA.Event.VoicePlaybackFinished.t()
+          | EDA.Event.VoiceChannelStatusUpdate.t()
+          | EDA.Event.RateLimited.t()
           | EDA.Event.ShardReady.t()
           | EDA.Event.AllShardsReady.t()
           | EDA.Event.Raw.t()

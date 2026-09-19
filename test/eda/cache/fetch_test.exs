@@ -23,6 +23,41 @@ defmodule EDA.Cache.FetchTest do
     |> Plug.Conn.resp(status, Jason.encode!(body))
   end
 
+  describe "fetch_role/2 cache policy" do
+    test "consults the policy with the real role, never nil", %{bypass: bypass} do
+      test_pid = self()
+
+      Application.put_env(:eda, :cache,
+        roles: [
+          policy: fn entity, key, value ->
+            send(test_pid, {:policy, entity, key, value})
+            :cache
+          end
+        ]
+      )
+
+      EDA.Cache.Config.setup()
+
+      Bypass.expect_once(bypass, "GET", "/guilds/frp1/roles", fn conn ->
+        json(conn, [%{"id" => "frp1role", "name" => "Admin"}])
+      end)
+
+      assert {:ok, role} = EDA.Cache.fetch_role("frp1", "frp1role")
+      assert role["name"] == "Admin"
+
+      # The policy must be asked about an actual role. Passing nil key/value
+      # breaks EDA.Cache.Policy.check/4's contract and makes per-role policies
+      # impossible to write.
+      assert_received {:policy, :role, key, value}
+      assert key == {"frp1", "frp1role"}
+      assert value["name"] == "Admin"
+
+      # ...and it must be asked exactly once per role, not once for the list
+      # and then again inside EDA.Cache.Role.create/2.
+      refute_received {:policy, _, _, _}
+    end
+  end
+
   describe "fetch_guild/1" do
     test "returns cached data without REST call" do
       guild = %{"id" => "fg1", "name" => "Cached Guild"}

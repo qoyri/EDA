@@ -89,7 +89,8 @@ defmodule EDA.Channel do
     :owner_id,
     :member_count,
     :message_count,
-    :total_message_sent
+    :total_message_sent,
+    :status
   ]
 
   @type t :: %__MODULE__{
@@ -118,7 +119,8 @@ defmodule EDA.Channel do
           owner_id: String.t() | nil,
           member_count: integer() | nil,
           message_count: integer() | nil,
-          total_message_sent: integer() | nil
+          total_message_sent: integer() | nil,
+          status: String.t() | nil
         }
 
   # ── Channel type accessors ──
@@ -262,7 +264,8 @@ defmodule EDA.Channel do
       owner_id: raw["owner_id"],
       member_count: raw["member_count"],
       message_count: raw["message_count"],
-      total_message_sent: raw["total_message_sent"]
+      total_message_sent: raw["total_message_sent"],
+      status: raw["status"]
     }
   end
 
@@ -362,5 +365,26 @@ defmodule EDA.Channel do
       {:ok, raw} when is_map(raw) -> {:ok, EDA.Message.from_raw(raw)}
       {:error, _} = err -> err
     end
+  end
+
+  @doc """
+  Sets a voice channel's status (up to 500 characters, or `nil` to clear it).
+
+  Accepts a channel struct or ID.
+
+  ## Options
+
+  - `:reason` - Audit log reason
+  """
+  @spec set_voice_status(t() | String.t() | integer(), String.t() | nil, keyword()) ::
+          :ok | {:error, term()}
+  def set_voice_status(channel, status, opts \\ [])
+
+  def set_voice_status(%__MODULE__{id: id}, status, opts),
+    do: set_voice_status(id, status, opts)
+
+  def set_voice_status(channel_id, status, opts)
+      when is_binary(channel_id) or is_integer(channel_id) do
+    EDA.API.Channel.set_voice_status(channel_id, status, opts)
   end
 end

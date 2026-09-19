@@ -68,4 +68,23 @@ defmodule EDA.API.Channel do
       error -> error
     end
   end
+
+  @doc """
+  Sets a voice channel's status (up to 500 characters, or `nil` to clear it).
+
+  Requires the `SET_VOICE_CHANNEL_STATUS` permission, plus `MANAGE_CHANNELS`
+  if the bot is not connected to the channel.
+
+  ## Options
+
+  - `:reason` - Audit log reason
+  """
+  @spec set_voice_status(String.t() | integer(), String.t() | nil, keyword()) ::
+          :ok | {:error, term()}
+  def set_voice_status(channel_id, status, opts \\ []) do
+    case put("/channels/#{channel_id}/voice-status", %{status: status}, opts) do
+      {:ok, _} -> :ok
+      error -> error
+    end
+  end
 end

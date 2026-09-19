@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **EDA.API.Message.pins/2** — one page of a channel's pins, with `pinned_at` timestamps and `has_more`
+- **EDA.API.Channel.set_voice_status/3** / **EDA.Channel.set_voice_status/3** — set or clear a voice channel's status, plus the `VOICE_CHANNEL_STATUS_UPDATE` event and the `:status` field on `EDA.Channel`
+- **EDA.Event.RateLimited** — gateway rate limit notifications (`opcode`, `retry_after`, `guild_id`, `nonce`), previously swallowed by `EDA.Event.Raw`
+- `:reason` (audit log) on `EDA.API.Message.pin/3` and `unpin/3`, and on `EDA.Message.pin/2` and `unpin/2`
+
+### Changed
+
+- **Pins** now use `/channels/{id}/messages/pins`; the deprecated `/channels/{id}/pins` routes are gone. `EDA.API.Message.pinned/2` keeps returning `{:ok, [message]}` but paginates past the old 50-pin ceiling
+- **EDA.Gateway.MemberChunker** throttles all-members OP 8 requests to one per guild per 30 seconds, queueing them instead of letting Discord drop them. Prefix searches and `user_ids` lookups are exempt. Configurable with `config :eda, member_chunk_cooldown_ms: 30_000`
+
+### Fixed
+
+- **Cache admission policies are now consulted once, with the real entity.** On the REST fallback path a custom `fn/3` or module policy was asked about the whole result with `nil` for both key and value, and then asked again per entity by the cache module. A policy that pattern matched on a map raised `FunctionClauseError`, and per-role decisions were impossible. `EDA.Cache.fetch_role/2` and the other `fetch_*` fallbacks now delegate straight to the cache modules, which apply the policy with the real key and value
+- **`EDA.Voice.Dave.Native` specs now match what the NIF actually returns.** The Rust side returns `Result<T, Atom>`, which Rustler encodes as `{:ok, T}`, so `new_session/3` yields `{:ok, reference()}` and `create_key_package/1`, `process_proposals/4`, `encrypt_opus/2` and `decrypt_audio/3` are double wrapped as `{:ok, {:ok, binary()}}`. The getters (`ready?/1`, `get_epoch/1`, `status/1`, `can_passthrough?/2`, `protocol_version/1`) are wrapped too. Runtime behaviour is unchanged — `EDA.Voice.Dave.Manager` already normalised both shapes — but the published specs were misleading for anyone calling the NIF directly
+- **`EDA.Modal.modal/7`** declared every input as `map()` while `modal/3..6` default the trailing inputs to `nil`, so each defaulted arity broke its own contract
+- Removed unreachable clauses from private helpers in `EDA.Cache` and `EDA.Command.Option`
+
+### Documentation
+
+- Corrected the Gateway and Cache configuration examples in the README: the key is `gateway_encoding:` (not `encoding:`) and `:etf` is the default; `compress:` does not exist since zlib-stream is unconditional; shard overrides use a top-level `shards:` (`:auto`, an integer, or `{range, total}`) rather than `shard_count:` under `:gateway`; and `:cache` options are per entity, with no `evict_interval`
+- `EDA.Gateway.Intents` no longer claims `:nonprivileged` is the default — `EDA.intents/0` falls back to `[:guilds]`
+
 ## [0.2.0] - 2026-04-04
 
 ### Installation

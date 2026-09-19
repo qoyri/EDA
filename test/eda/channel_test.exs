@@ -111,6 +111,12 @@ defmodule EDA.ChannelTest do
       assert channel.default_sort_order == nil
       assert channel.thread_metadata == nil
       assert channel.owner_id == nil
+      assert channel.status == nil
+    end
+
+    test "parses voice channel status" do
+      channel = Channel.from_raw(%{"id" => "vc1", "type" => 2, "status" => "gaming"})
+      assert channel.status == "gaming"
     end
   end
 
@@ -211,6 +217,29 @@ defmodule EDA.ChannelTest do
 
       assert {:ok, %EDA.Message{id: "msg1", content: "hello"}} =
                Channel.send_message("ch1", %{content: "hello"})
+    end
+  end
+
+  describe "set_voice_status/3" do
+    test "returns :ok on 204 and accepts a channel struct", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "PUT", "/channels/vc1/voice-status", fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        assert Jason.decode!(body) == %{"status" => "gaming"}
+        Plug.Conn.resp(conn, 204, "")
+      end)
+
+      assert :ok = Channel.set_voice_status(%Channel{id: "vc1"}, "gaming")
+    end
+
+    test "accepts an id, sends null to clear, and forwards the audit reason", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "PUT", "/channels/vc1/voice-status", fn conn ->
+        assert {"x-audit-log-reason", "cleanup"} in conn.req_headers
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        assert Jason.decode!(body) == %{"status" => nil}
+        Plug.Conn.resp(conn, 204, "")
+      end)
+
+      assert :ok = Channel.set_voice_status("vc1", nil, reason: "cleanup")
     end
   end
 end

@@ -406,7 +406,169 @@ defmodule EDA.Gateway.MemberChunkerTest do
     end
   end
 
+  describe "OP 8 throttle" do
+    setup do
+      Application.put_env(:eda, :member_chunk_cooldown_ms, 120)
+      on_exit(fn -> Application.delete_env(:eda, :member_chunk_cooldown_ms) end)
+      :ok
+    end
+
+    test "the first all-members request goes out and arms the cooldown" do
+      guild = "throttle_g1"
+      MemberChunker.request(guild)
+      Process.sleep(20)
+
+      assert Map.has_key?(chunker_state().cooldowns, guild)
+      assert Map.get(chunker_state().pending, guild, []) == []
+    end
+
+    test "a second request within the window is queued instead of sent" do
+      guild = "throttle_g2"
+      MemberChunker.request(guild)
+      Process.sleep(20)
+      armed_at = chunker_state().cooldowns[guild]
+
+      # A queued fire-and-forget would be coalesced, so use an await-style
+      # caller to observe the queue: it is enqueued, not dropped.
+      task = Task.async(fn -> MemberChunker.await(guild) end)
+      Process.sleep(20)
+
+      assert length(Map.get(chunker_state().pending, guild, [])) == 1
+      assert chunker_state().cooldowns[guild] == armed_at
+
+      Task.shutdown(task, :brutal_kill)
+    end
+
+    test "the queue drains once the cooldown expires" do
+      guild = "throttle_g3"
+      MemberChunker.request(guild)
+      Process.sleep(20)
+
+      task = Task.async(fn -> MemberChunker.await(guild) end)
+      Process.sleep(20)
+      assert length(Map.get(chunker_state().pending, guild, [])) == 1
+
+      Process.sleep(150)
+      assert Map.get(chunker_state().pending, guild, []) == []
+
+      Task.shutdown(task, :brutal_kill)
+    end
+
+    test "different guilds do not throttle each other" do
+      MemberChunker.request("throttle_g4")
+      MemberChunker.request("throttle_g5")
+      Process.sleep(20)
+
+      assert Map.get(chunker_state().pending, "throttle_g4", []) == []
+      assert Map.get(chunker_state().pending, "throttle_g5", []) == []
+      assert Map.has_key?(chunker_state().cooldowns, "throttle_g4")
+      assert Map.has_key?(chunker_state().cooldowns, "throttle_g5")
+    end
+
+    test "duplicate fire-and-forget requests are coalesced" do
+      guild = "throttle_g6"
+      MemberChunker.request(guild)
+      Process.sleep(20)
+
+      MemberChunker.request(guild)
+      MemberChunker.request(guild)
+      Process.sleep(20)
+
+      assert length(Map.get(chunker_state().pending, guild, [])) == 1
+    end
+
+    test "prefix search is never throttled" do
+      guild = "throttle_g7"
+      task1 = Task.async(fn -> MemberChunker.search(guild, "ali") end)
+      task2 = Task.async(fn -> MemberChunker.search(guild, "bob") end)
+      Process.sleep(20)
+
+      assert Map.get(chunker_state().pending, guild, []) == []
+      refute Map.has_key?(chunker_state().cooldowns, guild)
+
+      Task.shutdown(task1, :brutal_kill)
+      Task.shutdown(task2, :brutal_kill)
+    end
+
+    test "fetching by user ids is never throttled" do
+      guild = "throttle_g8"
+      task1 = Task.async(fn -> MemberChunker.fetch(guild, ["1"]) end)
+      task2 = Task.async(fn -> MemberChunker.fetch(guild, ["2"]) end)
+      Process.sleep(20)
+
+      assert Map.get(chunker_state().pending, guild, []) == []
+      refute Map.has_key?(chunker_state().cooldowns, guild)
+
+      Task.shutdown(task1, :brutal_kill)
+      Task.shutdown(task2, :brutal_kill)
+    end
+  end
+
+  describe "handle_rate_limited/1" do
+    setup do
+      Application.put_env(:eda, :member_chunk_cooldown_ms, 120)
+      on_exit(fn -> Application.delete_env(:eda, :member_chunk_cooldown_ms) end)
+      :ok
+    end
+
+    test "arms the cooldown from retry_after, overriding the local one" do
+      guild = "rl_g1"
+      MemberChunker.request(guild)
+      Process.sleep(20)
+      local = chunker_state().cooldowns[guild]
+
+      MemberChunker.handle_rate_limited(%{
+        "opcode" => 8,
+        "retry_after" => 5.0,
+        "meta" => %{"guild_id" => guild}
+      })
+
+      Process.sleep(20)
+      assert chunker_state().cooldowns[guild] > local
+    end
+
+    test "requeues the rejected request, preserving its caller" do
+      guild = "rl_g2"
+      MemberChunker.request(guild)
+      Process.sleep(20)
+
+      {nonce, request} =
+        Enum.find(chunker_state().requests, fn {_n, r} -> r.guild_id == guild end)
+
+      assert request.caller == nil
+
+      MemberChunker.handle_rate_limited(%{
+        "opcode" => 8,
+        "retry_after" => 0.05,
+        "meta" => %{"guild_id" => guild, "nonce" => nonce}
+      })
+
+      Process.sleep(20)
+      state = chunker_state()
+      refute Map.has_key?(state.requests, nonce)
+      assert [%{guild_id: ^guild}] = Map.get(state.pending, guild, [])
+    end
+
+    test "an unknown nonce only arms the cooldown" do
+      guild = "rl_g3"
+
+      MemberChunker.handle_rate_limited(%{
+        "opcode" => 8,
+        "retry_after" => 1.0,
+        "meta" => %{"guild_id" => guild, "nonce" => "nope"}
+      })
+
+      Process.sleep(20)
+      state = chunker_state()
+      assert Map.has_key?(state.cooldowns, guild)
+      assert Map.get(state.pending, guild, []) == []
+      assert Process.alive?(Process.whereis(MemberChunker))
+    end
+  end
+
   # ── Helpers ──────────────────────────────────────────────────────────
+
+  defp chunker_state, do: :sys.get_state(MemberChunker)
 
   defp start_tracked_request(guild_id) do
     # Fire-and-forget request to register a nonce, then extract it

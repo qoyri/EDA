@@ -363,6 +363,9 @@ defmodule EDA.Voice.Audio do
     end
   end
 
+  # :gen_udp.send/4 and the DAVE encrypt path are both FFI-ish boundaries; the final
+  # `error ->` clause is a deliberate guard, not dead code.
+  @dialyzer {:nowarn_function, send_single_frame: 5}
   defp send_single_frame(frame, voice_state, seq, timestamp, nonce) do
     with {:ok, frame} <- maybe_dave_encrypt(frame, voice_state.dave_manager),
          packet <-

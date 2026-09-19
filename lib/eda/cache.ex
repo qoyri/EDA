@@ -268,15 +268,8 @@ defmodule EDA.Cache do
 
     with {:ok, roles} <- EDA.API.Role.list(guild_id) do
       :telemetry.execute([:eda, :cache, :fallback], %{count: 1}, %{cache: :roles})
-      cache_roles_if_allowed(guild_id, roles)
+      Enum.each(roles, &EDA.Cache.Role.create(guild_id, &1))
       find_role(roles, role_id_str)
-    end
-  end
-
-  defp cache_roles_if_allowed(guild_id, roles) do
-    case EDA.Cache.Policy.check(EDA.Cache.Config.policy(:roles), :role, nil, nil) do
-      :cache -> Enum.each(roles, &EDA.Cache.Role.create(to_string(guild_id), &1))
-      :skip -> :ok
     end
   end
 
@@ -291,18 +284,11 @@ defmodule EDA.Cache do
     case rest_fn.() do
       {:ok, data} ->
         :telemetry.execute([:eda, :cache, :fallback], %{count: 1}, %{cache: cache_name})
-        maybe_cache(cache_name, data)
+        do_cache(cache_name, data)
         {:ok, data}
 
       {:error, _} = error ->
         error
-    end
-  end
-
-  defp maybe_cache(cache_name, data) do
-    case EDA.Cache.Policy.check(EDA.Cache.Config.policy(cache_name), nil, nil, data) do
-      :cache -> do_cache(cache_name, data)
-      :skip -> :ok
     end
   end
 
@@ -315,6 +301,4 @@ defmodule EDA.Cache do
       EDA.Cache.Member.create(guild_id, data)
     end
   end
-
-  defp do_cache(_, _data), do: :ok
 end

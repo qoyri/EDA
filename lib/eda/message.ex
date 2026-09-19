@@ -138,18 +138,26 @@ defmodule EDA.Message do
 
   @doc """
   Pins a message in its channel.
+
+  ## Options
+
+  - `:reason` - Audit log reason
   """
-  @spec pin(t()) :: :ok | {:error, term()}
-  def pin(%__MODULE__{channel_id: cid, id: mid}) do
-    EDA.API.Message.pin(cid, mid)
+  @spec pin(t(), keyword()) :: :ok | {:error, term()}
+  def pin(%__MODULE__{channel_id: cid, id: mid}, opts \\ []) do
+    EDA.API.Message.pin(cid, mid, opts)
   end
 
   @doc """
   Unpins a message from its channel.
+
+  ## Options
+
+  - `:reason` - Audit log reason
   """
-  @spec unpin(t()) :: :ok | {:error, term()}
-  def unpin(%__MODULE__{channel_id: cid, id: mid}) do
-    EDA.API.Message.unpin(cid, mid)
+  @spec unpin(t(), keyword()) :: :ok | {:error, term()}
+  def unpin(%__MODULE__{channel_id: cid, id: mid}, opts \\ []) do
+    EDA.API.Message.unpin(cid, mid, opts)
   end
 
   @doc """

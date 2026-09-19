@@ -27,6 +27,12 @@ defmodule EDA.Entity do
       def change(%Changeset{module: __MODULE__} = cs, key, value),
         do: Changeset.put(cs, key, value)
 
+      # Generic across every entity: an API function may return {:ok, map} (200),
+      # {:ok, nil} (204 — see EDA.HTTP.Client.handle_response/2) or a bare :ok.
+      # No single module exercises all four clauses, so Dialyzer sees the unused
+      # ones as dead per module. Scoped to this function only.
+      @dialyzer {:nowarn_function, parse_response: 1}
+
       @doc false
       defp parse_response({:ok, raw}) when is_map(raw), do: {:ok, from_raw(raw)}
       defp parse_response({:ok, nil}), do: :ok

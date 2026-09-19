@@ -14,6 +14,12 @@ defmodule EDA.Voice.Dave.Manager do
   alias EDA.Voice.Dave.Native
   alias EDA.Voice.Payload
 
+  # Final catch-alls at the NIF boundary. The specs in EDA.Voice.Dave.Native now
+  # enumerate every shape Rustler actually produces, so Dialyzer sees these as
+  # unreachable — they are kept deliberately: an unexpected NIF return must degrade
+  # to passthrough on the 50 fps audio path, not crash the voice session.
+  @dialyzer {:nowarn_function, encrypt_frame: 2, normalize_encrypt_result: 1}
+
   defstruct [
     :mls_session,
     :protocol_version,

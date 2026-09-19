@@ -122,7 +122,8 @@ defmodule EDA.Modal do
         text_input("q2", "Why?", :paragraph, required: false)
       )
   """
-  @spec modal(String.t(), String.t(), map(), map(), map(), map(), map()) :: map()
+  @spec modal(String.t(), String.t(), map(), map() | nil, map() | nil, map() | nil, map() | nil) ::
+          map()
   def modal(custom_id, title, input1, input2 \\ nil, input3 \\ nil, input4 \\ nil, input5 \\ nil) do
     inputs =
       [input1, input2, input3, input4, input5]
