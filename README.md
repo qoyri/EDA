@@ -152,6 +152,11 @@ config :eda, :cache,
   ]
 ```
 
+Channels the bot cannot view are **kept in the cache**, with their metadata redacted by Discord
+(`name` becomes `"___hidden___"`). Reject them with `EDA.Channel.obfuscated?/1` before showing a
+channel list, or skip them at admission with a `channels:` policy. See the "Obfuscated channels"
+section of `EDA.Cache`.
+
 Options are set **per entity**, not globally. The configurable caches are `:guilds`, `:users`,
 `:channels`, `:members`, `:roles`, `:voice_states` and `:presences`; each accepts `:policy` and
 `:max_size`. Caches left out use the defaults (`policy: :all`, no size limit). The eviction sweep

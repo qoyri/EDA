@@ -17,8 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   see, which becomes **mandatory for every bot on 2026-11-16**. Obfuscated channels still arrive over
   the gateway but with `name` set to `"___hidden___"`, sensitive fields nulled, a single
   `@everyone` `VIEW_CHANNEL` deny in `permission_overwrites`, and `CHANNEL_OBFUSCATED` (`1 <<< 17`)
-  in `flags`; `GET /guilds/{id}/channels` omits them. Enabling it early lets a bot observe and handle
-  the change ahead of the deadline
+  in `flags`. Enabling it early lets a bot observe and handle the change ahead of the deadline.
+  Note that only *gateway* payloads are redacted: probed against a real guild on 2026-09-19,
+  `GET /guilds/{id}/channels` still returned every obfuscated channel in full, contrary to Discord's
+  changelog
 - **Channel flags** on `EDA.Channel` — `flag_pinned/0`, `flag_require_tag/0`,
   `flag_hide_media_download_options/0`, `flag_obfuscated/0`, `flag_spoiler/0`, plus
   `all_flags/0`, `has_flag?/2`, `flag_list/1` and `obfuscated_name/0`. `has_flag?/2` and
@@ -28,6 +30,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it. Such channels still arrive over the gateway with `name` set to `"___hidden___"` and a single
   synthetic `@everyone` `VIEW_CHANNEL` deny in `permission_overwrites`; do not compute permissions
   from those overwrites
+
+### Changed
+
+- **`EDA.Permission.in_channel/3` returns `{:error, :channel_obfuscated}`** for a channel Discord has
+  redacted. The synthetic `@everyone` `VIEW_CHANNEL` deny is indistinguishable from a real overwrite,
+  so computing from it would return a confident but meaningless answer; the ambiguity is surfaced to
+  the caller instead. `has_permission?/4` maps it to `false`, like any other error
+- Obfuscated channels are **kept in the cache** rather than dropped: "this channel exists and I
+  cannot see it" is real information, and Discord expects apps that manage channels or compute
+  permissions across a guild to detect that state. `EDA.Cache.channels/0` and
+  `channels_for_guild/1` therefore include them — reject with `EDA.Channel.obfuscated?/1`, or skip
+  them at admission with a `channels:` cache policy. Documented on `EDA.Cache`
 
 ## [0.3.0] - 2026-09-19
 

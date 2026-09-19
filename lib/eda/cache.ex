@@ -18,6 +18,35 @@ defmodule EDA.Cache do
 
       # Get the bot user
       me = EDA.Cache.me()
+
+  ## Obfuscated channels
+
+  From **2026-11-16** Discord redacts channels the bot cannot view rather than hiding
+  them: they are still dispatched over the gateway, with `name` set to `"___hidden___"`,
+  sensitive fields nulled, and the `CHANNEL_OBFUSCATED` flag set. Before that date the
+  behaviour is opt-in via `config :eda, capabilities: [:channel_obfuscation]`.
+
+  **EDA caches them like any other channel.** They are dropped neither on write nor on
+  read, because "this channel exists and I cannot see it" is real information — Discord
+  explicitly expects apps that manage channels or compute permissions across a guild to
+  detect them and surface that state. Hiding them in the cache would make a channel that
+  demonstrably exists look absent.
+
+  The consequences are therefore yours to handle:
+
+    * `channels/0` and `channels_for_guild/1` include them — reject with
+      `EDA.Channel.obfuscated?/1` before showing a channel list to a user;
+    * their `permission_overwrites` hold a single synthetic `@everyone` `VIEW_CHANNEL`
+      deny. `EDA.Permission.in_channel/3` already refuses to compute from it and returns
+      `{:error, :channel_obfuscated}`, so that path is safe;
+    * a cache admission policy can drop them if you would rather not see them at all:
+
+          config :eda,
+            cache: [
+              channels: [policy: fn _entity, _key, channel ->
+                if EDA.Channel.obfuscated?(channel), do: :skip, else: :cache
+              end]
+            ]
   """
 
   @me_key :eda_current_user
@@ -107,12 +136,24 @@ defmodule EDA.Cache do
 
   @doc """
   Gets all cached channels.
+
+  Includes channels Discord has obfuscated; see `channels_for_guild/1`.
   """
   @spec channels() :: [map()]
   defdelegate channels(), to: EDA.Cache.Channel, as: :all
 
   @doc """
   Gets all channels for a guild.
+
+  Channels the bot cannot view are **included**, with their metadata redacted by
+  Discord (`name` is `"___hidden___"`). Filter them out when listing channels for
+  a user:
+
+      guild_id
+      |> EDA.Cache.channels_for_guild()
+      |> Enum.reject(&EDA.Channel.obfuscated?/1)
+
+  See the "Obfuscated channels" section of `EDA.Cache` for why they are kept.
   """
   @spec channels_for_guild(String.t() | integer()) :: [map()]
   defdelegate channels_for_guild(guild_id), to: EDA.Cache.Channel, as: :for_guild
