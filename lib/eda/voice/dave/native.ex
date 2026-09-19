@@ -12,14 +12,27 @@ defmodule EDA.Voice.Dave.Native do
 
   use Rustler, otp_app: :eda, crate: "eda_dave"
 
+  # Return shapes: the Rust side returns `Result<T, Atom>`, and Rustler encodes that
+  # as `{:ok, T}` / `{:error, atom}`. For the NIFs whose `T` is itself an `{:ok, ...}`
+  # tuple (create_key_package, process_proposals, encrypt_opus, decrypt_audio) the
+  # result is therefore DOUBLE-wrapped: `{:ok, {:ok, binary}}`. Verified against the
+  # loaded NIF on 2026-09-19. EDA.Voice.Dave.Manager normalises both shapes; the
+  # single-wrapped form is kept in these specs so that defensive handling stays valid.
+  #
+  # The same applies to the plain getters (ready?/1, get_epoch/1, status/1,
+  # can_passthrough?/2, protocol_version/1): their Rust side also returns `Result`,
+  # so they yield `{:ok, value}`, NOT the bare value. Only max_protocol_version/0
+  # returns a bare `u16`.
+
   @doc "Creates a new MLS session for the given protocol version, user ID, and channel ID."
   @spec new_session(pos_integer(), non_neg_integer(), non_neg_integer()) ::
-          reference() | no_return()
+          {:ok, reference()} | {:error, atom()} | reference() | no_return()
   def new_session(_protocol_version, _user_id, _channel_id),
     do: :erlang.nif_error(:nif_not_loaded)
 
   @doc "Creates and returns the client's MLS key package as `{:ok, binary}`."
-  @spec create_key_package(reference()) :: {:ok, binary()}
+  @spec create_key_package(reference()) ::
+          {:ok, {:ok, binary()}} | {:ok, binary()} | {:error, atom()}
   def create_key_package(_ref), do: :erlang.nif_error(:nif_not_loaded)
 
   @doc "Sets the external sender credential (from the voice gateway)."
@@ -34,7 +47,9 @@ defmodule EDA.Voice.Dave.Native do
   Returns `{:ok, commit_binary, welcome_binary_or_nil}`.
   """
   @spec process_proposals(reference(), :append | :revoke, binary(), [non_neg_integer()]) ::
-          {:ok, binary(), binary() | nil}
+          {:ok, {:ok, binary(), binary() | nil}}
+          | {:ok, binary(), binary() | nil}
+          | {:error, atom()}
   def process_proposals(_ref, _operation_type, _proposals, _user_ids),
     do: :erlang.nif_error(:nif_not_loaded)
 
@@ -52,23 +67,28 @@ defmodule EDA.Voice.Dave.Native do
   Returns `{:ok, encrypted_binary}` or `{:error, :not_ready | :encryption_failed | :error}`.
   """
   @spec encrypt_opus(reference(), binary()) ::
-          {:ok, binary()} | {:error, :not_ready | :encryption_failed | :error}
+          {:ok, {:ok, binary()}}
+          | {:ok, binary()}
+          | {:error, :not_ready | :encryption_failed | :error}
   def encrypt_opus(_ref, _packet), do: :erlang.nif_error(:nif_not_loaded)
 
   @doc "Decrypts a DAVE-encrypted audio packet. Returns `{:ok, decrypted_binary}`."
-  @spec decrypt_audio(reference(), non_neg_integer(), binary()) :: {:ok, binary()}
+  @spec decrypt_audio(reference(), non_neg_integer(), binary()) ::
+          {:ok, {:ok, binary()}} | {:ok, binary()} | {:error, atom()}
   def decrypt_audio(_ref, _sender_user_id, _packet), do: :erlang.nif_error(:nif_not_loaded)
 
   @doc "Returns true if the user's decryptor has an active passthrough (epoch transition grace period)."
-  @spec can_passthrough?(reference(), non_neg_integer()) :: boolean()
+  @spec can_passthrough?(reference(), non_neg_integer()) ::
+          {:ok, boolean()} | {:error, atom()} | boolean()
   def can_passthrough?(_ref, _user_id), do: :erlang.nif_error(:nif_not_loaded)
 
   @doc "Returns the current MLS epoch number."
-  @spec get_epoch(reference()) :: non_neg_integer()
+  @spec get_epoch(reference()) ::
+          {:ok, non_neg_integer()} | {:error, atom()} | non_neg_integer()
   def get_epoch(_ref), do: :erlang.nif_error(:nif_not_loaded)
 
   @doc "Returns true if the MLS session is ready (group established)."
-  @spec ready?(reference()) :: boolean()
+  @spec ready?(reference()) :: {:ok, boolean()} | {:error, atom()} | boolean()
   def ready?(_ref), do: :erlang.nif_error(:nif_not_loaded)
 
   @doc "Sets passthrough mode (disable/enable E2EE without destroying the session)."
@@ -85,11 +105,18 @@ defmodule EDA.Voice.Dave.Native do
     do: :erlang.nif_error(:nif_not_loaded)
 
   @doc "Returns the session status: `:inactive`, `:pending`, `:awaiting_response`, or `:active`."
-  @spec status(reference()) :: :inactive | :pending | :awaiting_response | :active
+  @spec status(reference()) ::
+          {:ok, :inactive | :pending | :awaiting_response | :active}
+          | {:error, atom()}
+          | :inactive
+          | :pending
+          | :awaiting_response
+          | :active
   def status(_ref), do: :erlang.nif_error(:nif_not_loaded)
 
   @doc "Returns the DAVE protocol version of this session."
-  @spec protocol_version(reference()) :: pos_integer()
+  @spec protocol_version(reference()) ::
+          {:ok, pos_integer()} | {:error, atom()} | pos_integer()
   def protocol_version(_ref), do: :erlang.nif_error(:nif_not_loaded)
 
   @doc "Returns the maximum DAVE protocol version supported by the davey crate."
