@@ -89,6 +89,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `EDA.User` now keeps `premium_type`, `mfa_enabled`, `locale`, `verified`, `email`,
   `avatar_decoration_data` and `collectibles`, which `from_raw/1` was dropping. On a real guild
   the last two are set on 129 and 111 of 573 users
+- **`:file_types` on `EDA.Command.Option.attachment/3`** — up to ten filters narrowing the file
+  picker Discord shows the user, as `:image`, `:video`, `:audio` or a dot-prefixed extension
+- **`EDA.FileType`** — the rules behind those filters, in a module of its own so the File Upload
+  component can share them. `normalize!/1` validates, `expand/1` resolves the group names to
+  concrete extensions, `matches?/2` re-applies the filter to a filename, and `equivalent?/2`
+  compares two filter lists ignoring order
+- The filters are validated before Discord sees them: `"pdf"` written without its dot, a group
+  name that does not exist, and an eleventh filter are all refused with a message naming the
+  fix. Discord takes the first two without complaint and then shows the user nothing
 
 ### Changed
 
@@ -144,6 +153,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `EDA.User.display_name/1` explains why it does not read Discord's own `display_name` field:
   that field is null whenever the user has no global name — 46 of 573 users on a real guild —
   while this falls back to the username and always names somebody
+- `EDA.FileType` states that this filter matches the **filename's extension** and never inspects
+  the file, so it is not validation — Discord's own wording is that you remain responsible for
+  checking the contents
+- It also notes that Discord returns the filters in an order of its own, which makes a direct
+  list comparison report "changed" forever when diffing a deployed command against its
+  definition; `equivalent?/2` is the comparison to use
 
 ## [0.4.1] - 2026-09-21
 

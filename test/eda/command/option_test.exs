@@ -166,6 +166,48 @@ defmodule EDA.Command.OptionTest do
       opt = attachment("file", "Upload a file")
       assert opt.type == 11
     end
+
+    test "file_types narrows the picker and is normalised" do
+      opt = attachment("receipt", "Proof of purchase", file_types: [:image, ".PDF"])
+
+      assert opt.file_types == ["image", ".pdf"]
+    end
+
+    test "file_types reaches the wire" do
+      map = attachment("f", "A file", file_types: [:image]) |> EDA.Command.Option.to_map()
+
+      assert map[:file_types] == ["image"]
+    end
+
+    test "no file_types means no key at all, rather than an empty list" do
+      map = attachment("f", "A file") |> EDA.Command.Option.to_map()
+
+      refute Map.has_key?(map, :file_types)
+    end
+
+    test "an invalid filter is refused when the option is built" do
+      assert_raise ArgumentError, ~r/dot-prefixed extension/, fn ->
+        attachment("f", "A file", file_types: ["pdf"])
+      end
+    end
+
+    test "file_types is rejected on option types that do not take it" do
+      # Discord only accepts it on ATTACHMENT; sending it elsewhere is a silent no-op.
+      assert_raise ArgumentError, ~r/unexpected options \[:file_types\]/, fn ->
+        string("q", "A query", file_types: [:image])
+      end
+
+      assert_raise ArgumentError, ~r/unexpected options \[:file_types\]/, fn ->
+        channel("c", "A channel", file_types: [:image])
+      end
+    end
+
+    test "it still accepts :required alongside" do
+      opt = attachment("f", "A file", required: true, file_types: [:audio])
+
+      assert opt.required == true
+      assert opt.file_types == ["audio"]
+    end
   end
 
   # ── Sub Commands ────────────────────────────────────────────────────

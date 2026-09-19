@@ -43,6 +43,7 @@ defmodule EDA.Command.Option do
     min_length: nil,
     max_length: nil,
     autocomplete: nil,
+    file_types: nil,
     name_localizations: nil,
     description_localizations: nil
   ]
@@ -59,7 +60,8 @@ defmodule EDA.Command.Option do
           max_value: number() | nil,
           min_length: non_neg_integer() | nil,
           max_length: pos_integer() | nil,
-          autocomplete: boolean() | nil
+          autocomplete: boolean() | nil,
+          file_types: [String.t()] | nil
         }
 
   @option_name_regex ~r/^[-_\p{L}\p{N}]{1,32}$/u
@@ -192,10 +194,29 @@ defmodule EDA.Command.Option do
     ])
   end
 
-  @doc "Creates an ATTACHMENT option (type 11)."
+  @doc """
+  Creates an ATTACHMENT option (type 11).
+
+  ## Options
+
+    * `:required` - whether the user must supply a file
+    * `:file_types` - up to #{EDA.FileType.max_filters()} filters narrowing the file picker.
+      Each is `:image`, `:video`, `:audio` or a dot-prefixed extension — see `EDA.FileType`
+
+  ## Examples
+
+      attachment("avatar", "A picture of you", required: true, file_types: [:image])
+
+      attachment("receipt", "Proof of purchase", file_types: [:image, ".pdf"])
+
+  > #### `:file_types` narrows the picker, it does not validate {: .warning}
+  >
+  > Discord matches the filename's extension and never inspects the file. Check what you
+  > actually received before trusting it.
+  """
   @spec attachment(String.t(), String.t(), keyword()) :: t()
   def attachment(name, description, opts \\ []) do
-    build(11, name, description, opts, [:required])
+    build(11, name, description, opts, [:required, :file_types])
   end
 
   @doc """
@@ -245,6 +266,7 @@ defmodule EDA.Command.Option do
     |> put_if(:min_length, opt.min_length)
     |> put_if(:max_length, opt.max_length)
     |> put_if(:autocomplete, opt.autocomplete)
+    |> put_if(:file_types, opt.file_types)
     |> put_if(:name_localizations, opt.name_localizations)
     |> put_if(:description_localizations, opt.description_localizations)
   end
@@ -269,6 +291,10 @@ defmodule EDA.Command.Option do
 
   defp apply_opt({:required, value}, opt) when is_boolean(value) do
     %{opt | required: value}
+  end
+
+  defp apply_opt({:file_types, file_types}, opt) do
+    %{opt | file_types: EDA.FileType.normalize!(file_types)}
   end
 
   defp apply_opt({:choices, choices}, opt) when is_list(choices) do
