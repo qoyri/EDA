@@ -27,6 +27,23 @@ defmodule EDA.API.Role do
       the values sum to more than the guild's `member_count` (2739 against 528 on the
       guild probed).
 
+  ## Why not count from the cache?
+
+  The traditional approach in other libraries is to filter cached members —
+  discord.js's `Role.members`, JDA's `getMembersWithRoles/1`. EDA can do the same with
+  `EDA.Cache.members/1`, but that needs the privileged `:guild_members` intent **and** a
+  fully chunked member cache (`config :eda, chunk_members: true`). This endpoint needs
+  neither.
+
+  Measured against a live guild with a complete member cache (2026-09-19), the two agree
+  exactly: 0 divergences over 56 roles, 2739 assignments either way. But counting from the
+  cache saw only **52** roles against the endpoint's 56 — **roles with zero members are
+  absent from a cache-derived tally and present here**. If you are listing every role with
+  its count, that difference is the whole point.
+
+  discord.js exposes the same endpoint as `guild.roles.fetchMemberCounts()` and documents
+  the same `@everyone` exclusion.
+
   ## Examples
 
       {:ok, counts} = EDA.API.Role.member_counts(guild_id)

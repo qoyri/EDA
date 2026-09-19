@@ -10,9 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **`EDA.API.Role.member_counts/1`** — `GET /guilds/{id}/roles/member-counts`, returning a map of
-  role ID to member count. The `@everyone` role is absent from the result (every member carries it),
-  and the counts overlap — a member with three roles is counted in all three, so they sum to more
-  than the guild's `member_count`
+  role ID to member count, mirroring discord.js's `guild.roles.fetchMemberCounts()`. The `@everyone`
+  role is absent from the result (every member carries it), and the counts overlap — a member with
+  three roles is counted in all three, so they sum to more than the guild's `member_count`.
+  Unlike counting from `EDA.Cache.members/1`, it needs neither the privileged `:guild_members` intent
+  nor a chunked cache, and it **includes roles with zero members**, which a cache-derived tally omits
+  entirely
 
 - **`EDA.Role.colors`** / **`EDA.Role.Colors`** — role colours, superseding the deprecated single
   `color` field. Three styles, matching JDA's `isDefault`/`isGradient`/`isHolographic` and
