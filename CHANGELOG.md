@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-19
+
+### Installation
+
+```elixir
+def deps do
+  [
+    {:eda, "~> 0.3.0"}
+  ]
+end
+```
+
 ### Added
 
 - **EDA.API.Message.pins/2** — one page of a channel's pins, with `pinned_at` timestamps and `has_more`

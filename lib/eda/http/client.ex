@@ -7,7 +7,8 @@ defmodule EDA.HTTP.Client do
   require Logger
 
   @default_base_url "https://discord.com/api/v10"
-  @user_agent "DiscordBot (EDA, 0.1.0)"
+  # Derived at compile time so it cannot drift from the released version again.
+  @user_agent "DiscordBot (EDA, #{Mix.Project.config()[:version]})"
 
   # ── Public HTTP verbs (used by EDA.API.* modules) ──
 
