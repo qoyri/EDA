@@ -47,6 +47,73 @@ defmodule EDA.Member do
   defp parse_user(nil), do: nil
   defp parse_user(raw) when is_map(raw), do: EDA.User.from_raw(raw)
 
+  @doc """
+  When the member's timeout ends, or `nil` if they have never been timed out.
+
+  May return a date in the **past**, in which case the timeout has expired — Discord
+  leaves the field populated. Use `timed_out?/1` to ask whether it is currently active.
+  JDA draws the same distinction with `getTimeOutEnd()` / `isTimedOut()`.
+
+  Accepts a struct or a raw member map.
+
+  ## Examples
+
+      iex> EDA.Member.time_out_end(%EDA.Member{communication_disabled_until: "2099-01-01T00:00:00Z"})
+      ~U[2099-01-01 00:00:00Z]
+
+      iex> EDA.Member.time_out_end(%EDA.Member{})
+      nil
+  """
+  @spec time_out_end(t() | map()) :: DateTime.t() | nil
+  def time_out_end(member)
+
+  def time_out_end(%__MODULE__{communication_disabled_until: until}), do: parse_timestamp(until)
+  def time_out_end(%{"communication_disabled_until" => until}), do: parse_timestamp(until)
+  def time_out_end(_member), do: nil
+
+  @doc """
+  Returns `true` while the member is currently timed out.
+
+  Accepts a struct or a raw member map.
+
+  > #### Not reflected in permissions {: .warning}
+  >
+  > Discord removes every permission except `VIEW_CHANNEL` and `READ_MESSAGE_HISTORY`
+  > from a timed-out member, but `EDA.Permission.in_channel/3` does **not** account for
+  > it — neither does JDA's `hasPermission`. Check this yourself before gating an action
+  > on a permission.
+
+  ## Examples
+
+      iex> EDA.Member.timed_out?(%EDA.Member{communication_disabled_until: "2099-01-01T00:00:00Z"})
+      true
+
+      iex> EDA.Member.timed_out?(%EDA.Member{communication_disabled_until: "2020-01-01T00:00:00Z"})
+      false
+
+      iex> EDA.Member.timed_out?(%EDA.Member{})
+      false
+  """
+  @spec timed_out?(t() | map()) :: boolean()
+  def timed_out?(member) do
+    case time_out_end(member) do
+      nil -> false
+      until -> DateTime.compare(until, DateTime.utc_now()) == :gt
+    end
+  end
+
+  defp parse_timestamp(nil), do: nil
+
+  defp parse_timestamp(value) when is_binary(value) do
+    case DateTime.from_iso8601(value) do
+      {:ok, dt, _offset} -> dt
+      {:error, _reason} -> nil
+    end
+  end
+
+  defp parse_timestamp(%DateTime{} = value), do: value
+  defp parse_timestamp(_value), do: nil
+
   # ── Entity Manager ──
 
   use EDA.Entity
