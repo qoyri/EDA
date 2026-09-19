@@ -58,16 +58,77 @@ defmodule EDA.HTTP.MultipartTest do
       assert Enum.at(json_part["attachments"], 1)["id"] == 1
     end
 
-    test "spoiler files get SPOILER_ prefix" do
+    test "a spoiler is requested with is_spoiler, leaving the filename alone" do
       file = F.from_binary("data", "secret.png", spoiler: true)
       {body_iodata, _ct} = Multipart.encode(%{}, [file])
 
       body = IO.iodata_to_binary(body_iodata)
-      assert body =~ ~s(filename="SPOILER_secret.png")
+      assert body =~ ~s(filename="secret.png")
+      refute body =~ "SPOILER_"
 
       json_part = extract_json_payload(body)
       [att] = json_part["attachments"]
-      assert att["filename"] == "SPOILER_secret.png"
+      assert att["filename"] == "secret.png"
+      assert att["is_spoiler"] == true
+    end
+
+    test "a file that is not a spoiler says nothing about it" do
+      file = F.from_binary("data", "plain.png")
+      {body_iodata, _ct} = Multipart.encode(%{}, [file])
+
+      [att] =
+        body_iodata |> IO.iodata_to_binary() |> extract_json_payload() |> Map.get("attachments")
+
+      refute Map.has_key?(att, "is_spoiler")
+    end
+
+    test "a filename the caller prefixed itself is left untouched" do
+      file = F.from_binary("data", "SPOILER_manual.png")
+      {body_iodata, _ct} = Multipart.encode(%{}, [file])
+
+      body = IO.iodata_to_binary(body_iodata)
+      assert body =~ ~s(filename="SPOILER_manual.png")
+    end
+
+    test "attachments already in the payload are kept, and uploads indexed after them" do
+      # An edit that retains two attachments and adds one file. Dropping the retained
+      # entries would delete those two attachments from the message.
+      payload = %{
+        content: "edited",
+        attachments: [%{id: "111"}, %{id: "222", is_spoiler: true}]
+      }
+
+      {body_iodata, _ct} = Multipart.encode(payload, [F.from_binary("x", "new.png")])
+      json_part = body_iodata |> IO.iodata_to_binary() |> extract_json_payload()
+
+      assert [first, second, third] = json_part["attachments"]
+      assert first["id"] == "111"
+      assert second["id"] == "222"
+      assert second["is_spoiler"] == true
+      # a new file is addressed by its index in files[n], not by a snowflake
+      assert third["id"] == 0
+      assert third["filename"] == "new.png"
+    end
+
+    test "a string-keyed attachments array is honoured too" do
+      {body_iodata, _ct} = Multipart.encode(%{"attachments" => [%{"id" => "9"}]}, [])
+      json_part = body_iodata |> IO.iodata_to_binary() |> extract_json_payload()
+
+      assert [%{"id" => "9"}] = json_part["attachments"]
+    end
+
+    test "no files and nothing retained never sends an empty array" do
+      # An empty attachments array deletes every attachment on the message being edited.
+      {body_iodata, _ct} = Multipart.encode(%{content: "hi"}, [])
+      json_part = body_iodata |> IO.iodata_to_binary() |> extract_json_payload()
+
+      refute Map.has_key?(json_part, "attachments")
+    end
+
+    test "a non-list attachments value is rejected" do
+      assert_raise ArgumentError, ~r/attachments must be a list/, fn ->
+        Multipart.encode(%{attachments: %{id: "1"}}, [])
+      end
     end
 
     test "file data is included in body" do

@@ -40,7 +40,7 @@ defmodule EDA.File do
   ## Options
 
     * `:description` - Alt text for the file (max 1024 chars)
-    * `:spoiler` - If `true`, prefixes the filename with `SPOILER_`
+    * `:spoiler` - If `true`, Discord blurs the file until clicked
   """
   @spec from_binary(binary() | list(), String.t(), keyword()) :: t()
   def from_binary(data, name, opts \\ [])
@@ -71,7 +71,7 @@ defmodule EDA.File do
 
     * `:name` - Override the filename (defaults to basename of path)
     * `:description` - Alt text for the file (max 1024 chars)
-    * `:spoiler` - If `true`, prefixes the filename with `SPOILER_`
+    * `:spoiler` - If `true`, Discord blurs the file until clicked
   """
   @spec from_path(String.t(), keyword()) :: t()
   def from_path(path, opts \\ []) when is_binary(path) do
@@ -85,10 +85,17 @@ defmodule EDA.File do
   end
 
   @doc """
-  Returns the effective filename, with `SPOILER_` prefix if spoiler is true.
+  Returns the filename Discord should show.
+
+  This is the name as given. Spoilering used to be requested by prefixing the filename with
+  `SPOILER_`, which meant the prefix was visible in the name forever after; EDA now sets the
+  `is_spoiler` field of the attachment request instead, so `:spoiler` no longer rewrites the
+  name. `EDA.Attachment.spoiler?/1` reads the resulting flag back.
+
+  A name you prefix yourself still works — Discord honours the convention — and is left
+  alone.
   """
   @spec effective_name(t()) :: String.t()
-  def effective_name(%__MODULE__{name: name, spoiler: true}), do: "SPOILER_" <> name
   def effective_name(%__MODULE__{name: name}), do: name
 
   # Validations

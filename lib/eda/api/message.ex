@@ -297,7 +297,42 @@ defmodule EDA.API.Message do
     end
   end
 
-  @doc "Edits a message."
+  @doc """
+  Edits a message.
+
+  Accepts a keyword list of options (which may upload files) or a raw payload map.
+
+  ## The `attachments` array replaces, it does not merge
+
+  Discord treats `attachments` as the complete list the message should end up with, so an
+  attachment left out of it is deleted. Uploading a file without naming the existing ones
+  therefore removes them:
+
+      # keeps only the newly uploaded file — the message's other attachments are gone
+      EDA.API.Message.edit(channel_id, message_id, files: [EDA.File.from_path("new.png")])
+
+  Name them with `EDA.Attachment.keep/2` to hold on to them, and the upload is appended:
+
+      EDA.API.Message.edit(channel_id, message_id,
+        attachments: Enum.map(message.attachments, &EDA.Attachment.keep/1),
+        files: [EDA.File.from_path("new.png")]
+      )
+
+  `:attachments` also takes bare ids and raw attachment maps. `EDA.Message.edit/2` has the
+  shorter `attachments: :keep` for a message struct you already hold.
+
+  Omitting `:attachments` entirely leaves the message's attachments untouched — it is only
+  sending the array that is destructive.
+
+  ## Changing an existing attachment
+
+  `EDA.Attachment.keep/2` carries the two fields Discord lets an edit update, so a spoiler
+  can be applied after the fact without re-uploading the file:
+
+      EDA.API.Message.edit(channel_id, message_id,
+        attachments: [EDA.Attachment.keep(attachment, is_spoiler: true, description: "Ending")]
+      )
+  """
   @spec edit(String.t() | integer(), String.t() | integer(), map() | keyword()) ::
           {:ok, map()} | {:error, term()}
   def edit(channel_id, message_id, opts) when is_list(opts) do

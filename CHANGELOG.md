@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Attachment flags** — `EDA.Attachment.spoiler?/1`, `clip?/1`, `thumbnail?/1`, `remix?/1`,
+  `animated?/1`, plus `has_flag?/2`, `flag_list/1` and the five `flag_*/0` constants. `spoiler?/1`
+  reads the flag Discord reports rather than guessing from a `SPOILER_` filename prefix
+- **`EDA.Attachment.keep/2`** and the `:attachments` option on message create and edit — the array
+  Discord uses to decide which attachments a message keeps. `keep/2` also carries the two fields an
+  edit may change on an attachment that already exists, so a file can be blurred, un-blurred or
+  re-captioned without re-uploading it
+- `EDA.Message.edit/2` accepts a keyword list, including `attachments: :keep` — shorthand for the
+  attachments the struct already holds, which is what stops an upload from wiping them
+- `EDA.Attachment` gained the `title`, `flags`, `placeholder` and `placeholder_version` fields
 - **`EDA.Cache.Adapter`** — the cache storage backend is now a behaviour with swappable
   implementations, configured with `config :eda, cache_adapter: ...`. Ships
   `EDA.Cache.Adapter.ETS` (the default, unchanged behaviour) and `EDA.Cache.Adapter.NoOp`
@@ -131,6 +141,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`EDA.File`'s `:spoiler` option no longer renames the file.** It sets the attachment request's
+  `is_spoiler` field instead, so the name you chose is the name Discord shows — previously every
+  spoiler arrived as `SPOILER_holiday.png`. `EDA.File.effective_name/1` returns the name unchanged;
+  a prefix you write yourself still works
+- `EDA.HTTP.Multipart.encode/2` keeps an `attachments` array already present in the payload and
+  indexes uploads after it, instead of replacing it
 - **Breaking: an option a route does not define now raises `ArgumentError`, and nothing is
   sent.** 0.4.1 logged a warning and sent the request unchanged, as announced there. Discord
   ignores a field or query parameter it does not recognise, so a misspelt option never failed —

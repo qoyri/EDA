@@ -332,7 +332,34 @@ defmodule EDA.HTTP.Client do
     |> Map.new()
     |> put_embeds(opts)
     |> maybe_put_poll(opts[:poll])
+    |> maybe_put_attachments(opts[:attachments])
     |> maybe_put_v2(opts[:v2])
+  end
+
+  defp maybe_put_attachments(payload, nil), do: payload
+
+  defp maybe_put_attachments(payload, attachments) when is_list(attachments) do
+    Map.put(payload, :attachments, Enum.map(attachments, &normalize_attachment/1))
+  end
+
+  defp maybe_put_attachments(_payload, other) do
+    raise ArgumentError, ":attachments must be a list, got: #{inspect(other)}"
+  end
+
+  # An %EDA.Attachment{} also matches %{id: _}, so it has to be tried first.
+  defp normalize_attachment(%EDA.Attachment{} = attachment),
+    do: EDA.Attachment.keep(attachment)
+
+  defp normalize_attachment(%{id: _} = entry), do: entry
+  defp normalize_attachment(%{"id" => _} = raw), do: EDA.Attachment.keep(raw)
+
+  defp normalize_attachment(id) when is_binary(id) or is_integer(id),
+    do: EDA.Attachment.keep(id)
+
+  defp normalize_attachment(other) do
+    raise ArgumentError,
+          "attachment must be an %EDA.Attachment{}, a raw attachment map, an id, or a map " <>
+            "built by EDA.Attachment.keep/2, got: #{inspect(other)}"
   end
 
   defp put_embeds(payload, opts) do
