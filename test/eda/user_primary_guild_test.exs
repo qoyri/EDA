@@ -66,6 +66,44 @@ defmodule EDA.UserPrimaryGuildTest do
     end
   end
 
+  describe "raw map support — EDA.Cache.users/0 returns maps, not structs" do
+    test "server_tag/1 reads a raw user map, like display_name/1 does" do
+      assert User.server_tag(%{"primary_guild" => @raw_primary_guild}) == "BABL"
+    end
+
+    test "server_tag/1 respects identity_enabled on a raw map" do
+      hidden = Map.put(@raw_primary_guild, "identity_enabled", false)
+
+      assert User.server_tag(%{"primary_guild" => hidden}) == nil
+    end
+
+    test "server_tag/1 is nil for a raw map without the key, or a null value" do
+      assert User.server_tag(%{"id" => "1"}) == nil
+      assert User.server_tag(%{"primary_guild" => nil}) == nil
+    end
+
+    test "guild_tag_badge_url/2 works from a struct and from a raw map" do
+      expected =
+        "https://cdn.discordapp.com/guild-tag-badges/1508992262657409046/22957f5661c149eefe1ba25d2bec7060.png"
+
+      struct_user = User.from_raw(%{"id" => "1", "primary_guild" => @raw_primary_guild})
+
+      assert User.guild_tag_badge_url(struct_user) == expected
+      assert User.guild_tag_badge_url(%{"primary_guild" => @raw_primary_guild}) == expected
+    end
+
+    test "guild_tag_badge_url/2 forwards :size" do
+      url = User.guild_tag_badge_url(%{"primary_guild" => @raw_primary_guild}, size: 64)
+
+      assert String.ends_with?(url, "?size=64")
+    end
+
+    test "guild_tag_badge_url/2 is nil without a primary guild" do
+      assert User.guild_tag_badge_url(%User{}) == nil
+      assert User.guild_tag_badge_url(%{"id" => "1"}) == nil
+    end
+  end
+
   describe "EDA.User integration" do
     test "from_raw/1 parses primary_guild into a struct" do
       user =

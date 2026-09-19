@@ -14,12 +14,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the counts overlap — a member with three roles is counted in all three, so they sum to more
   than the guild's `member_count`
 
-- **`EDA.Role.colors`** / **`EDA.Role.Colors`** — gradient role colours, which supersede the
-  deprecated single `color` field. `EDA.Role.primary_color/1` prefers `colors.primary_color` and
-  falls back to `color`; `EDA.Role.gradient?/1` and `EDA.Role.Colors.gradient?/1` report whether a
-  role uses a gradient. Observed on a real guild: every role carried all three keys, 7 of 57 used a
-  gradient, and the `ENHANCED_ROLE_COLORS` guild feature was **absent** despite gradients being in
-  use — so do not gate on that feature
+- **`EDA.Role.colors`** / **`EDA.Role.Colors`** — role colours, superseding the deprecated single
+  `color` field. Three styles, matching JDA's `isDefault`/`isGradient`/`isHolographic` and
+  discord.js's `RoleColors`: `style/1` returns `:solid`, `:gradient` or `:holographic`, with
+  `solid?/1`, `gradient?/1` and `holographic?/1`. **`gradient?/1` is false for holographic roles** —
+  Discord treats them as distinct styles. `EDA.Role.primary_color/1` prefers `colors.primary_color`
+  and falls back to `color`
+- **Writing colours** — `EDA.API.Role.set_colors/4` and `EDA.Role.set_colors/4`, with the
+  `EDA.Role.Colors.solid/1`, `gradient/2` and `holographic/0` constructors. Only the `colors` object
+  is sent, never the deprecated `color`, matching discord.js. `EDA.Role.Colors` implements
+  `Jason.Encoder` and `to_map/1` omits nil keys so a solid colour does not accidentally clear a
+  gradient
+- **Holographic is a constrained style**: sending `tertiary_color` makes Discord enforce
+  `11127295 / 16759788 / 16761760`, so `holographic/0` takes no arguments and the three values are
+  exposed as `holographic_primary/0`, `holographic_secondary/0` and `holographic_tertiary/0`
+- **`EDA.Error.missing_guild_feature/0`** (670006) — returned as HTTP 403 when setting a gradient or
+  holographic colour on an ineligible guild
+- Observed on real guilds: every role carried all three keys, `primary_color` equalled the legacy
+  `color` on all 57, and 7 used a gradient. `ENHANCED_ROLE_COLORS` appeared in the `features` array
+  of **no** guild — not even the one with gradients already in place — so it cannot be used as a
+  pre-check for either reading or writing. Writing on a boost-tier-0 guild returned 670006
 - **`EDA.User.primary_guild`** / **`EDA.User.PrimaryGuild`** — the user's server tag
   (`identity_guild_id`, `identity_enabled`, `tag`, `badge`). `EDA.User.server_tag/1` returns the tag
   only when it is actually displayed, and `EDA.User.PrimaryGuild.badge_url/2` builds the CDN URL.
@@ -54,6 +68,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   redacted. The synthetic `@everyone` `VIEW_CHANNEL` deny is indistinguishable from a real overwrite,
   so computing from it would return a confident but meaningless answer; the ambiguity is surfaced to
   the caller instead. `has_permission?/4` maps it to `false`, like any other error
+- Redaction **nulls** the sensitive fields rather than omitting them, so a channel that becomes
+  obfuscated has its cached `name`, `topic`, `status` and `last_message_id` genuinely replaced by the
+  merge in `EDA.Cache.Channel.update/2` — previously cached values do not survive. Redaction is
+  selective: `position`, `parent_id`, `nsfw`, `bitrate` and `rate_limit_per_user` keep real values.
+  Verified against a live guild
 - Obfuscated channels are **kept in the cache** rather than dropped: "this channel exists and I
   cannot see it" is real information, and Discord expects apps that manage channels or compute
   permissions across a guild to detect that state. `EDA.Cache.channels/0` and

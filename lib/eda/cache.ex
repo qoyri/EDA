@@ -32,6 +32,13 @@ defmodule EDA.Cache do
   detect them and surface that state. Hiding them in the cache would make a channel that
   demonstrably exists look absent.
 
+  Redaction **nulls** the sensitive fields rather than omitting them, which matters here:
+  `EDA.Cache.Channel.update/2` merges the incoming payload over the cached one, so a channel
+  that becomes obfuscated has its `name`, `topic`, `status` and `last_message_id` genuinely
+  replaced — the previously cached values do not survive. Verified against a live guild on
+  2026-09-19. Redaction is also **selective**: `position`, `parent_id`, `nsfw`, `bitrate` and
+  `rate_limit_per_user` keep their real values.
+
   The consequences are therefore yours to handle:
 
     * `channels/0` and `channels_for_guild/1` include them — reject with

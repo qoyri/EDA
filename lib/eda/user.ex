@@ -74,6 +74,36 @@ defmodule EDA.User do
     do: "#{@discord_cdn}/avatars/#{id}/#{a}.png"
 
   @doc """
+  URL of the user's server tag badge, or `nil`.
+
+  discord.js exposes the same helper on the user (`guildTagBadgeURL()`) rather than
+  only on the nested object, because that is where callers have it to hand. Accepts a
+  struct or a raw user map, like `avatar_url/1`.
+
+  ## Options
+
+  - `:size` — power of two between 16 and 4096
+
+  ## Examples
+
+      iex> EDA.User.guild_tag_badge_url(%EDA.User{primary_guild: %EDA.User.PrimaryGuild{identity_guild_id: "1", badge: "abc"}})
+      "https://cdn.discordapp.com/guild-tag-badges/1/abc.png"
+
+      iex> EDA.User.guild_tag_badge_url(%EDA.User{})
+      nil
+  """
+  @spec guild_tag_badge_url(t() | map(), keyword()) :: String.t() | nil
+  def guild_tag_badge_url(user, opts \\ [])
+
+  def guild_tag_badge_url(%__MODULE__{primary_guild: pg}, opts),
+    do: EDA.User.PrimaryGuild.badge_url(pg, opts)
+
+  def guild_tag_badge_url(%{"primary_guild" => raw}, opts),
+    do: raw |> EDA.User.PrimaryGuild.from_raw() |> EDA.User.PrimaryGuild.badge_url(opts)
+
+  def guild_tag_badge_url(_user, _opts), do: nil
+
+  @doc """
   The server tag the user is currently displaying, or `nil`.
 
   Returns `nil` when there is no primary guild, or when the tag exists but is not
@@ -90,8 +120,17 @@ defmodule EDA.User do
       iex> EDA.User.server_tag(%EDA.User{})
       nil
   """
-  @spec server_tag(t()) :: String.t() | nil
-  def server_tag(%__MODULE__{primary_guild: pg}) do
+  @spec server_tag(t() | map()) :: String.t() | nil
+  def server_tag(user)
+
+  def server_tag(%__MODULE__{primary_guild: pg}), do: tag_if_displayed(pg)
+
+  def server_tag(%{"primary_guild" => raw}),
+    do: raw |> EDA.User.PrimaryGuild.from_raw() |> tag_if_displayed()
+
+  def server_tag(_user), do: nil
+
+  defp tag_if_displayed(pg) do
     if EDA.User.PrimaryGuild.displayed?(pg), do: pg.tag
   end
 
