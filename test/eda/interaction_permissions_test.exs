@@ -98,6 +98,51 @@ defmodule EDA.InteractionPermissionsTest do
     end
   end
 
+  describe "user_permissions/1 — the interaction's own channel" do
+    test "reads the member's precomputed bitset" do
+      payload =
+        interaction(%{
+          "member" => %{
+            "user" => %{"id" => "u1"},
+            "permissions" => to_string(@send_messages ||| @manage_messages)
+          }
+        })
+
+      assert Interaction.user_permissions(payload) == (@send_messages ||| @manage_messages)
+      assert Interaction.user_can?(payload, :manage_messages)
+      refute Interaction.user_can?(payload, :embed_links)
+    end
+
+    test "works through the parsed struct too" do
+      payload =
+        interaction(%{
+          "member" => %{"user" => %{"id" => "u1"}, "permissions" => to_string(@manage_messages)}
+        })
+
+      struct = EDA.Event.InteractionCreate.from_raw(payload)
+
+      assert struct.member.permissions == to_string(@manage_messages)
+      assert Interaction.user_permissions(struct) == @manage_messages
+      assert Interaction.user_can?(struct, :manage_messages)
+    end
+
+    test "nil outside a guild, where there is no member" do
+      assert Interaction.user_permissions(interaction()) == nil
+      assert Interaction.user_permissions(%{"id" => "i1"}) == nil
+      refute Interaction.user_can?(%{"id" => "i1"}, :send_messages)
+    end
+
+    test "the bot's and the user's bitsets are different questions" do
+      payload =
+        interaction(%{
+          "member" => %{"user" => %{"id" => "u1"}, "permissions" => to_string(@manage_messages)}
+        })
+
+      assert Interaction.app_permissions(payload) == (@send_messages ||| @embed_links)
+      assert Interaction.user_permissions(payload) == @manage_messages
+    end
+  end
+
   describe "user_permissions/2" do
     test "is the invoking user's permissions, not the bot's" do
       assert Interaction.user_permissions(interaction(), "c_allowed") ==

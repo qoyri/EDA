@@ -12,6 +12,7 @@ defmodule EDA.Member do
     :deaf,
     :mute,
     :pending,
+    :permissions,
     :communication_disabled_until
   ]
 
@@ -25,6 +26,7 @@ defmodule EDA.Member do
           deaf: boolean() | nil,
           mute: boolean() | nil,
           pending: boolean() | nil,
+          permissions: String.t() | nil,
           communication_disabled_until: String.t() | nil
         }
 
@@ -40,6 +42,7 @@ defmodule EDA.Member do
       deaf: raw["deaf"],
       mute: raw["mute"],
       pending: raw["pending"],
+      permissions: raw["permissions"],
       communication_disabled_until: raw["communication_disabled_until"]
     }
   end

@@ -263,8 +263,13 @@ defmodule EDA.Interaction do
         respond(interaction, "I cannot post there.", ephemeral: true)
       end
 
-  Returns `nil` when the field is absent — an interaction from a context where Discord did
-  not send it, or a channel that was not resolved.
+  Returns `nil` when the field is absent — a channel that was not resolved, an interaction
+  from a context where Discord did not send it, or an app installed to a user rather than to
+  the guild, since Discord only computes a channel's `app_permissions` when the bot is a
+  member of that guild.
+
+  `nil` is not `0`. Being told nothing is not the same as being denied everything, so the
+  two are kept apart; `can?/2` treats both as "no".
   """
   @spec app_permissions(interaction()) :: integer() | nil
   def app_permissions(%{app_permissions: value}), do: parse_bitset(value)
@@ -280,15 +285,28 @@ defmodule EDA.Interaction do
   end
 
   @doc """
-  Returns the permissions the **invoking user** holds in a resolved channel, as a bitset.
+  Returns the permissions the **invoking user** holds, as a bitset.
 
-  Discord computes this alongside the bot's, which is what makes "you cannot do that here"
+  With one argument, this is what Discord computed for them in the channel the interaction
+  came from — it rides along on the interaction's `member`. With a channel id, it is their
+  permissions in that *resolved* channel.
+
+  Discord computes both alongside the bot's, which is what makes "you cannot do that here"
   answerable without fetching the member and their roles.
 
       if EDA.Interaction.user_can?(interaction, destination, :manage_messages) do
         # ...
       end
+
+  `nil` outside a guild, since a DM has no member.
   """
+  @spec user_permissions(interaction()) :: integer() | nil
+  def user_permissions(%{member: %EDA.Member{permissions: value}}), do: parse_bitset(value)
+  def user_permissions(%{member: %{"permissions" => value}}), do: parse_bitset(value)
+  def user_permissions(%{"member" => %{"permissions" => value}}), do: parse_bitset(value)
+  def user_permissions(_interaction), do: nil
+
+  @doc "Returns the invoking user's permissions in a resolved channel. See `user_permissions/1`."
   @spec user_permissions(interaction(), String.t()) :: integer() | nil
   def user_permissions(interaction, channel_id) do
     interaction
@@ -319,10 +337,17 @@ defmodule EDA.Interaction do
   end
 
   @doc """
-  Returns `true` if the invoking user holds a permission in a resolved channel.
+  Returns `true` if the invoking user holds a permission.
 
-  See `user_permissions/2`.
+  `user_can?/2` asks about the channel the interaction came from, `user_can?/3` about a
+  resolved channel. See `user_permissions/1`.
   """
+  @spec user_can?(interaction(), EDA.Permission.flag()) :: boolean()
+  def user_can?(interaction, flag) do
+    holds?(user_permissions(interaction), flag)
+  end
+
+  @doc "Returns `true` if the invoking user holds a permission in a resolved channel."
   @spec user_can?(interaction(), String.t(), EDA.Permission.flag()) :: boolean()
   def user_can?(interaction, channel_id, flag) do
     holds?(user_permissions(interaction, channel_id), flag)
