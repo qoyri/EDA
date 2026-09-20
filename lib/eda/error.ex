@@ -334,6 +334,7 @@ defmodule EDA.Error do
     90_002 => {:cannot_use_burst_reactions, "User cannot use burst reactions"},
 
     # ── Application Availability (110xxx) ──
+    110_000 => {:index_not_available, "Index not yet available. Try again later"},
     110_001 => {:application_not_available, "Application not yet available. Try again later"},
 
     # ── API Overload (130xxx) ──
@@ -1260,6 +1261,10 @@ defmodule EDA.Error do
   def cannot_use_burst_reactions, do: 90_002
 
   # ── Application Availability (110xxx) ──
+
+  @doc "Search index not yet available (110000)."
+  @spec index_not_available() :: 110_000
+  def index_not_available, do: 110_000
 
   @doc "Application not yet available (110001)."
   @spec application_not_available() :: 110_001

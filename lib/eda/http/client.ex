@@ -135,10 +135,20 @@ defmodule EDA.HTTP.Client do
     params =
       opts
       |> Enum.reject(fn {_, v} -> is_nil(v) end)
+      |> Enum.flat_map(&expand_query_param/1)
       |> URI.encode_query()
 
     if params == "", do: path, else: path <> "?" <> params
   end
+
+  # Discord expresses a multi-valued filter as a repeated key — `channel_id=a&channel_id=b`
+  # — which URI.encode_query/1 cannot express, and raises on. Verified against the live
+  # search endpoint on 2026-09-20.
+  defp expand_query_param({key, values}) when is_list(values) do
+    Enum.map(values, fn value -> {key, value} end)
+  end
+
+  defp expand_query_param(pair), do: [pair]
 
   def build_message_payload(opts) do
     {files, opts} = extract_files(opts)

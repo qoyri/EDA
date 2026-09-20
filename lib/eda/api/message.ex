@@ -80,6 +80,183 @@ defmodule EDA.API.Message do
     })
   end
 
+  @doc """
+  Searches a guild's message history.
+
+  `GET /guilds/{guild_id}/messages/search`. Requires `READ_MESSAGE_HISTORY` in the channels
+  searched, and is gated on the **`MESSAGE_CONTENT`** privileged intent.
+
+  Returns Discord's raw payload. `EDA.Message.search/2` returns parsed structs and flattens
+  the nesting described below.
+
+  ## The `messages` key is a list of *lists*
+
+  Each entry is a context group, not a message: Discord returns the matching message
+  surrounded by its neighbours, and marks the match itself with `"hit" => true`. A group of
+  one is the usual case, but nothing promises it.
+
+      {:ok, %{"messages" => groups, "total_results" => total}} =
+        EDA.API.Message.search(guild_id, content: "deploy")
+
+      hits = Enum.map(groups, fn group -> Enum.find(group, & &1["hit"]) end)
+
+  ## Options
+
+  Multi-valued filters take a list and become repeated query keys.
+
+    * `:content` - free text, max 1024 characters
+    * `:channel_id` - restrict to these channels, max 500
+    * `:author_id` - max 100 · `:author_type` - `:user`, `:bot` or `:webhook`
+    * `:mentions` - messages mentioning these users, max 100
+    * `:mentions_role_id` - max 100 · `:mention_everyone` - boolean
+    * `:replied_to_user_id`, `:replied_to_message_id` - max 100
+    * `:has` - `:image`, `:sound`, `:video`, `:file`, `:sticker`, `:embed`, `:link`,
+      `:poll` or `:snapshot`
+    * `:embed_type`, `:embed_provider`, `:link_hostname`, `:attachment_filename`,
+      `:attachment_extension` - max 100 each
+    * `:pinned` - boolean · `:include_nsfw` - boolean, default `false`
+    * `:min_id` / `:max_id` - snowflake bounds
+    * `:sort_by` - `:timestamp` (default) or `:relevance` · `:sort_order` - `:desc` or `:asc`
+    * `:limit` - 1–25, default 25 · `:offset` - max 9975
+    * `:slop` - words allowed between matching tokens, max 100, default 2
+
+  ## Examples
+
+      EDA.API.Message.search(guild_id,
+        content: "incident",
+        channel_id: [ops_channel, alerts_channel],
+        has: [:link],
+        sort_by: :relevance,
+        limit: 10
+      )
+
+  ## Caveats Discord documents
+
+    * **Sort order is ignored when sorting by relevance.**
+    * `total_results` is approximate while messages are being created or deleted, and a page
+      may come back slightly shorter than `:limit`.
+    * `:offset` caps at 9975, so at most ten thousand results are reachable — narrow the
+      query rather than paging to the end.
+    * A guild whose history is still being indexed answers **HTTP 202** rather than results.
+      That is a success status carrying no messages, so it is reported as
+      `{:error, {:index_pending, retry_after_seconds}}` instead of an empty search.
+  """
+  @spec search(String.t() | integer(), keyword()) :: {:ok, map()} | {:error, term()}
+  def search(guild_id, opts \\ []) do
+    query = opts |> validate_search!() |> normalize_search()
+
+    case EDA.HTTP.Client.get(with_query("/guilds/#{guild_id}/messages/search", query)) do
+      {:ok, %{"code" => 110_000} = body} ->
+        {:error, {:index_pending, body["retry_after"]}}
+
+      other ->
+        other
+    end
+  end
+
+  @search_limits %{
+    channel_id: 500,
+    author_id: 100,
+    mentions: 100,
+    mentions_role_id: 100,
+    replied_to_user_id: 100,
+    replied_to_message_id: 100,
+    embed_type: 100,
+    embed_provider: 100,
+    link_hostname: 100,
+    attachment_filename: 100,
+    attachment_extension: 100
+  }
+
+  @has_values ~w(image sound video file sticker embed link poll snapshot)a
+  @author_types ~w(user bot webhook)a
+  @sort_by ~w(timestamp relevance)a
+  @sort_order ~w(asc desc)a
+
+  # Discord answers an over-long filter with an opaque 50035, so the limits it documents are
+  # checked here where the message can name the option.
+  defp validate_search!(opts) do
+    Enum.each(opts, fn {key, value} -> validate_search_opt!(key, value) end)
+    opts
+  end
+
+  defp validate_search_opt!(:limit, value) when value not in 1..25 do
+    raise ArgumentError, ":limit must be between 1 and 25, got: #{inspect(value)}"
+  end
+
+  defp validate_search_opt!(:offset, value) when is_integer(value) and value > 9975 do
+    raise ArgumentError, ":offset caps at 9975, got: #{inspect(value)}"
+  end
+
+  defp validate_search_opt!(:slop, value) when is_integer(value) and value > 100 do
+    raise ArgumentError, ":slop caps at 100, got: #{inspect(value)}"
+  end
+
+  defp validate_search_opt!(:content, value) when is_binary(value) do
+    if String.length(value) > 1024 do
+      raise ArgumentError, ":content is limited to 1024 characters"
+    end
+  end
+
+  defp validate_search_opt!(:has, value), do: validate_members!(:has, value, @has_values)
+
+  defp validate_search_opt!(:author_type, value),
+    do: validate_members!(:author_type, value, @author_types)
+
+  defp validate_search_opt!(:sort_by, value), do: validate_member!(:sort_by, value, @sort_by)
+
+  defp validate_search_opt!(:sort_order, value),
+    do: validate_member!(:sort_order, value, @sort_order)
+
+  defp validate_search_opt!(key, value) when is_list(value) do
+    case Map.get(@search_limits, key) do
+      nil ->
+        :ok
+
+      max when length(value) > max ->
+        raise ArgumentError,
+              "#{inspect(key)} accepts at most #{max} values, got #{length(value)}"
+
+      _max ->
+        :ok
+    end
+  end
+
+  defp validate_search_opt!(_key, _value), do: :ok
+
+  defp validate_members!(key, values, allowed) when is_list(values) do
+    Enum.each(values, &validate_member!(key, &1, allowed))
+  end
+
+  defp validate_members!(key, value, allowed), do: validate_member!(key, value, allowed)
+
+  defp validate_member!(key, value, allowed) do
+    normalized = if is_binary(value), do: String.to_existing_atom(value), else: value
+
+    unless normalized in allowed do
+      raise ArgumentError, "#{inspect(key)} accepts #{inspect(allowed)}, got: #{inspect(value)}"
+    end
+  rescue
+    ArgumentError ->
+      reraise ArgumentError,
+              [message: "#{inspect(key)} accepts #{inspect(allowed)}, got: #{inspect(value)}"],
+              __STACKTRACE__
+  end
+
+  # Atoms are friendlier to write than Discord's strings, and ids may be integers.
+  defp normalize_search(opts) do
+    Enum.map(opts, fn
+      {key, values} when is_list(values) -> {key, Enum.map(values, &to_query_value/1)}
+      {key, value} -> {key, to_query_value(value)}
+    end)
+  end
+
+  defp to_query_value(value) when is_atom(value) and not is_boolean(value) and not is_nil(value),
+    do: Atom.to_string(value)
+
+  defp to_query_value(value) when is_integer(value), do: Integer.to_string(value)
+  defp to_query_value(value), do: value
+
   @doc "Gets a message by ID."
   @spec get(String.t() | integer(), String.t() | integer()) ::
           {:ok, map()} | {:error, term()}
