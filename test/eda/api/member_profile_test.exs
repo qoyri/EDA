@@ -48,19 +48,63 @@ defmodule EDA.API.MemberProfileTest do
       assert_receive {:body, %{"nick" => "EDA"}, _reason}
     end
 
-    test "sends only the profile fields, never a stray option", %{bypass: bypass} do
+    test "sends only the profile fields, and the reason travels as a header",
+         %{bypass: bypass} do
       expect_me(bypass, self())
 
       assert {:ok, _} =
                Member.modify_me("111",
                  nick: "EDA",
                  bio: "Built on OTP",
-                 reason: "profile refresh",
-                 priority: :low
+                 reason: "profile refresh"
                )
 
       assert_receive {:body, body, _reason}
       assert body == %{"nick" => "EDA", "bio" => "Built on OTP"}
+    end
+
+    test "an unknown option is refused rather than quietly dropped", %{bypass: bypass} do
+      # Confirmed live on 2026-09-20: dropping it answered {:ok, member} with the nickname
+      # unchanged, so `nickname:` looked like it had worked.
+      Bypass.down(bypass)
+
+      error = assert_raise(ArgumentError, fn -> Member.modify_me("111", nickname: "EDA") end)
+
+      assert error.message =~ "unknown option [:nickname]"
+      assert error.message =~ ":nick"
+      assert error.message =~ ":banner"
+
+      assert_raise ArgumentError, ~r/unknown options \[:a, :b\]/, fn ->
+        Member.modify_me("111", a: 1, b: 2)
+      end
+    end
+
+    test "a nickname over 32 characters is refused, as Discord refuses it", %{bypass: bypass} do
+      # Verified live: 32 accepted, 33 answered 50035.
+      Bypass.down(bypass)
+
+      assert_raise ArgumentError, ~r/:nick is limited to 32 characters/, fn ->
+        Member.modify_me("111", nick: String.duplicate("n", 33))
+      end
+    end
+
+    test "exactly 32 characters is fine, and nil clears it", %{bypass: bypass} do
+      expect_me(bypass, self())
+
+      assert {:ok, _} = Member.modify_me("111", nick: String.duplicate("n", 32))
+      assert_receive {:body, _body, _reason}
+    end
+
+    test "no bio length is imposed, because Discord imposes none", %{bypass: bypass} do
+      # 200 characters were accepted by the live API on 2026-09-20. A 190-character limit
+      # exists elsewhere as a client-side convention; enforcing it here would reject valid
+      # input.
+      expect_me(bypass, self())
+
+      assert {:ok, _} = Member.modify_me("111", bio: String.duplicate("b", 200))
+
+      assert_receive {:body, body, _reason}
+      assert String.length(body["bio"]) == 200
     end
 
     test "the reason becomes an audit log header rather than a body field",

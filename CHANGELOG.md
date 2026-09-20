@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`EDA.API.Member.modify_me/2`** and **`EDA.Member.modify_me/2`** — the bot's per-guild profile
+  (`PATCH /guilds/{id}/members/@me`). Sets `nick`, `avatar`, `banner` and `bio` for one guild,
+  overriding the account-wide identity there. Only `:nick` needs a permission
+  (`CHANGE_NICKNAME`); the appearance fields need none
+- **`EDA.ImageData`** — builds the base64 data URIs Discord calls *image data*, for every endpoint
+  that takes an avatar, banner, icon or emoji rather than a file upload. The media type is read
+  from the image's magic number instead of its extension, and a format Discord does not accept —
+  WebP above all — is refused locally with a readable message instead of producing an opaque API
+  error
+- `:avatar` and `:banner` accept a path, raw image bytes or a ready-made data URI on
+  `EDA.API.Member.modify_me/2` and `EDA.API.User.modify_me/1`; `nil` clears the field
+- `EDA.Member` gained the `banner` and `bio` fields
+- `modify_me/2` refuses an option it does not define instead of dropping it — `nickname:`
+  previously answered `{:ok, member}` with nothing changed — and enforces the 32-character
+  nickname limit Discord enforces. No bio limit is imposed, because Discord imposes none
+
 ### Changed
 
 - **Breaking: an option a route does not define now raises `ArgumentError`, and nothing is
@@ -23,20 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   — no longer crashes the option check with an opaque "expected a keyword list" error. Every route
   validating a map body was affected since 0.4.1. A string key now counts as the atom of the same
   name.
-### Added
-
-- **`EDA.API.Member.modify_me/2`** and **`EDA.Member.modify_me/2`** — the bot's per-guild profile
-  (`PATCH /guilds/{id}/members/@me`). Sets `nick`, `avatar`, `banner` and `bio` for one guild,
-  overriding the account-wide identity there. Only `:nick` needs a permission
-  (`CHANGE_NICKNAME`); the appearance fields need none
-- **`EDA.ImageData`** — builds the base64 data URIs Discord calls *image data*, for every endpoint
-  that takes an avatar, banner, icon or emoji rather than a file upload. The media type is read
-  from the image's magic number instead of its extension, and a format Discord does not accept —
-  WebP above all — is refused locally with a readable message instead of producing an opaque API
-  error
-- `:avatar` and `:banner` accept a path, raw image bytes or a ready-made data URI on
-  `EDA.API.Member.modify_me/2` and `EDA.API.User.modify_me/1`; `nil` clears the field
-- `EDA.Member` gained the `banner` and `bio` fields
 
 ## [0.4.1] - 2026-09-21
 
