@@ -130,6 +130,10 @@ defmodule EDA.API.Message do
         limit: 10
       )
 
+  An option this endpoint does not define is **refused**, not forwarded: Discord ignores a
+  query parameter it does not recognise, so `contnet:` would quietly return the guild's whole
+  history while looking like a filtered search.
+
   ## Caveats Discord documents
 
     * **Sort order is ignored when sorting by relevance.**
@@ -173,9 +177,20 @@ defmodule EDA.API.Message do
   @sort_by ~w(timestamp relevance)a
   @sort_order ~w(asc desc)a
 
+  @search_keys ~w(content channel_id author_id author_type mentions mentions_role_id
+                  mention_everyone replied_to_user_id replied_to_message_id pinned has
+                  embed_type embed_provider link_hostname attachment_filename
+                  attachment_extension sort_by sort_order limit offset slop min_id max_id
+                  include_nsfw)a
+
   # Discord answers an over-long filter with an opaque 50035, so the limits it documents are
   # checked here where the message can name the option.
+  #
+  # An unknown key is refused rather than forwarded: Discord ignores a query parameter it
+  # does not recognise, so `contnet:` would return the whole guild's history while looking
+  # like a filtered search. That is the one failure mode a search must not have.
   defp validate_search!(opts) do
+    check_options!(opts, @search_keys, "EDA.API.Message.search/2")
     Enum.each(opts, fn {key, value} -> validate_search_opt!(key, value) end)
     opts
   end

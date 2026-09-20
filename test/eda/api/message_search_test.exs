@@ -118,6 +118,59 @@ defmodule EDA.API.MessageSearchTest do
       :ok
     end
 
+    test "an unknown option is refused instead of being sent as a junk parameter" do
+      # Discord ignores query parameters it does not recognise, so a typo would return the
+      # guild's whole history while looking like a filtered search. A keyword list has no
+      # compile-time protection against a misspelt key, so the function checks its own.
+      assert_raise ArgumentError, ~r/Message.search\/2: unknown option \[:contnet\]/, fn ->
+        Message.search("111", contnet: "typo")
+      end
+
+      assert_raise ArgumentError, ~r/unknown options \[:foo, :bar\]/, fn ->
+        Message.search("111", foo: 1, bar: 2)
+      end
+    end
+
+    test "the refusal lists what is accepted" do
+      error = assert_raise(ArgumentError, fn -> Message.search("111", nope: 1) end)
+
+      assert error.message =~ ":content"
+      assert error.message =~ ":attachment_filename"
+      assert error.message =~ ":sort_by"
+    end
+
+    test "every documented option is accepted" do
+      opts = [
+        content: "x",
+        channel_id: ["1"],
+        author_id: ["1"],
+        author_type: [:user],
+        mentions: ["1"],
+        mentions_role_id: ["1"],
+        mention_everyone: true,
+        replied_to_user_id: ["1"],
+        replied_to_message_id: ["1"],
+        pinned: false,
+        has: [:link],
+        embed_type: ["image"],
+        embed_provider: ["x"],
+        link_hostname: ["example.com"],
+        attachment_filename: ["cat.png"],
+        attachment_extension: ["png"],
+        sort_by: :timestamp,
+        sort_order: :desc,
+        limit: 25,
+        offset: 0,
+        slop: 2,
+        min_id: "1",
+        max_id: "2",
+        include_nsfw: false
+      ]
+
+      # Bypass is down, so reaching the transport proves validation let everything through.
+      assert {:error, _} = Message.search("111", opts)
+    end
+
     test "limit is 1..25" do
       assert_raise ArgumentError, ~r/:limit must be between 1 and 25/, fn ->
         Message.search("111", limit: 26)
