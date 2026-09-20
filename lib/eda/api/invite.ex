@@ -21,6 +21,11 @@ defmodule EDA.API.Invite do
 
   import EDA.HTTP.Client
 
+  @create_keys ~w(max_age max_uses temporary unique target_type target_user_id
+                  target_application_id role_ids target_users reason)a
+
+  @get_keys ~w(with_counts guild_scheduled_event_id)a
+
   @doc """
   Gets an invite by code.
 
@@ -35,6 +40,7 @@ defmodule EDA.API.Invite do
   """
   @spec get(String.t(), keyword()) :: {:ok, map()} | {:error, term()}
   def get(invite_code, opts \\ []) do
+    check_options!(opts, @get_keys, "EDA.API.Invite.get/2")
     EDA.HTTP.Client.get(with_query("/invites/#{invite_code}", opts))
   end
 
@@ -78,6 +84,7 @@ defmodule EDA.API.Invite do
   """
   @spec create(String.t() | integer(), keyword() | map()) :: {:ok, map()} | {:error, term()}
   def create(channel_id, opts \\ []) do
+    check_options!(opts, @create_keys, "EDA.API.Invite.create/2")
     {target_users, opts} = pop_target_users(opts)
     {reason, body} = pop_reason(opts)
     path = "/channels/#{channel_id}/invites"

@@ -304,6 +304,64 @@ defmodule EDA.API.InviteTargetUsersTest do
     end
   end
 
+  describe "unknown options are refused, not forwarded" do
+    test "create/2 names the offending key and what it accepts", %{bypass: bypass} do
+      # Discord ignores a body field it does not recognise, so `max_ages: 3600` would
+      # silently give the default 24-hour invite while looking like it asked for an hour.
+      Bypass.down(bypass)
+
+      error = assert_raise(ArgumentError, fn -> Invite.create("111", max_ages: 3600) end)
+
+      assert error.message =~ "unknown option [:max_ages]"
+      assert error.message =~ ":max_age"
+      assert error.message =~ ":role_ids"
+    end
+
+    test "get/2 rejects a misspelt query option", %{bypass: bypass} do
+      Bypass.down(bypass)
+
+      assert_raise ArgumentError, ~r/unknown option \[:with_count\]/, fn ->
+        Invite.get("abc123", with_count: true)
+      end
+    end
+
+    test "several unknown keys are reported together", %{bypass: bypass} do
+      Bypass.down(bypass)
+
+      assert_raise ArgumentError, ~r/unknown options \[:foo, :bar\]/, fn ->
+        Invite.create("111", foo: 1, bar: 2)
+      end
+    end
+
+    test "the map form is checked too", %{bypass: bypass} do
+      Bypass.down(bypass)
+
+      assert_raise ArgumentError, ~r/unknown option \[:nope\]/, fn ->
+        Invite.create("111", %{nope: 1})
+      end
+    end
+
+    test "every documented option is accepted", %{bypass: bypass} do
+      Bypass.down(bypass)
+
+      opts = [
+        max_age: 3600,
+        max_uses: 1,
+        temporary: false,
+        unique: true,
+        target_type: 1,
+        target_user_id: "1",
+        target_application_id: "2",
+        role_ids: ["3"],
+        reason: "because"
+      ]
+
+      # Reaching the transport proves validation let everything through.
+      assert {:error, _} = Invite.create("111", opts)
+      assert {:error, _} = Invite.get("abc", with_counts: true, guild_scheduled_event_id: "1")
+    end
+  end
+
   describe "get/2" do
     test "GET /invites/:code with query options", %{bypass: bypass} do
       Bypass.expect_once(bypass, "GET", "/invites/abc123", fn conn ->

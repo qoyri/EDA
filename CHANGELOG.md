@@ -7,22 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- **Breaking: an option a route does not define now raises `ArgumentError`, and nothing is
-  sent.** 0.4.1 logged a warning and sent the request unchanged, as announced there. Discord
-  ignores a field or query parameter it does not recognise, so a misspelt option never failed —
-  it silently did nothing, or worse: `limit` mistyped on a member listing returned one member,
-  `user_id` mistyped on an entitlement listing returned everybody's, and `day: 30` on a prune kicked
-  on the default seven days. The error names the function and the accepted keys. A project that
-  saw no `unknown option` warning on 0.4.1 is unaffected.
-
-### Fixed
-
-- A string-keyed map — a decoded JSON body, such as `EDA.API.User.modify_me(%{"username" => "x"})`
-  — no longer crashes the option check with an opaque "expected a keyword list" error. Every route
-  validating a map body was affected since 0.4.1. A string key now counts as the atom of the same
-  name.
 ### Added
 
 - **Invite target users** — an invite can be restricted to a named list of people.
@@ -42,9 +26,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `type/1`, `target_type/1`, `guest_invite?/1`, `has_target_users?/1`, `permanent?/1` and
   `url/1`. `guild_id` and `channel_id` are derived from the nested objects when Discord sends
   the REST shape rather than the gateway one
+- An option `create/2` or `get/2` does not define is refused rather than forwarded: Discord
+  ignores a body field or query parameter it does not recognise, so `max_ages:` would quietly
+  produce the default 24-hour invite while looking like it asked for an hour
 - `EDA.HTTP.Multipart.encode_named/2`, and a matching sender in the internal HTTP client, for
   endpoints wanting a file under a name of its own rather than the `files[n]` attachment
   convention
+
+### Changed
+
+- **Breaking: an option a route does not define now raises `ArgumentError`, and nothing is
+  sent.** 0.4.1 logged a warning and sent the request unchanged, as announced there. Discord
+  ignores a field or query parameter it does not recognise, so a misspelt option never failed —
+  it silently did nothing, or worse: `limit` mistyped on a member listing returned one member,
+  `user_id` mistyped on an entitlement listing returned everybody's, and `day: 30` on a prune kicked
+  on the default seven days. The error names the function and the accepted keys. A project that
+  saw no `unknown option` warning on 0.4.1 is unaffected.
+
+### Fixed
+
+- A string-keyed map — a decoded JSON body, such as `EDA.API.User.modify_me(%{"username" => "x"})`
+  — no longer crashes the option check with an opaque "expected a keyword list" error. Every route
+  validating a map body was affected since 0.4.1. A string key now counts as the atom of the same
+  name.
 
 ## [0.4.1] - 2026-09-21
 
