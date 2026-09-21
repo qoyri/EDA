@@ -11,7 +11,7 @@ A complete, production-grade Discord library for Elixir. 24 API modules, 68+ eve
 
 - **Full Discord API coverage** — 24 resource-based REST modules: messages, guilds, channels, members, roles, commands, interactions, webhooks, threads, stages, polls, stickers, emojis, scheduled events, auto-moderation, monetization (SKU/entitlements/subscriptions), and more
 - **Typed event structs** — 68+ gateway events across 7 categories (Guild, Message, Channel, Voice, Thread, Stage, Invite) with pattern matching, not raw maps
-- **Voice with DAVE E2EE** — Opus audio send/receive, OGG playback, AES-256-GCM and XChaCha20-Poly1305 transport encryption, plus DAVE (Discord's end-to-end encryption, required for voice since March 2026) via an optional Rust NIF with DirtyCpu scheduling
+- **Voice with DAVE E2EE** — Opus audio send/receive, OGG playback, AES-256-GCM and XChaCha20-Poly1305 transport encryption, plus DAVE (Discord's end-to-end encryption, required for voice since March 2026) via a precompiled native library — no Rust toolchain needed
 - **Smart sharding** — Auto shard count from `/gateway/bot`, staggered startup respecting `max_concurrency`, per-shard ready tracking, exponential backoff with jitter
 - **Configurable cache** — ETS-backed O(1) lookups for 7 entity types (guilds, channels, users, members, roles, presences, voice states) with admission policies and LRW eviction
 - **ETF + zlib** — Binary ETF encoding and zlib-stream compression for lower bandwidth and faster deserialization
@@ -38,24 +38,24 @@ Since March 2026 Discord only accepts end-to-end encrypted voice, using its **DA
 DMs, group DMs, voice channels and Go Live — everything except Stage channels. A voice connection that
 does not offer DAVE is refused with close code `4017`.
 
-EDA implements DAVE through a Rust NIF, kept optional so that bots without voice need no Rust
-toolchain. To use voice, add Rustler, install Rust (for example with [rustup](https://rustup.rs)),
-and turn DAVE on:
+EDA speaks DAVE through a native library, which it downloads precompiled when it compiles — for
+Linux (x86-64, ARM64, ARMv7 and RISC-V; glibc and musl), macOS, Windows and FreeBSD. So voice needs
+no extra dependency and no configuration: DAVE is on as soon as the library is loaded.
+
+On another platform, or to compile without network access, build it from source instead. That needs
+Rust (for example through [rustup](https://rustup.rs)) and Rustler:
 
 ```elixir
-def deps do
-  [
-    {:eda, "~> 0.4.1"},
-    {:rustler, "~> 0.35"}
-  ]
-end
+{:rustler, "~> 0.35"}
 ```
 
 ```elixir
-config :eda, dave: true
+config :rustler_precompiled, :force_build, eda: true
 ```
 
-Without Rustler EDA still compiles and runs; `dave: true` then logs which dependency is missing.
+If the library cannot be obtained, EDA still compiles and everything but voice works: compilation
+prints a warning, and voice connections are refused with `4017`, which EDA logs with the reason.
+`config :eda, dave: false` turns DAVE off, for a bot that only uses Stage channels.
 
 ## Quick Start
 

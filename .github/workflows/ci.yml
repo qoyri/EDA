@@ -84,24 +84,30 @@ jobs:
           EOF
           echo 'defmodule Consumer do end' > consumer/lib/consumer.ex
           cat > consumer/check.exs <<'EOF'
-          false = EDA.Voice.Dave.Native.available?()
-
-          try do
-            EDA.Voice.Dave.Native.new_session(1, 0, 0)
-            raise "the NIF stub returned instead of raising :nif_not_loaded"
-          rescue
-            e in ErlangError -> :nif_not_loaded = e.original
-          end
-
-          # dave: true without the NIF must not advertise DAVE to Discord.
-          Application.put_env(:eda, :dave, true)
           EDA.Cache.put_me(%{"id" => "1", "username" => "ci"})
           state = %{guild_id: "1", session_id: "s", token: "t", heartbeat_interval: nil, heartbeat_ref: nil}
           hello = %{"op" => 8, "d" => %{"heartbeat_interval" => 41_250}}
-          {:reply, identify, _} = EDA.Voice.Event.handle(hello, state)
-          nil = identify.d[:max_dave_protocol_version]
 
-          IO.puts("EDA compiles and degrades cleanly without Rustler")
+          if EDA.Voice.Dave.Native.available?() do
+            # The precompiled NIF was downloaded for this version: DAVE is on by default.
+            {:reply, identify, _} = EDA.Voice.Event.handle(hello, state)
+            1 = identify.d[:max_dave_protocol_version]
+            IO.puts("EDA compiles without Rust and loads the precompiled DAVE NIF")
+          else
+            # No binary for this version yet (unreleased) or this platform: the stubs raise, and
+            # DAVE must not be advertised to Discord.
+            try do
+              EDA.Voice.Dave.Native.new_session(1, 0, 0)
+              raise "the NIF stub returned instead of raising :nif_not_loaded"
+            rescue
+              e in ErlangError -> :nif_not_loaded = e.original
+            end
+
+            Application.put_env(:eda, :dave, true)
+            {:reply, identify, _} = EDA.Voice.Event.handle(hello, state)
+            nil = identify.d[:max_dave_protocol_version]
+            IO.puts("EDA compiles without Rust and degrades cleanly without the DAVE NIF")
+          end
           EOF
 
       - name: EDA compiles without Rustler
@@ -111,7 +117,7 @@ jobs:
           if [ -d deps/rustler ]; then echo "rustler was pulled in, the check is meaningless"; exit 1; fi
           mix compile
 
-      - name: DAVE degrades instead of crashing
+      - name: DAVE loads, or degrades instead of crashing
         working-directory: consumer
         run: mix run check.exs
 

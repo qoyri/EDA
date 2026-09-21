@@ -5,29 +5,42 @@ defmodule EDA.Voice.Dave.Native do
   Wraps the `davey` Rust crate which implements the MLS (RFC 9420) key
   exchange protocol used by Discord's DAVE protocol.
 
-  The NIF is compiled and loaded automatically via Rustler when Rust is
-  available. If the NIF cannot be loaded, all functions raise `:nif_not_loaded`
-  and `available?/0` returns false.
+  The NIF is downloaded precompiled when EDA compiles, from the GitHub release of EDA's version,
+  and verified against the checksums shipped in the package. Binaries exist for Linux (x86-64,
+  ARM64, ARMv7, RISC-V; glibc and musl), macOS, Windows and FreeBSD, so no Rust toolchain is needed.
 
-  ## DAVE is optional
+  ## Building from source
 
-  `:rustler` is an optional dependency, so a bot that never uses end-to-end encrypted voice
-  does not need a Rust toolchain. To enable DAVE, add it to your own project and install Rust:
+  On another platform, or without network access at compile time, build it from source. That needs
+  Rust and Rustler:
 
       {:rustler, "~> 0.35"}
 
-  Without it, EDA compiles normally and this module keeps its stubs. `config :eda, dave: true`
-  then logs a warning instead of crashing the voice session.
+      config :rustler_precompiled, :force_build, eda: true
 
-  Note that Discord has required DAVE for voice since March 2026 — DMs, group DMs, voice
-  channels and Go Live; only Stage channels are exempt — and refuses a connection that does
-  not offer it with close code 4017. A bot that joins voice therefore needs the NIF.
+  ## Without the NIF
+
+  If the NIF can be neither downloaded nor built, EDA still compiles, with a warning, and this
+  module keeps its stubs: every function raises `:nif_not_loaded` and `available?/0` returns false.
+  Voice is then connected without offering DAVE, which Discord refuses with close code 4017 —
+  it has required DAVE since March 2026 for DMs, group DMs, voice channels and Go Live; only Stage
+  channels are exempt.
   """
 
-  # `:rustler` is optional in EDA's mix.exs, so a consumer who did not add it has no Rustler
-  # module at all — an unconditional `use Rustler` made EDA itself fail to compile. See
-  # EDA.Voice.Dave.NativeLoader for why a plain `if` around the `use` is not enough.
-  use EDA.Voice.Dave.NativeLoader, otp_app: :eda, crate: "eda_dave"
+  # See EDA.Voice.Dave.NativeLoader for how the NIF is obtained, and why failing to obtain it does
+  # not fail compilation.
+  version = Mix.Project.config()[:version]
+
+  use EDA.Voice.Dave.NativeLoader,
+    otp_app: :eda,
+    crate: "eda_dave",
+    base_url: "https://github.com/qoyri/EDA/releases/download/v#{version}",
+    version: version,
+    targets: ["x86_64-unknown-freebsd" | RustlerPrecompiled.Config.default_targets()],
+    nif_versions: ["2.15"],
+    # EDA's own dev and test environments build the NIF they are working on. As a dependency,
+    # EDA is compiled in :prod and downloads the binary published for its version.
+    force_build: Mix.env() in [:dev, :test]
 
   # Return shapes: the Rust side returns `Result<T, Atom>`, and Rustler encodes that
   # as `{:ok, T}` / `{:error, atom}`. For the NIFs whose `T` is itself an `{:ok, ...}`
