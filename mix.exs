@@ -34,8 +34,10 @@ defmodule EDA.MixProject do
       # WebSocket client
       {:websockex, "~> 0.4"},
 
-      # HTTP client
-      {:httpoison, "~> 2.0"},
+      # HTTP client. 3.x brings hackney 4, which fixes the CVEs in hackney 1.x
+      # (EEF-CVE-2026-47069, -47071, -47075, -47076); 2.x is still accepted so that a
+      # project pinned to httpoison 2 for another dependency can resolve.
+      {:httpoison, "~> 2.0 or ~> 3.0"},
 
       # JSON encoding/decoding
       {:jason, "~> 1.4"},
