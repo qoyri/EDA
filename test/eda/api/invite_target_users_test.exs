@@ -328,7 +328,7 @@ defmodule EDA.API.InviteTargetUsersTest do
     test "several unknown keys are reported together", %{bypass: bypass} do
       Bypass.down(bypass)
 
-      assert_raise ArgumentError, ~r/unknown options \[:foo, :bar\]/, fn ->
+      assert_raise ArgumentError, ~r/unknown options \[:bar, :foo\]/, fn ->
         Invite.create("111", foo: 1, bar: 2)
       end
     end
