@@ -62,6 +62,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `modify_me/2` refuses an option it does not define instead of dropping it — `nickname:`
   previously answered `{:ok, member}` with nothing changed — and enforces the 32-character
   nickname limit Discord enforces. No bio limit is imposed, because Discord imposes none
+- **Permissions straight off an interaction** — a resolved channel carries two bitsets Discord
+  computed for you: `app_permissions` for the bot and `permissions` for the invoking user.
+  `EDA.Interaction.app_permissions/1,2`, `user_permissions/1,2`, `can?/2,3`, `user_can?/2,3` and
+  `permission_list/1,2` read them, so "may I post in the channel they picked?" needs no REST
+  call and no permission arithmetic
+- `user_permissions/1` and `user_can?/2` answer the same question for the **invoking user** in
+  the channel the interaction came from, which Discord ships on the interaction's `member`
+- An absent bitset is `nil`, never `0` — being told nothing is not the same as being denied
+  everything, and the documentation says when a resolved channel's `app_permissions` is absent
+- `EDA.Member` gained `permissions`, the precomputed bitset Discord sends on an interaction's
+  member and which `from_raw/1` was dropping
+- `EDA.Interaction.resolved_channel/2` and `resolved_channels/1` return `%EDA.Channel{}` structs
+  instead of raw maps
+- `EDA.Channel` gained `permissions`, `app_permissions` and `last_pin_timestamp` — fields Discord
+  sends only on the partial channel objects inside an interaction
 
 ### Changed
 
