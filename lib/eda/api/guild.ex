@@ -108,4 +108,91 @@ defmodule EDA.API.Guild do
         error
     end
   end
+
+  # ── Onboarding ─────────────────────────────────────────────────────
+
+  @onboarding_keys ~w(prompts default_channel_ids enabled mode)a
+
+  @doc """
+  Gets a guild's onboarding: its prompts, default channels, and whether it is enabled.
+
+  `GET /guilds/{guild_id}/onboarding`. `EDA.Onboarding.fetch/1` returns it as a struct.
+  """
+  @spec onboarding(String.t() | integer()) :: {:ok, map()} | {:error, term()}
+  def onboarding(guild_id), do: EDA.HTTP.Client.get("/guilds/#{guild_id}/onboarding")
+
+  @doc """
+  Replaces a guild's onboarding. Requires `MANAGE_GUILD` and `MANAGE_ROLES`.
+
+  `PUT /guilds/{guild_id}/onboarding`. Every field is optional, but `:prompts`, when given, is
+  the **complete** list: a prompt left out is deleted. `EDA.Onboarding.save/2` is the safe way to
+  change one prompt among several.
+
+  ## Options
+
+    * `:prompts` — `EDA.Onboarding.Prompt` structs or raw prompt maps. An option's emoji is
+      sent as `emoji_id` / `emoji_name` / `emoji_animated` whichever form it came in: Discord
+      ignores the `emoji` object it returns, so sending that back would clear the emoji
+    * `:default_channel_ids` — channels every member joins
+    * `:enabled` — enabling needs at least 7 default channels, 5 of them open to `@everyone`
+    * `:mode` — `:default` or `:advanced`
+    * `:reason` — audit log reason
+  """
+  @spec modify_onboarding(String.t() | integer(), keyword() | map()) ::
+          {:ok, map()} | {:error, term()}
+  def modify_onboarding(guild_id, opts) do
+    {reason, body} = pop_prune_reason(opts)
+    check_options!(body, @onboarding_keys, "EDA.API.Guild.modify_onboarding/2")
+
+    body =
+      body
+      |> maybe_update(:prompts, fn prompts -> Enum.map(prompts, &prompt_payload/1) end)
+      |> maybe_update(:mode, &EDA.Onboarding.mode_value!/1)
+
+    put("/guilds/#{guild_id}/onboarding", body, reason)
+  end
+
+  defp maybe_update(body, key, fun) do
+    case body do
+      %{^key => value} -> Map.put(body, key, fun.(value))
+      _ -> body
+    end
+  end
+
+  defp prompt_payload(%EDA.Onboarding.Prompt{} = prompt),
+    do: EDA.Onboarding.Prompt.to_payload(prompt)
+
+  # A raw map, perhaps straight from onboarding/1: bring each option's emoji object into the
+  # flat form Discord accepts.
+  defp prompt_payload(%{} = prompt) do
+    prompt = Map.new(prompt, fn {k, v} -> {to_string(k), v} end)
+
+    case prompt do
+      %{"options" => options} when is_list(options) ->
+        %{prompt | "options" => Enum.map(options, &option_payload/1)}
+
+      _ ->
+        prompt
+    end
+  end
+
+  defp option_payload(%EDA.Onboarding.Option{} = option),
+    do: EDA.Onboarding.Option.to_payload(option)
+
+  defp option_payload(%{} = option) do
+    option = Map.new(option, fn {k, v} -> {to_string(k), v} end)
+
+    case Map.pop(option, "emoji") do
+      {%{} = emoji, rest} ->
+        emoji = Map.new(emoji, fn {k, v} -> {to_string(k), v} end)
+
+        rest
+        |> Map.put_new("emoji_id", emoji["id"])
+        |> Map.put_new("emoji_name", emoji["name"])
+        |> Map.put_new("emoji_animated", emoji["animated"] || false)
+
+      {_none, rest} ->
+        rest
+    end
+  end
 end

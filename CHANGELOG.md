@@ -168,6 +168,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `:cover_image` as a path or bytes through `EDA.ImageData`. What Discord would refuse is refused
   before sending: a flag other than the three limited intents, more than 5 tags or one over 20
   characters
+- **Guild onboarding** — `EDA.API.Guild.onboarding/1` and `modify_onboarding/2`
+  (`GET` / `PUT /guilds/{id}/onboarding`), and `EDA.Onboarding` with its `Prompt` and `Option`
+  structs: `fetch/1`, `save/2`, `prompt/3`, `option/2`, `add_prompt/2` and `remove_prompt/2`
+- The round trip is safe. Discord returns an option's emoji as an `emoji` object but only accepts
+  `emoji_id` / `emoji_name` / `emoji_animated`, so saving an onboarding exactly as it was read
+  cleared every emoji — confirmed against the live API. Every request, from structs or from raw
+  maps, now sends the flat fields
+- New prompts and options get a placeholder id: Discord refuses a prompt without one, then
+  replaces it with its own on save
 
 ### Changed
 
