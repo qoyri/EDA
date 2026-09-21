@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- The DAVE NIF now builds against `davey` 0.1.4 instead of 0.1.1. The older lock pulled in OpenMLS
+  and cryptography crates with published advisories — GHSA-8x3w-qj7j-gqhf (high),
+  GHSA-435g-fcv3-8j26 and GHSA-g433-pq76-6cmf — and 0.1.4 also brings the library's encryption in
+  line with Discord's reference implementation. Only projects that compile the NIF (voice with
+  `dave: true`) are affected; they pick this up on the next build.
+
 ## [0.4.1] - 2026-09-21
 
 A patch release: bug fixes and a dependency security update. Nothing is removed and no signature
