@@ -55,16 +55,24 @@ defmodule EDA.Voice.Dave.ManagerTest do
   end
 
   describe "handle_mls_event/3" do
-    test "OP 21 (PREPARE_TRANSITION) returns no replies" do
+    test "OP 24 (PREPARE_EPOCH) epoch=1 re-initialises and sends a key package" do
       manager = Manager.new(1, 12_345, 67_890)
-      {_manager, replies} = Manager.handle_mls_event(manager, 21, %{"protocol_version" => 1})
-      assert replies == []
+
+      {manager, replies} =
+        Manager.handle_mls_event(manager, 24, %{"epoch" => 1, "protocol_version" => 1})
+
+      assert [{:binary, <<26, _::binary>>}] = replies
+      assert manager.protocol_version == 1
     end
 
-    test "OP 24 (PREPARE_EPOCH) epoch=1 resets and sends key package" do
+    test "OP 24 (PREPARE_EPOCH) epoch=1 at protocol 0 resets without a key package" do
       manager = Manager.new(1, 12_345, 67_890)
-      {_manager, replies} = Manager.handle_mls_event(manager, 24, %{"epoch" => 1})
-      assert [{:binary, <<26, _::binary>>}] = replies
+
+      {manager, replies} =
+        Manager.handle_mls_event(manager, 24, %{"epoch" => 1, "protocol_version" => 0})
+
+      assert replies == []
+      assert Manager.current_version(manager) == 0
     end
 
     test "OP 24 (PREPARE_EPOCH) epoch!=1 returns no replies" do
@@ -79,19 +87,141 @@ defmodule EDA.Voice.Dave.ManagerTest do
       assert replies == []
     end
 
-    test "OP 22 (EXECUTE_TRANSITION) clears pending state" do
-      manager = Manager.new(1, 12_345, 67_890)
-      manager = %{manager | pending_epoch: 5, transition_id: 1}
-      {manager, replies} = Manager.handle_mls_event(manager, 22, %{})
-      assert manager.pending_epoch == nil
-      assert manager.transition_id == nil
-      assert replies == []
-    end
-
     test "unhandled opcode returns no replies" do
       manager = Manager.new(0, 12_345, 67_890)
       {_manager, replies} = Manager.handle_mls_event(manager, 99, %{})
       assert replies == []
+    end
+  end
+
+  describe "transitions" do
+    setup do
+      %{manager: Manager.new(1, 12_345, 67_890)}
+    end
+
+    test "transition 0 executes at once and is not acknowledged", %{manager: manager} do
+      {manager, replies} =
+        Manager.handle_mls_event(manager, 21, %{"transition_id" => 0, "protocol_version" => 1})
+
+      assert replies == []
+      assert manager.pending_transitions == %{}
+      assert manager.last_transition_id == 0
+      assert manager.transitions == 1
+    end
+
+    test "any other transition is acknowledged and waits for OP 22", %{manager: manager} do
+      {manager, replies} =
+        Manager.handle_mls_event(manager, 21, %{"transition_id" => 4, "protocol_version" => 1})
+
+      assert [%{op: 23, d: %{transition_id: 4}}] = replies
+      assert manager.pending_transitions == %{4 => 1}
+      assert manager.transitions == 0
+
+      {manager, []} = Manager.handle_mls_event(manager, 22, %{"transition_id" => 4})
+      assert manager.pending_transitions == %{}
+      assert manager.last_transition_id == 4
+      assert manager.transitions == 1
+    end
+
+    test "OP 22 for a transition that is not pending changes nothing", %{manager: manager} do
+      assert {^manager, []} = Manager.handle_mls_event(manager, 22, %{"transition_id" => 9})
+    end
+
+    test "a downgrade to protocol 0 is acknowledged, then turns encryption off", %{
+      manager: manager
+    } do
+      # The playback process holds a copy taken when the connection became ready.
+      playback_copy = manager
+      frame = <<1, 2, 3, 4, 5>>
+
+      {manager, replies} =
+        Manager.handle_mls_event(manager, 21, %{"transition_id" => 2, "protocol_version" => 0})
+
+      assert [%{op: 23, d: %{transition_id: 2}}] = replies
+      assert Manager.current_version(manager) == 1
+
+      {downgraded, []} = Manager.handle_mls_event(manager, 22, %{"transition_id" => 2})
+
+      assert downgraded.downgraded
+      assert Manager.current_version(downgraded) == 0
+      refute Manager.transitioned_to_dave?(manager, downgraded)
+
+      # Discord now expects unencrypted media, and the copy sees the transition too.
+      assert {:ok, ^frame, _} = Manager.encrypt_frame(downgraded, frame)
+      assert {:ok, ^frame, _} = Manager.encrypt_frame(playback_copy, frame)
+      assert {:ok, ^frame, _} = Manager.decrypt_frame(downgraded, frame, 42)
+    end
+
+    test "an upgrade after a downgrade restores DAVE", %{manager: manager} do
+      {manager, _} =
+        Manager.handle_mls_event(manager, 21, %{"transition_id" => 2, "protocol_version" => 0})
+
+      {downgraded, []} = Manager.handle_mls_event(manager, 22, %{"transition_id" => 2})
+
+      {manager, _} =
+        Manager.handle_mls_event(downgraded, 21, %{"transition_id" => 3, "protocol_version" => 1})
+
+      {upgraded, []} = Manager.handle_mls_event(manager, 22, %{"transition_id" => 3})
+
+      refute upgraded.downgraded
+      assert Manager.current_version(upgraded) == 1
+      assert Manager.transitioned_to_dave?(downgraded, upgraded)
+    end
+  end
+
+  describe "recovery from a refused commit or welcome" do
+    setup do
+      %{manager: Manager.new(1, 12_345, 67_890)}
+    end
+
+    test "a refused commit reports the transition and offers a new key package", %{
+      manager: manager
+    } do
+      {manager, replies} =
+        Manager.handle_mls_event(manager, 29, %{"transition_id" => 3, "commit_bin" => "garbage"})
+
+      assert [%{op: 31, d: %{transition_id: 3}}, {:binary, <<26, _::binary>>}] = replies
+      assert manager.reinitializing
+    end
+
+    test "a refused welcome reports the transition and offers a new key package", %{
+      manager: manager
+    } do
+      {manager, replies} =
+        Manager.handle_mls_event(manager, 30, %{"transition_id" => 5, "welcome_bin" => "garbage"})
+
+      assert [%{op: 31, d: %{transition_id: 5}}, {:binary, <<26, _::binary>>}] = replies
+      assert manager.reinitializing
+    end
+
+    test "recovers once, not once per failure", %{manager: manager} do
+      {manager, [_ | _]} =
+        Manager.handle_mls_event(manager, 30, %{"transition_id" => 5, "welcome_bin" => "garbage"})
+
+      assert {_, []} =
+               Manager.handle_mls_event(manager, 29, %{
+                 "transition_id" => 6,
+                 "commit_bin" => "garbage"
+               })
+    end
+
+    test "an executed transition ends the recovery", %{manager: manager} do
+      {manager, _} =
+        Manager.handle_mls_event(manager, 30, %{"transition_id" => 5, "welcome_bin" => "garbage"})
+
+      {manager, []} =
+        Manager.handle_mls_event(manager, 21, %{"transition_id" => 0, "protocol_version" => 1})
+
+      refute manager.reinitializing
+    end
+  end
+
+  describe "decrypt_frame/3" do
+    test "passes Opus silence frames through, as Discord sends them unencrypted" do
+      manager = Manager.new(1, 12_345, 67_890)
+
+      assert {:ok, <<0xF8, 0xFF, 0xFE>>, _} =
+               Manager.decrypt_frame(manager, <<0xF8, 0xFF, 0xFE>>, 42)
     end
   end
 end

@@ -22,6 +22,8 @@ defmodule EDA.Voice.Session do
   # Other fatal codes → give up, don't reconnect
   @fatal_close_codes [4004, 4009, 4011, 4016]
 
+  @voice_docs "https://hexdocs.pm/eda/readme.html#voice"
+
   defstruct [
     :guild_id,
     :channel_id,
@@ -162,9 +164,8 @@ defmodule EDA.Voice.Session do
   def handle_disconnect(%{reason: {:remote, 4017, msg}}, state) do
     Logger.error(
       "Voice gateway refused guild #{state.guild_id} with 4017 (#{msg}): Discord requires " <>
-        "DAVE end-to-end encryption for voice outside Stage channels. Enable it with " <>
-        "config :eda, dave: true, and add {:rustler, \"~> 0.35\"} with a Rust toolchain. " <>
-        "Not reconnecting."
+        "DAVE end-to-end encryption for voice outside Stage channels. " <>
+        dave_unavailable_reason() <> " Not reconnecting."
     )
 
     cleanup_state(state)
@@ -358,6 +359,20 @@ defmodule EDA.Voice.Session do
   end
 
   defp maybe_dave_decrypt(opus_data, _manager, _user_id), do: opus_data
+
+  defp dave_unavailable_reason do
+    cond do
+      Application.get_env(:eda, :dave) == false ->
+        "It is turned off by config :eda, dave: false."
+
+      not EDA.Voice.Dave.Native.available?() ->
+        "The DAVE NIF is not loaded: see the warning printed when EDA compiled, or " <>
+          "#{@voice_docs} to build it from source."
+
+      true ->
+        "DAVE was offered, so Discord refused it for another reason."
+    end
+  end
 
   defp cleanup_state(state) do
     if state.heartbeat_ref, do: Process.cancel_timer(state.heartbeat_ref)
