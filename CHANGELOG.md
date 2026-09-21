@@ -156,6 +156,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`VOICE_CHANNEL_EFFECT_SEND`** — `EDA.Event.VoiceChannelEffectSend`, sent when someone in the
   bot's voice channel plays a sound or sends an emoji reaction. `soundboard?/1` tells the two
   apart, and the animation type is `:premium` or `:basic`
+- **The bot's own application** — `EDA.API.Application.me/0` and `modify_me/1`
+  (`GET` / `PATCH /applications/@me`), `activity_instance/1`, and the `EDA.App` struct with
+  `me/0`, `modify/1`, `flags/1`, `has_flag?/2`, `integration_types/1`, `icon_url/2` and
+  `cover_image_url/2`. It is `EDA.App` because `EDA.Application` is EDA's OTP application
+- `EDA.App` reads `flags_new` when Discord sends it: `flags` stops at 31 bits and any newer flag
+  appears only in the string, so code reading `flags` alone would miss it without a sound
+- `modify_me/1` takes friendly forms and translates them: flags as atoms, permissions as
+  `EDA.Permission` atoms, `integration_types_config` keyed by `:guild_install` /
+  `:user_install`, `event_webhooks_status` as `:enabled` / `:disabled`, and `:icon` /
+  `:cover_image` as a path or bytes through `EDA.ImageData`. What Discord would refuse is refused
+  before sending: a flag other than the three limited intents, more than 5 tags or one over 20
+  characters
 
 ### Changed
 

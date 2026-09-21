@@ -100,6 +100,7 @@ defmodule EDA.MixProject do
         Voice: ~r/^EDA\.Voice/,
         Entities: [
           EDA.Activity,
+          EDA.App,
           EDA.Attachment,
           EDA.AuditLog,
           EDA.AuditLog.Change,
