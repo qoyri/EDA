@@ -247,22 +247,52 @@ defmodule EDA.Voice.Event do
 
   # Advertising DAVE commits the session to MLS: Discord will expect end-to-end encrypted
   # media. Without the NIF that cannot be honoured, so it is only advertised when it can be.
+  #
+  # Discord refuses voice without DAVE outside Stage channels (close code 4017), so connecting
+  # without it deserves a warning in both cases — including the default, where `:dave` is not
+  # set at all and nothing used to be said until the connection was refused. Once per VM: it is
+  # configuration advice, not an event, and a bot may join many channels.
+  @voice_docs "https://hexdocs.pm/eda/readme.html#voice"
+
   defp dave_version do
     cond do
       not Application.get_env(:eda, :dave, false) ->
+        warn_once(
+          :dave_disabled,
+          "[EDA] Connecting to voice without DAVE, because config :eda, dave is not enabled. " <>
+            "Discord refuses voice without DAVE end-to-end encryption everywhere but Stage " <>
+            "channels (close code 4017). See #{@voice_docs}"
+        )
+
         0
 
       EDA.Voice.Dave.Native.available?() ->
         1
 
       true ->
-        Logger.warning(
+        warn_once(
+          :dave_nif_missing,
           "[EDA] config :eda, dave: true, but the DAVE NIF is not available — add " <>
             "{:rustler, \"~> 0.35\"} to your deps and install a Rust toolchain. " <>
-            "Connecting to voice without end-to-end encryption."
+            "Discord requires DAVE for voice everywhere but Stage channels, so this " <>
+            "connection will be refused with close code 4017. See #{@voice_docs}"
         )
 
         0
+    end
+  end
+
+  @doc false
+  # Clears the once-per-VM flags, so tests can observe the warnings deterministically.
+  def reset_dave_warnings do
+    for key <- [:dave_disabled, :dave_nif_missing], do: :persistent_term.erase({__MODULE__, key})
+    :ok
+  end
+
+  defp warn_once(key, message) do
+    unless :persistent_term.get({__MODULE__, key}, false) do
+      :persistent_term.put({__MODULE__, key}, true)
+      Logger.warning(message)
     end
   end
 end

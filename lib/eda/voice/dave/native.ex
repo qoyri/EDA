@@ -17,7 +17,11 @@ defmodule EDA.Voice.Dave.Native do
       {:rustler, "~> 0.35"}
 
   Without it, EDA compiles normally and this module keeps its stubs. `config :eda, dave: true`
-  then logs a warning and voice connects without DAVE rather than crashing.
+  then logs a warning instead of crashing the voice session.
+
+  Note that Discord has required DAVE for voice since March 2026 — DMs, group DMs, voice
+  channels and Go Live; only Stage channels are exempt — and refuses a connection that does
+  not offer it with close code 4017. A bot that joins voice therefore needs the NIF.
   """
 
   # `:rustler` is optional in EDA's mix.exs, so a consumer who did not add it has no Rustler

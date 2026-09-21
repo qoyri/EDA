@@ -155,6 +155,23 @@ defmodule EDA.Voice.Session do
     {:ok, %{state | ready: false, udp_socket: nil, secret_key: nil}}
   end
 
+  # 4017 → "E2EE/DAVE protocol required". Discord has refused voice without DAVE outside Stage
+  # channels since March 2026. It used to fall through to the generic clause below and read as
+  # an unexplained disconnect, so it gets a message that says what to change. Not retried:
+  # reconnecting would be refused the same way.
+  def handle_disconnect(%{reason: {:remote, 4017, msg}}, state) do
+    Logger.error(
+      "Voice gateway refused guild #{state.guild_id} with 4017 (#{msg}): Discord requires " <>
+        "DAVE end-to-end encryption for voice outside Stage channels. Enable it with " <>
+        "config :eda, dave: true, and add {:rustler, \"~> 0.35\"} with a Rust toolchain. " <>
+        "Not reconnecting."
+    )
+
+    cleanup_state(state)
+    EDA.Voice.voice_disconnected(state.guild_id)
+    {:ok, %{state | ready: false, udp_socket: nil, secret_key: nil}}
+  end
+
   # Other fatal codes → give up
   def handle_disconnect(%{reason: {:remote, code, msg}}, state)
       when code in @fatal_close_codes do
