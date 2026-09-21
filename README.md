@@ -5,13 +5,13 @@
 [![Hex Docs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/eda)
 [![License: MIT](https://img.shields.io/hexpm/l/eda.svg)](https://opensource.org/licenses/MIT)
 
-A complete, production-grade Discord library for Elixir. 24 API modules, 68+ event types, full voice with DAVE E2EE, automatic sharding, and 1300+ tests.
+A complete, production-grade Discord library for Elixir. 24 API modules, 68+ event types, full voice with DAVE E2EE, automatic sharding, and 1500+ tests.
 
 ## Why EDA?
 
 - **Full Discord API coverage** — 24 resource-based REST modules: messages, guilds, channels, members, roles, commands, interactions, webhooks, threads, stages, polls, stickers, emojis, scheduled events, auto-moderation, monetization (SKU/entitlements/subscriptions), and more
 - **Typed event structs** — 68+ gateway events across 7 categories (Guild, Message, Channel, Voice, Thread, Stage, Invite) with pattern matching, not raw maps
-- **Voice with DAVE E2EE** — Opus audio send/receive, OGG playback, AES-256-GCM and XChaCha20-Poly1305 transport encryption, plus mandatory DAVE (Discord E2EE) via Rust NIF with DirtyCpu scheduling
+- **Voice with DAVE E2EE** — Opus audio send/receive, OGG playback, AES-256-GCM and XChaCha20-Poly1305 transport encryption, plus DAVE (Discord's end-to-end encryption, required for voice since March 2026) via an optional Rust NIF with DirtyCpu scheduling
 - **Smart sharding** — Auto shard count from `/gateway/bot`, staggered startup respecting `max_concurrency`, per-shard ready tracking, exponential backoff with jitter
 - **Configurable cache** — ETS-backed O(1) lookups for 7 entity types (guilds, channels, users, members, roles, presences, voice states) with admission policies and LRW eviction
 - **ETF + zlib** — Binary ETF encoding and zlib-stream compression for lower bandwidth and faster deserialization
@@ -25,10 +25,37 @@ A complete, production-grade Discord library for Elixir. 24 API modules, 68+ eve
 ```elixir
 def deps do
   [
-    {:eda, "~> 0.4.0"}
+    {:eda, "~> 0.4.1"}
   ]
 end
 ```
+
+That is all a bot needs — unless it joins voice channels.
+
+### Voice
+
+Since March 2026 Discord only accepts end-to-end encrypted voice, using its **DAVE** protocol, for
+DMs, group DMs, voice channels and Go Live — everything except Stage channels. A voice connection that
+does not offer DAVE is refused with close code `4017`.
+
+EDA implements DAVE through a Rust NIF, kept optional so that bots without voice need no Rust
+toolchain. To use voice, add Rustler, install Rust (for example with [rustup](https://rustup.rs)),
+and turn DAVE on:
+
+```elixir
+def deps do
+  [
+    {:eda, "~> 0.4.1"},
+    {:rustler, "~> 0.35"}
+  ]
+end
+```
+
+```elixir
+config :eda, dave: true
+```
+
+Without Rustler EDA still compiles and runs; `dave: true` then logs which dependency is missing.
 
 ## Quick Start
 
@@ -81,14 +108,14 @@ EDA.API.Message.create(channel_id, content: "With embed", embeds: [%{title: "Hey
 # Guilds & members
 {:ok, guild} = EDA.API.Guild.get(guild_id)
 {:ok, member} = EDA.API.Member.get(guild_id, user_id)
-EDA.API.Role.add(guild_id, user_id, role_id)
+EDA.API.Member.add_role(guild_id, user_id, role_id)
 
 # Slash commands
-EDA.API.Command.create_global(app_id, %{name: "ping", description: "Pong!"})
+EDA.API.Command.create_global(%{name: "ping", description: "Pong!"})
 
 # Reactions, threads, webhooks...
 EDA.API.Reaction.create(channel_id, message_id, "🔥")
-EDA.API.Thread.create(channel_id, %{name: "Discussion", auto_archive_duration: 1440})
+EDA.API.Thread.start(channel_id, name: "Discussion", type: 11, auto_archive_duration: 1440)
 ```
 
 ## DX Helpers
@@ -195,9 +222,11 @@ config :eda, capabilities: [:channel_obfuscation]
 ```
 
 `:channel_obfuscation` becomes mandatory for all bots on **2026-11-16**. Channels the bot cannot see
-are still dispatched, but redacted — `name` becomes `"___hidden___"` and `flags` carry
-`CHANNEL_OBFUSCATED` — while `GET /guilds/{id}/channels` omits them. Enabling it early lets you see
-the redacted payloads and adapt caching and permission checks before the deadline. Unset by default.
+are still dispatched over the gateway, but redacted — `name` becomes `"___hidden___"` and `flags`
+carry `CHANNEL_OBFUSCATED`. Discord's changelog says `GET /guilds/{id}/channels` omits them; probed
+against a real guild, REST still returned them unredacted, so do not rely on either source to hide a
+channel. Enabling it early lets you see the redacted payloads and adapt caching and permission checks
+before the deadline. Unset by default.
 
 Sharding is automatic. EDA fetches the recommended shard count from Discord, launches shards with staggered timing, and tracks per-shard readiness. Override with:
 
