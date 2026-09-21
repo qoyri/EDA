@@ -70,6 +70,20 @@ defmodule EDA.Event do
     "VOICE_PLAYBACK_FINISHED" => EDA.Event.VoicePlaybackFinished,
     "VOICE_CHANNEL_STATUS_UPDATE" => EDA.Event.VoiceChannelStatusUpdate,
     "VOICE_CHANNEL_EFFECT_SEND" => EDA.Event.VoiceChannelEffectSend,
+    "USER_UPDATE" => EDA.Event.UserUpdate,
+    "ENTITLEMENT_CREATE" => EDA.Event.EntitlementCreate,
+    "ENTITLEMENT_UPDATE" => EDA.Event.EntitlementUpdate,
+    "ENTITLEMENT_DELETE" => EDA.Event.EntitlementDelete,
+    "SUBSCRIPTION_CREATE" => EDA.Event.SubscriptionCreate,
+    "SUBSCRIPTION_UPDATE" => EDA.Event.SubscriptionUpdate,
+    "SUBSCRIPTION_DELETE" => EDA.Event.SubscriptionDelete,
+    "INTEGRATION_CREATE" => EDA.Event.IntegrationCreate,
+    "INTEGRATION_UPDATE" => EDA.Event.IntegrationUpdate,
+    "INTEGRATION_DELETE" => EDA.Event.IntegrationDelete,
+    "GUILD_INTEGRATIONS_UPDATE" => EDA.Event.GuildIntegrationsUpdate,
+    "APPLICATION_COMMAND_PERMISSIONS_UPDATE" => EDA.Event.ApplicationCommandPermissionsUpdate,
+    "CHANNEL_INFO" => EDA.Event.ChannelInfo,
+    "VOICE_CHANNEL_START_TIME_UPDATE" => EDA.Event.VoiceChannelStartTimeUpdate,
     "GUILD_AVAILABLE" => EDA.Event.GuildCreate,
     "GUILD_UNAVAILABLE" => EDA.Event.GuildDelete,
     "GATEWAY_CLOSE" => EDA.Event.GatewayClose,
@@ -148,6 +162,20 @@ defmodule EDA.Event do
           | EDA.Event.VoicePlaybackFinished.t()
           | EDA.Event.VoiceChannelStatusUpdate.t()
           | EDA.Event.VoiceChannelEffectSend.t()
+          | EDA.Event.UserUpdate.t()
+          | EDA.Event.EntitlementCreate.t()
+          | EDA.Event.EntitlementUpdate.t()
+          | EDA.Event.EntitlementDelete.t()
+          | EDA.Event.SubscriptionCreate.t()
+          | EDA.Event.SubscriptionUpdate.t()
+          | EDA.Event.SubscriptionDelete.t()
+          | EDA.Event.IntegrationCreate.t()
+          | EDA.Event.IntegrationUpdate.t()
+          | EDA.Event.IntegrationDelete.t()
+          | EDA.Event.GuildIntegrationsUpdate.t()
+          | EDA.Event.ApplicationCommandPermissionsUpdate.t()
+          | EDA.Event.ChannelInfo.t()
+          | EDA.Event.VoiceChannelStartTimeUpdate.t()
           | EDA.Event.RateLimited.t()
           | EDA.Event.ShardReady.t()
           | EDA.Event.AllShardsReady.t()

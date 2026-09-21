@@ -50,12 +50,27 @@ defmodule EDA.AuditLog do
     111 => :thread_update,
     112 => :thread_delete,
     121 => :application_command_permission_update,
+    130 => :soundboard_sound_create,
+    131 => :soundboard_sound_update,
+    132 => :soundboard_sound_delete,
     140 => :auto_moderation_rule_create,
     141 => :auto_moderation_rule_update,
     142 => :auto_moderation_rule_delete,
     143 => :auto_moderation_block_message,
     144 => :auto_moderation_flag_to_channel,
-    145 => :auto_moderation_user_timeout
+    145 => :auto_moderation_user_timeout,
+    146 => :auto_moderation_quarantine_user,
+    150 => :creator_monetization_request_created,
+    151 => :creator_monetization_terms_accepted,
+    163 => :onboarding_prompt_create,
+    164 => :onboarding_prompt_update,
+    165 => :onboarding_prompt_delete,
+    166 => :onboarding_create,
+    167 => :onboarding_update,
+    190 => :home_settings_create,
+    191 => :home_settings_update,
+    192 => :voice_channel_status_create,
+    193 => :voice_channel_status_delete
   }
 
   @reverse_types Map.new(@action_types, fn {k, v} -> {v, k} end)

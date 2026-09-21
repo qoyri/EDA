@@ -116,6 +116,16 @@ defmodule EDA.Gateway.Connection do
     end)
   end
 
+  @doc """
+  Sends OP 43 (Request Channel Info) for a guild, on the shard that owns it. Answered by a
+  `CHANNEL_INFO` dispatch.
+  """
+  @spec request_channel_info(String.t(), [String.t()]) :: :ok
+  def request_channel_info(guild_id, fields) do
+    shard_id = ShardManager.shard_for_guild(guild_id)
+    WebSockex.cast(via(shard_id), {:request_channel_info, guild_id, fields})
+  end
+
   defp via(shard_id), do: {:via, Registry, {EDA.Gateway.Registry, shard_id}}
 
   # WebSockex Callbacks
@@ -343,6 +353,11 @@ defmodule EDA.Gateway.Connection do
 
   def handle_cast({:request_guild_members, payload}, state) do
     frame = %{op: 8, d: payload}
+    {:reply, state.encoding.encode(frame), state}
+  end
+
+  def handle_cast({:request_channel_info, guild_id, fields}, state) do
+    frame = %{op: 43, d: %{guild_id: guild_id, fields: fields}}
     {:reply, state.encoding.encode(frame), state}
   end
 

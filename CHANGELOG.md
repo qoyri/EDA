@@ -177,6 +177,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   maps, now sends the flat fields
 - New prompts and options get a placeholder id: Discord refuses a prompt without one, then
   replaces it with its own on save
+- **Every gateway event Discord documents is now a typed struct.** Fourteen fell through to
+  `EDA.Event.Raw`: `USER_UPDATE`; `ENTITLEMENT_CREATE` / `_UPDATE` / `_DELETE` and
+  `SUBSCRIPTION_CREATE` / `_UPDATE` / `_DELETE`, the gateway half of monetization EDA already
+  covered over REST; `INTEGRATION_CREATE` / `_UPDATE` / `_DELETE` and `GUILD_INTEGRATIONS_UPDATE`;
+  `APPLICATION_COMMAND_PERMISSIONS_UPDATE`; `CHANNEL_INFO` and `VOICE_CHANNEL_START_TIME_UPDATE`
+- New structs behind them: **`EDA.Entitlement`** (with `active?/2`, since an expired entitlement is
+  not deleted), **`EDA.Integration`** and **`EDA.Command.Permissions`** (recognising the
+  `@everyone` and all-channels constants)
+- **`EDA.Channel.request_info/2`** — opcode 43, Request Channel Info: voice channel statuses and
+  session start times, which are not on the channel object, answered by `CHANNEL_INFO`. Start
+  times are `DateTime`s; the live gateway sends them as strings though the reference says integer,
+  and both are read
+- Fifteen audit log action types: soundboard (130–132), automod quarantine (146), creator
+  monetization (150–151), onboarding (163–167), home settings (190–191), voice channel status
+  (192–193)
 
 ### Changed
 
@@ -226,6 +241,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The internal query-string builder expands a list value into repeated keys
   (`channel_id=a&channel_id=b`), which is how Discord expresses a multi-valued filter.
   `URI.encode_query/1` raises on a list, so any endpoint needing one was unreachable
+- **`EDA.Cache.me/0` follows `USER_UPDATE`.** Renaming the bot or changing its avatar left the
+  cached bot user as it was at `READY` for the rest of the session
 
 ### Security
 
@@ -246,6 +263,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - It also notes that Discord returns the filters in an order of its own, which makes a direct
   list comparison report "changed" forever when diffing a deployed command against its
   definition; `equivalent?/2` is the comparison to use
+- `EDA.User.premium_type/1`: `0` is only meaningful for an app approved for `identify.premium`;
+  Discord answers `0` to every other app, so `:none` there says nothing about the user's Nitro
+- `EDA.Event.PresenceUpdate`: a custom status is omitted when the user's profile privacy hides it,
+  so its absence does not mean there is none
+- `EDA.API.Guild.prune/2` and `prune_count/2`: the `PRUNE_REQUIRES_ADMIN` guild feature makes them
+  require `ADMINISTRATOR`
 
 ## [0.4.1] - 2026-09-21
 

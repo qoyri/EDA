@@ -1,5 +1,12 @@
 defmodule EDA.Event.PresenceUpdate do
-  @moduledoc "Dispatched when a user's presence is updated."
+  @moduledoc """
+  Dispatched when a user's presence is updated. Needs the `:guild_presences` intent.
+
+  A user's custom status (the activity of type 4) is **omitted** from `activities` when their
+  profile privacy setting is *Friends Only*, or *Friends & Small Servers Only* in a guild of more
+  than 200 members. Its absence therefore does not mean the user has no custom status. The other
+  activity types are not affected by that setting, though Activity Sharing can hide them.
+  """
   use EDA.Event.Access
 
   defstruct [:guild_id, :user, :status, :activities, :client_status]
