@@ -190,6 +190,23 @@ Options are set **per entity**, not globally. The configurable caches are `:guil
 `:max_size`. Caches left out use the defaults (`policy: :all`, no size limit). The eviction sweep
 interval is fixed and not configurable.
 
+### Storage backend
+
+Where entries live is a separate choice from which entries are kept. The default stores them in
+ETS, local to the node; `EDA.Cache.Adapter.NoOp` stores nothing; and `EDA.Cache.Adapter.Mnesia`
+shares one cache across a cluster, so a node that restarts rejoins it warm:
+
+```elixir
+config :eda,
+  cache_adapter: EDA.Cache.Adapter.Mnesia,
+  cache_mnesia: [copies: :ram_copies, nodes: [node()]]
+```
+
+The Mnesia adapter needs `:mnesia` in your own application's `:extra_applications` — EDA does
+not start it for bots that never use it. Admission policies, `max_size` and eviction sit above the
+adapter, so they apply unchanged to any backend, including one of your own implementing
+`EDA.Cache.Adapter`.
+
 ## Events
 
 | Event | Description |
