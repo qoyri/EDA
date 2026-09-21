@@ -38,7 +38,7 @@ defmodule EDA.API.Message do
   end
 
   def create(channel_id, opts) when is_list(opts) do
-    check_options(opts, @create_keys, "EDA.API.Message.create/2")
+    check_options!(opts, @create_keys, "EDA.API.Message.create/2")
     {delete_after, opts} = Keyword.pop(opts, :delete_after)
 
     result =
@@ -109,7 +109,7 @@ defmodule EDA.API.Message do
   @spec edit(String.t() | integer(), String.t() | integer(), map() | keyword()) ::
           {:ok, map()} | {:error, term()}
   def edit(channel_id, message_id, opts) when is_list(opts) do
-    check_options(opts, @edit_keys, "EDA.API.Message.edit/3")
+    check_options!(opts, @edit_keys, "EDA.API.Message.edit/3")
 
     case build_message_payload(opts) do
       {payload, files} ->
@@ -435,7 +435,7 @@ defmodule EDA.API.Message do
   end
 
   defp do_reply(channel_id, message_id, opts) when is_list(opts) do
-    check_options(opts, @create_keys, "EDA.API.Message.reply/2")
+    check_options!(opts, @create_keys, "EDA.API.Message.reply/2")
     {delete_after, opts} = Keyword.pop(opts, :delete_after)
 
     payload =

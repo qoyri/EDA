@@ -27,7 +27,7 @@ defmodule EDA.API.Webhook do
   @spec create(String.t() | integer(), map() | keyword()) :: {:ok, map()} | {:error, term()}
   def create(channel_id, opts) do
     body = Map.new(opts)
-    check_options(body, @create_keys, "EDA.API.Webhook.create/2")
+    check_options!(body, @create_keys, "EDA.API.Webhook.create/2")
     post("/channels/#{channel_id}/webhooks", body)
   end
 
@@ -53,7 +53,7 @@ defmodule EDA.API.Webhook do
   @spec modify(String.t() | integer(), map() | keyword()) :: {:ok, map()} | {:error, term()}
   def modify(webhook_id, opts) do
     body = Map.new(opts)
-    check_options(body, @modify_keys, "EDA.API.Webhook.modify/2")
+    check_options!(body, @modify_keys, "EDA.API.Webhook.modify/2")
     patch("/webhooks/#{webhook_id}", body)
   end
 
@@ -76,7 +76,7 @@ defmodule EDA.API.Webhook do
   @spec execute(String.t() | integer(), String.t(), map() | keyword()) ::
           {:ok, map()} | {:error, term()}
   def execute(webhook_id, webhook_token, opts) when is_list(opts) do
-    check_options(
+    check_options!(
       opts,
       @execute_body ++ @execute_query ++ @builder_keys,
       "EDA.API.Webhook.execute/3"
@@ -95,7 +95,7 @@ defmodule EDA.API.Webhook do
   end
 
   def execute(webhook_id, webhook_token, opts) when is_map(opts) do
-    check_options(opts, @execute_body ++ @execute_query, "EDA.API.Webhook.execute/3")
+    check_options!(opts, @execute_body ++ @execute_query, "EDA.API.Webhook.execute/3")
     {query, body} = Map.split(opts, @execute_query)
     post(webhook_path(webhook_id, webhook_token, Map.to_list(query)), body)
   end
@@ -134,7 +134,7 @@ defmodule EDA.API.Webhook do
         ) ::
           {:ok, map()} | {:error, term()}
   def edit_message(webhook_id, webhook_token, message_id, opts) when is_list(opts) do
-    check_options(
+    check_options!(
       opts,
       @edit_body ++ @edit_query ++ @builder_keys,
       "EDA.API.Webhook.edit_message/4"
@@ -150,7 +150,7 @@ defmodule EDA.API.Webhook do
   end
 
   def edit_message(webhook_id, webhook_token, message_id, opts) when is_map(opts) do
-    check_options(opts, @edit_body ++ @edit_query, "EDA.API.Webhook.edit_message/4")
+    check_options!(opts, @edit_body ++ @edit_query, "EDA.API.Webhook.edit_message/4")
     {query, body} = Map.split(opts, @edit_query)
 
     patch(

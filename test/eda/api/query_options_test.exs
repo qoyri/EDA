@@ -3,8 +3,8 @@ defmodule EDA.API.QueryOptionsTest do
   Every endpoint that builds a query string declares the parameters Discord defines.
 
   Discord ignores a query parameter it does not recognise, so a misspelt filter does not
-  fail — it silently changes the result. In 0.4.x an unknown key is reported with a warning
-  and the request is sent unchanged; 0.5 will refuse it. `limit` mistyped on a member listing returns the
+  fail — it silently changes the result, so an unknown key raises and nothing is sent. `limit`
+  mistyped on a member listing would return the
   default of **one** member instead of a thousand, and `user_id` mistyped on an entitlement
   listing returns everybody's entitlements rather than one person's.
 
@@ -52,57 +52,45 @@ defmodule EDA.API.QueryOptionsTest do
     ]
   end
 
-  describe "an unknown option is reported" do
+  describe "an unknown option is refused" do
     test "at every query endpoint, naming the path", %{bypass: bypass} do
-      # Bypass is down: the call fails at the transport, which is after the check ran.
+      # Bypass is down: were the check to let the call through, it would fail at the transport
+      # rather than raise.
       Bypass.down(bypass)
 
       Enum.each(endpoints(), fn {label, call, _accepted} ->
-        log = capture_log(fn -> call.(nope: 1) end)
-
-        assert log =~ "unknown option [:nope]", "#{label} did not warn: #{inspect(log)}"
-        assert log =~ "EDA 0.5 will raise", "#{label} should announce the 0.5 behaviour"
+        error = assert_raise ArgumentError, fn -> call.(nope: 1) end
+        assert error.message =~ "unknown option [:nope]", "#{label}: #{error.message}"
       end)
     end
 
-    test "the warning lists what is accepted", %{bypass: bypass} do
+    test "the error lists what is accepted, and where", %{bypass: bypass} do
       Bypass.down(bypass)
 
-      log = capture_log(fn -> EDA.API.Member.list("111", limits: 10) end)
+      error = assert_raise ArgumentError, fn -> EDA.API.Member.list("111", limits: 10) end
 
-      assert log =~ "[:limits]"
-      assert log =~ ":limit"
-      assert log =~ ":after"
-      assert log =~ "/guilds/111/members"
+      assert error.message =~ "[:limits]"
+      assert error.message =~ ":limit"
+      assert error.message =~ ":after"
+      assert error.message =~ "/guilds/111/members"
     end
 
     test "several are reported together", %{bypass: bypass} do
       Bypass.down(bypass)
 
-      log = capture_log(fn -> EDA.API.Message.list("111", a: 1, b: 2) end)
-
-      assert log =~ "unknown options [:a, :b]"
+      assert_raise ArgumentError, ~r/unknown options \[:a, :b\]/, fn ->
+        EDA.API.Message.list("111", a: 1, b: 2)
+      end
     end
 
-    test "the request still goes out unchanged, unknown key included", %{bypass: bypass} do
-      # A patch release must not stop a working call. If EDA's list lagged behind Discord,
-      # a genuinely new parameter still reaches it.
-      Bypass.expect_once(bypass, "GET", "/guilds/111/members", fn conn ->
-        assert URI.decode_query(conn.query_string) == %{"limit" => "5", "brand_new" => "x"}
-
-        conn
-        |> Plug.Conn.put_resp_content_type("application/json")
-        |> Plug.Conn.resp(200, Jason.encode!([]))
-      end)
-
-      capture_log(fn ->
-        assert {:ok, []} = EDA.API.Member.list("111", limit: 5, brand_new: "x")
-      end)
+    test "nothing is sent", %{bypass: _bypass} do
+      # No expectation is set: a request reaching Bypass would fail the test on exit.
+      assert_raise ArgumentError, fn -> EDA.API.Member.list("111", limit: 5, brand_new: "x") end
     end
   end
 
   describe "every documented option is accepted" do
-    test "no endpoint's set is too narrow — its own options raise no warning",
+    test "no endpoint's set is too narrow — its own options are accepted",
          %{bypass: bypass} do
       Bypass.down(bypass)
 
@@ -189,23 +177,12 @@ defmodule EDA.API.QueryOptionsTest do
       assert reason == URI.encode("spring cleaning")
     end
 
-    test "Invite.create/2 warns about a misspelt option, and sends it anyway", %{bypass: bypass} do
-      test_pid = self()
+    test "Invite.create/2 refuses a misspelt option" do
+      # `max_ages: 3600` would give the default 24-hour invite while looking like one hour.
+      error = assert_raise ArgumentError, fn -> EDA.API.Invite.create("111", max_ages: 3600) end
 
-      Bypass.expect_once(bypass, "POST", "/channels/111/invites", fn conn ->
-        {:ok, raw, conn} = Plug.Conn.read_body(conn)
-        send(test_pid, {:body, Jason.decode!(raw)})
-
-        conn
-        |> Plug.Conn.put_resp_content_type("application/json")
-        |> Plug.Conn.resp(200, Jason.encode!(%{"code" => "abc"}))
-      end)
-
-      log = capture_log(fn -> assert {:ok, _} = EDA.API.Invite.create("111", max_ages: 3600) end)
-
-      assert log =~ "EDA.API.Invite.create/2"
-      assert log =~ "unknown option [:max_ages]"
-      assert_receive {:body, %{"max_ages" => 3600}}
+      assert error.message =~ "EDA.API.Invite.create/2"
+      assert error.message =~ "unknown option [:max_ages]"
     end
 
     test "Invite.create/2 accepts every documented option silently", %{bypass: bypass} do
@@ -228,16 +205,12 @@ defmodule EDA.API.QueryOptionsTest do
       refute log =~ "unknown option"
     end
 
-    test "Guild.prune/2 warns about an unknown option — it is a destructive call",
-         %{bypass: bypass} do
-      # `day: 30` prunes on the default 7 days. The warning is the only signal the caller
-      # gets that more members than intended are about to go.
-      Bypass.down(bypass)
+    test "Guild.prune/2 refuses an unknown option — it is a destructive call" do
+      # `day: 30` would prune on the default 7 days, kicking more members than intended.
+      error = assert_raise ArgumentError, fn -> EDA.API.Guild.prune("111", day: 30) end
 
-      log = capture_log(fn -> EDA.API.Guild.prune("111", day: 30) end)
-
-      assert log =~ "unknown option [:day]"
-      assert log =~ "EDA.API.Guild.prune/2"
+      assert error.message =~ "unknown option [:day]"
+      assert error.message =~ "EDA.API.Guild.prune/2"
     end
 
     test "no options at all is still a bare path", %{bypass: bypass} do

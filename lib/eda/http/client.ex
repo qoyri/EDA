@@ -88,39 +88,34 @@ defmodule EDA.HTTP.Client do
   returns everybody's. Endpoints therefore declare the parameters Discord defines.
   """
   def with_query(path, opts, allowed) when is_list(allowed) do
-    check_options(opts, allowed, path)
+    check_options!(opts, allowed, path)
     with_query(path, opts)
   end
 
   @doc """
-  Logs a warning for every key in `opts` that is not in `allowed`, naming `where`.
+  Raises `ArgumentError` for any key in `opts` that is not in `allowed`, naming `where`.
 
   Discord ignores a field or parameter it does not recognise, so an unknown key is never a
   harmless no-op: it is an option the caller believes they set. `limit` mistyped on a member
   listing returns one member instead of a thousand; `allowed_mention` instead of
-  `allowed_mentions` lets a ping through.
+  `allowed_mentions` lets a ping through; `day: 30` on a prune kicks on the default seven days.
+  Nothing is sent.
 
-  The request is **not** altered — an unknown key is still sent. If EDA's list is behind
-  Discord's, the cost is a warning that should not have fired, never a working call that
-  stops working. EDA 0.5 will raise instead of warning.
-
-  Accepts a keyword list or a map, and always returns `:ok`.
+  Accepts a keyword list or a map, and returns `:ok`.
   """
-  def check_options(opts, allowed, where) when is_map(opts),
-    do: check_options(Map.to_list(opts), allowed, where)
+  def check_options!(opts, allowed, where) when is_map(opts),
+    do: check_options!(Map.to_list(opts), allowed, where)
 
-  def check_options(opts, allowed, where) when is_list(opts) and is_list(allowed) do
+  def check_options!(opts, allowed, where) when is_list(opts) and is_list(allowed) do
     case Keyword.keys(opts) -- allowed do
       [] ->
         :ok
 
       unknown ->
-        Logger.warning(
-          "[EDA] #{where}: unknown option#{if length(unknown) > 1, do: "s"} " <>
-            "#{inspect(unknown)} — Discord ignores what it does not recognise, so this " <>
-            "has no effect. Accepted: #{inspect(Enum.sort(allowed))}. " <>
-            "The request was sent unchanged; EDA 0.5 will raise here instead."
-        )
+        raise ArgumentError,
+              "#{where}: unknown option#{if length(unknown) > 1, do: "s"} " <>
+                "#{inspect(unknown)} — Discord ignores what it does not recognise, so it " <>
+                "would have no effect. Accepted: #{inspect(Enum.sort(allowed))}"
     end
   end
 

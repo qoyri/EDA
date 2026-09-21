@@ -45,14 +45,14 @@ defmodule EDA.API.Guild do
       role are spared
     * `:reason` - audit log reason
 
-  Accepts a keyword list or a map. An option this endpoint does not define is reported with
-  a warning: Discord ignores an unrecognised body field, so `day: 30` prunes on the **default
-  7 days** instead — a destructive call doing more than it was asked. EDA 0.5 will refuse it.
+  Accepts a keyword list or a map. An option this endpoint does not define raises
+  `ArgumentError` and nothing is sent: Discord ignores an unrecognised body field, so `day: 30`
+  would prune on the **default 7 days** — a destructive call doing more than it was asked.
   """
   @spec prune(String.t() | integer(), map() | keyword()) :: {:ok, map()} | {:error, term()}
   def prune(guild_id, opts) do
     {reason, body} = pop_prune_reason(opts)
-    check_options(body, @prune_keys, "EDA.API.Guild.prune/2")
+    check_options!(body, @prune_keys, "EDA.API.Guild.prune/2")
     post("/guilds/#{guild_id}/prune", body, reason)
   end
 

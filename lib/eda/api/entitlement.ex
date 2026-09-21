@@ -92,7 +92,7 @@ defmodule EDA.API.Entitlement do
   @spec create_test(map() | keyword()) :: {:ok, map()} | {:error, term()}
   def create_test(opts) do
     body = Map.new(opts)
-    check_options(body, [:sku_id, :owner_id, :owner_type], "EDA.API.Entitlement.create_test/1")
+    check_options!(body, [:sku_id, :owner_id, :owner_type], "EDA.API.Entitlement.create_test/1")
     post("/applications/#{app_id()}/entitlements", body)
   end
 

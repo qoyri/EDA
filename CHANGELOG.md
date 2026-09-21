@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking: an option a route does not define now raises `ArgumentError`, and nothing is
+  sent.** 0.4.1 logged a warning and sent the request unchanged, as announced there. Discord
+  ignores a field or query parameter it does not recognise, so a misspelt option never failed —
+  it silently did nothing, or worse: `limit` mistyped on a member listing returned one member,
+  `user_id` mistyped on an entitlement listing returned everybody's, and `day: 30` on a prune kicked
+  on the default seven days. The error names the function and the accepted keys. A project that
+  saw no `unknown option` warning on 0.4.1 is unaffected.
+
 ## [0.4.1] - 2026-09-21
 
 A patch release: bug fixes and a dependency security update. Nothing is removed and no signature
