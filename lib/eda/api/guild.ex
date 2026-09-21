@@ -25,7 +25,12 @@ defmodule EDA.API.Guild do
     EDA.HTTP.Client.get("/guilds/#{guild_id}/channels")
   end
 
-  @doc "Gets the number of members that would be pruned."
+  @doc """
+  Gets the number of members that would be pruned.
+
+  Requires `MANAGE_GUILD` and `KICK_MEMBERS` — or `ADMINISTRATOR` when the guild has the
+  `PRUNE_REQUIRES_ADMIN` feature, which its owner can turn on.
+  """
   @spec prune_count(String.t() | integer(), keyword()) :: {:ok, map()} | {:error, term()}
   def prune_count(guild_id, opts \\ []) do
     EDA.HTTP.Client.get(with_query("/guilds/#{guild_id}/prune", opts, [:days, :include_roles]))
@@ -35,6 +40,9 @@ defmodule EDA.API.Guild do
 
   @doc """
   Begins a guild prune. **This kicks members.**
+
+  Requires `MANAGE_GUILD` and `KICK_MEMBERS` — or `ADMINISTRATOR` when the guild has the
+  `PRUNE_REQUIRES_ADMIN` feature, which its owner can turn on.
 
   ## Options
 

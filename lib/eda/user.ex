@@ -83,8 +83,11 @@ defmodule EDA.User do
 
   Returns `nil` when Discord did not send the field, which is the usual case: `premium_type`
   needs the `identify.premium` OAuth2 scope and never appears on a user seen through the
-  gateway or the REST API. `nil` therefore means *not known*, and is not the same answer as
-  `:none`, which means the user has no Nitro.
+  gateway or the REST API. `nil` therefore means *not known*.
+
+  `:none` is only meaningful for an app **approved** for `identify.premium`, a scope Discord
+  grants to partners only. For every other app Discord answers `0` whatever the user's
+  subscription, so `:none` there says nothing about their Nitro either.
 
   ## Examples
 

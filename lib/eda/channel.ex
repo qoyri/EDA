@@ -542,4 +542,32 @@ defmodule EDA.Channel do
       when is_binary(channel_id) or is_integer(channel_id) do
     EDA.API.Channel.set_voice_status(channel_id, status, opts)
   end
+
+  @info_fields [:status, :voice_start_time]
+
+  @doc """
+  Asks the gateway for a guild's ephemeral channel data (opcode 43): voice channel statuses and
+  voice session start times, which are not part of the channel object.
+
+  The answer arrives as a `CHANNEL_INFO` event — `EDA.Event.ChannelInfo`. Returns `:ok` once the
+  request is sent; it does not wait for the answer. Changes after that arrive as
+  `VOICE_CHANNEL_STATUS_UPDATE` and `VOICE_CHANNEL_START_TIME_UPDATE`.
+
+      EDA.Channel.request_info(guild_id)
+      EDA.Channel.request_info(guild_id, [:status])
+  """
+  @spec request_info(String.t() | integer(), [:status | :voice_start_time]) :: :ok
+  def request_info(guild_id, fields \\ @info_fields) when is_list(fields) do
+    case fields -- @info_fields do
+      [] ->
+        EDA.Gateway.Connection.request_channel_info(
+          to_string(guild_id),
+          Enum.map(fields, &to_string/1)
+        )
+
+      unknown ->
+        raise ArgumentError,
+              "channel info fields are #{inspect(@info_fields)}, got #{inspect(unknown)}"
+    end
+  end
 end

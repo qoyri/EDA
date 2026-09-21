@@ -252,6 +252,20 @@ defmodule EDA.Gateway.Events do
 
   # ── Presences ──────────────────────────────────────────────────────
 
+  # The bot's own user changed (name, avatar, ...). Without this, EDA.Cache.me/0 kept the
+  # READY-time user for the whole session.
+  defp update_cache("USER_UPDATE", data) do
+    EDA.Cache.User.create(data)
+
+    user_id = data["id"]
+
+    case EDA.Cache.me_raw() do
+      %{"id" => ^user_id} = me -> EDA.Cache.put_me(Map.merge(me, data))
+      nil -> EDA.Cache.put_me(data)
+      _other_user -> :ok
+    end
+  end
+
   defp update_cache("PRESENCE_UPDATE", data) do
     if guild_id = data["guild_id"] do
       EDA.Cache.Presence.upsert(guild_id, data)
