@@ -123,6 +123,39 @@ defmodule EDA.Member do
   defp parse_timestamp(%DateTime{} = value), do: value
   defp parse_timestamp(_value), do: nil
 
+  @doc """
+  The member's highest role in a guild, as the cached role map, or `nil` when they have none
+  beyond `@everyone` (or their roles are not cached).
+
+  "Highest" is the role with the greatest `position`, ties broken by the lower id, which is how
+  Discord orders roles in the member list and in permission hierarchy checks.
+  """
+  @spec top_role(t() | map(), String.t() | integer()) :: map() | nil
+  def top_role(member, guild_id) do
+    member
+    |> role_ids()
+    |> Enum.map(&EDA.Cache.Role.get(guild_id, &1))
+    |> Enum.reject(&is_nil/1)
+    |> Enum.max_by(&{&1["position"] || 0, -String.to_integer(&1["id"])}, fn -> nil end)
+  end
+
+  @doc """
+  The position of the member's highest role in a guild; `0`, the position of `@everyone`, when
+  they have no other role. Compare two members, or a member and a role, to know which one ranks
+  above the other — Discord refuses to let a member act on someone at or above them.
+  """
+  @spec top_role_position(t() | map(), String.t() | integer()) :: non_neg_integer()
+  def top_role_position(member, guild_id) do
+    case top_role(member, guild_id) do
+      nil -> 0
+      role -> role["position"] || 0
+    end
+  end
+
+  defp role_ids(%__MODULE__{roles: roles}), do: roles || []
+  defp role_ids(%{"roles" => roles}), do: roles || []
+  defp role_ids(_member), do: []
+
   # ── Entity Manager ──
 
   use EDA.Entity

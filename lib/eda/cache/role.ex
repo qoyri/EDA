@@ -43,6 +43,23 @@ defmodule EDA.Cache.Role do
   end
 
   @doc """
+  Gets a role by guild and role ID — one lookup on the composite key, and `nil` for a role that
+  belongs to another guild.
+  """
+  @spec get(String.t() | integer(), String.t() | integer()) :: map() | nil
+  def get(guild_id, role_id) do
+    case adapter().get(@table, {to_string(guild_id), to_string(role_id)}) do
+      nil ->
+        :telemetry.execute([:eda, :cache, :miss], %{count: 1}, %{cache: @cache_name})
+        nil
+
+      role ->
+        :telemetry.execute([:eda, :cache, :hit], %{count: 1}, %{cache: @cache_name})
+        role
+    end
+  end
+
+  @doc """
   Gets all roles for a guild. O(guild_size) via match_object.
   """
   @spec for_guild(String.t() | integer()) :: [map()]

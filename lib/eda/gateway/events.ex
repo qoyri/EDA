@@ -82,7 +82,9 @@ defmodule EDA.Gateway.Events do
     active = :counters.get(counter, 1)
     max = Application.get_env(:eda, :max_event_concurrency, 1000)
 
-    if active >= max do
+    # An interaction is never dropped: Discord waits three seconds for an answer, then shows the
+    # user a failure, and there is no redelivery. It still counts towards the limit.
+    if active >= max and event_type != "INTERACTION_CREATE" do
       Logger.warning("Event dispatch at capacity (#{active}), dropping #{event_type}")
 
       :telemetry.execute(
@@ -98,10 +100,13 @@ defmodule EDA.Gateway.Events do
       Task.Supervisor.start_child(EDA.Gateway.TaskSupervisor, fn ->
         try do
           consumer.handle_event(event)
-        rescue
-          e ->
+        catch
+          # `exit` and `throw` escape a plain `rescue`; catching every kind keeps the log naming
+          # the event, whatever the consumer did.
+          kind, reason ->
             Logger.error(
-              "Consumer error handling #{event_type}: #{Exception.message(e)}\n#{Exception.format_stacktrace(__STACKTRACE__)}"
+              "Consumer error handling #{event_type}: " <>
+                Exception.format(kind, reason, __STACKTRACE__)
             )
         after
           :counters.sub(counter, 1, 1)

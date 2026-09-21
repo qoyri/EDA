@@ -211,6 +211,10 @@ defmodule EDA.Cache do
   @spec get_role(String.t() | integer()) :: map() | nil
   defdelegate get_role(role_id), to: EDA.Cache.Role, as: :get
 
+  @doc "Gets a role by guild and role ID, without going through the role-to-guild index."
+  @spec get_role(String.t() | integer(), String.t() | integer()) :: map() | nil
+  defdelegate get_role(guild_id, role_id), to: EDA.Cache.Role, as: :get
+
   @doc """
   Gets all roles for a guild.
   """
@@ -302,7 +306,8 @@ defmodule EDA.Cache do
   def fetch_member(guild_id, user_id) do
     case get_member(guild_id, user_id) do
       nil ->
-        rest_fallback(:members, fn -> EDA.API.Member.get(guild_id, user_id) end)
+        # A member fetched over REST carries no guild_id, so it is cached under the one asked for.
+        rest_fallback({:members, guild_id}, fn -> EDA.API.Member.get(guild_id, user_id) end)
 
       member ->
         {:ok, member}
@@ -340,11 +345,13 @@ defmodule EDA.Cache do
     end
   end
 
-  defp rest_fallback(cache_name, rest_fn) do
+  defp rest_fallback(target, rest_fn) do
+    cache_name = with {name, _guild_id} <- target, do: name
+
     case rest_fn.() do
       {:ok, data} ->
         :telemetry.execute([:eda, :cache, :fallback], %{count: 1}, %{cache: cache_name})
-        do_cache(cache_name, data)
+        do_cache(target, data)
         {:ok, data}
 
       {:error, _} = error ->
@@ -356,9 +363,5 @@ defmodule EDA.Cache do
   defp do_cache(:users, data), do: EDA.Cache.User.create(data)
   defp do_cache(:channels, data), do: EDA.Cache.Channel.create(data)
 
-  defp do_cache(:members, data) do
-    if guild_id = data["guild_id"] do
-      EDA.Cache.Member.create(guild_id, data)
-    end
-  end
+  defp do_cache({:members, guild_id}, data), do: EDA.Cache.Member.create(guild_id, data)
 end

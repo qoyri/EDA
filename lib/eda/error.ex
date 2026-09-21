@@ -1488,4 +1488,23 @@ defmodule EDA.Error do
   @doc "Invalid client secret (530007)."
   @spec invalid_client_secret() :: 530_007
   def invalid_client_secret, do: 530_007
+
+  @doc """
+  Whether a REST error means the thing asked for does not exist: an HTTP 404, or one of
+  Discord's *Unknown …* codes (10001–10999), which is how it says so even when the status
+  differs.
+
+  Accepts the error term or the whole `{:error, term}` tuple.
+
+      iex> EDA.Error.not_found?({:error, %{status: 404, code: 10_008, message: "Unknown Message"}})
+      true
+
+      iex> EDA.Error.not_found?(%{status: 403, code: 50_013, message: "Missing Permissions"})
+      false
+  """
+  @spec not_found?(term()) :: boolean()
+  def not_found?({:error, error}), do: not_found?(error)
+  def not_found?(%{code: code}) when is_integer(code) and code in 10_000..10_999, do: true
+  def not_found?(%{status: 404}), do: true
+  def not_found?(_other), do: false
 end

@@ -124,6 +124,44 @@ defmodule EDA.Gateway.TaskSupervisorTest do
       assert Process.alive?(sup_pid)
     end
 
+    test "an interaction is dispatched even at capacity — Discord gives no second chance" do
+      Application.put_env(:eda, :consumer, __MODULE__.EchoConsumer)
+      Application.put_env(:eda, :max_event_concurrency, 0)
+
+      on_exit(fn ->
+        Application.delete_env(:eda, :consumer)
+        Application.delete_env(:eda, :max_event_concurrency)
+      end)
+
+      Events.dispatch("INTERACTION_CREATE", %{"id" => "1", "type" => 2, "token" => "t"})
+
+      assert_receive {:event, {:INTERACTION_CREATE, %EDA.Event.InteractionCreate{id: "1"}}}, 500
+    end
+
+    test "exit and throw are logged with the event, like an exception" do
+      import ExUnit.CaptureLog
+
+      on_exit(fn -> Application.delete_env(:eda, :consumer) end)
+
+      for consumer <- [__MODULE__.ExitingConsumer, __MODULE__.ThrowingConsumer] do
+        Application.put_env(:eda, :consumer, consumer)
+
+        log =
+          capture_log(fn ->
+            Events.dispatch("MESSAGE_CREATE", %{
+              "content" => "x",
+              "author" => %{"id" => "1", "username" => "bot"}
+            })
+
+            Process.sleep(100)
+          end)
+
+        assert log =~ "Consumer error handling MESSAGE_CREATE"
+      end
+
+      assert :counters.get(:persistent_term.get(:eda_event_task_counter), 1) == 0
+    end
+
     test "telemetry emitted on drop" do
       Application.put_env(:eda, :consumer, __MODULE__.BlockingConsumer)
       Application.put_env(:eda, :max_event_concurrency, 0)
@@ -166,6 +204,14 @@ defmodule EDA.Gateway.TaskSupervisorTest do
     def handle_event(_event) do
       Process.sleep(:infinity)
     end
+  end
+
+  defmodule ExitingConsumer do
+    def handle_event(_event), do: exit(:gone)
+  end
+
+  defmodule ThrowingConsumer do
+    def handle_event(_event), do: throw(:thrown)
   end
 
   defmodule CrashingConsumer do

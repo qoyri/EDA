@@ -74,7 +74,7 @@ defmodule EDA.HTTP.Client do
 
   def interaction_request_multipart(path, body, files) do
     url = base_url() <> path
-    {encoded, content_type} = EDA.HTTP.Multipart.encode(body, files)
+    {encoded, content_type} = EDA.HTTP.Multipart.encode(body, files, attachments_in: :data)
 
     headers = [
       {"Content-Type", content_type},
