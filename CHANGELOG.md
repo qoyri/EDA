@@ -39,7 +39,12 @@ end
   EDA now compiles without it, and the NIF functions raise `:nif_not_loaded` as documented
 - **`dave: true` without the NIF no longer crashes the voice session.** EDA used to advertise DAVE to
   Discord and then call a stub that raises. It now advertises DAVE only when the NIF is loaded;
-  otherwise it logs which dependency is missing and connects without end-to-end encryption
+  otherwise it logs which dependency is missing. Discord has required DAVE for voice outside Stage
+  channels since March 2026, so a bot that joins voice needs Rustler; the README's Voice section
+  says what to add
+- **Close code 4017 names its cause.** Discord refuses a voice connection that does not offer DAVE
+  with 4017 ("E2EE/DAVE protocol required"). EDA logged it as a generic disconnect; it now logs an
+  error saying DAVE is required and how to enable it
 - **Message options were silently dropped.** The keyword form of every message send —
   `EDA.API.Message.create/2`, `edit/3`, `reply/2`, `EDA.API.Webhook.execute/3`, `edit_message/4`,
   `EDA.API.Thread.create_post/3` — kept five keys and discarded the rest, and still answered

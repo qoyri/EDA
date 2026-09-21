@@ -259,7 +259,8 @@ defmodule EDA.Voice.Event do
         Logger.warning(
           "[EDA] config :eda, dave: true, but the DAVE NIF is not available — add " <>
             "{:rustler, \"~> 0.35\"} to your deps and install a Rust toolchain. " <>
-            "Connecting to voice without end-to-end encryption."
+            "Discord requires DAVE for voice everywhere but Stage channels, so this " <>
+            "connection will be refused with close code 4017."
         )
 
         0
