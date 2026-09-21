@@ -70,12 +70,24 @@ defmodule EDA.Voice.Dave.Native do
   def process_proposals(_ref, _operation_type, _proposals, _user_ids),
     do: :erlang.nif_error(:nif_not_loaded)
 
-  @doc "Processes an MLS commit from the gateway."
-  @spec process_commit(reference(), binary()) :: :ok | :error
+  @doc """
+  Processes an MLS commit from the gateway.
+
+  A failure names its cause: `:no_group` or `:pending_group` when the session has not joined a group
+  the commit could apply to, `:invalid` otherwise.
+  """
+  @spec process_commit(reference(), binary()) ::
+          :ok | :error | {:error, :no_group | :pending_group | :invalid}
   def process_commit(_ref, _commit), do: :erlang.nif_error(:nif_not_loaded)
 
-  @doc "Processes an MLS welcome message from the gateway."
-  @spec process_welcome(reference(), binary()) :: :ok | :error
+  @doc """
+  Processes an MLS welcome message from the gateway.
+
+  A failure names its cause: `:already_in_group` when the session had already joined through a
+  commit of its own — the expected outcome of a commit race — `:no_external_sender`, or `:invalid`.
+  """
+  @spec process_welcome(reference(), binary()) ::
+          :ok | :error | {:error, :already_in_group | :no_external_sender | :invalid}
   def process_welcome(_ref, _welcome), do: :erlang.nif_error(:nif_not_loaded)
 
   @doc """
@@ -108,11 +120,21 @@ defmodule EDA.Voice.Dave.Native do
   @spec ready?(reference()) :: {:ok, boolean()} | {:error, atom()} | boolean()
   def ready?(_ref), do: :erlang.nif_error(:nif_not_loaded)
 
-  @doc "Sets passthrough mode (disable/enable E2EE without destroying the session)."
-  @spec set_passthrough_mode(reference(), boolean()) :: :ok | :error
-  def set_passthrough_mode(_ref, _passthrough), do: :erlang.nif_error(:nif_not_loaded)
+  @doc """
+  Sets passthrough mode on every decryptor: while it is on, unencrypted frames are accepted.
 
-  @doc "Resets the MLS group state without losing key material or external sender."
+  Turning it on is immediate; `transition_expiry` is how many seconds decryptors keep accepting
+  unencrypted frames once it is turned off again.
+  """
+  @spec set_passthrough_mode(reference(), boolean(), non_neg_integer()) :: :ok | :error
+  def set_passthrough_mode(_ref, _passthrough, _transition_expiry),
+    do: :erlang.nif_error(:nif_not_loaded)
+
+  @doc """
+  Leaves the MLS group and clears the session's key storage, keeping the external sender.
+
+  It does not prepare a new pending group, so a session that must commit again needs `reinit/4`.
+  """
   @spec reset(reference()) :: :ok | :error
   def reset(_ref), do: :erlang.nif_error(:nif_not_loaded)
 

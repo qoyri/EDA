@@ -201,8 +201,7 @@ defmodule EDA.Voice.Event do
     {updated_manager, replies} = Dave.Manager.handle_mls_event(state.dave_manager, op, data)
     new_state = %{state | dave_manager: updated_manager}
 
-    # If DAVE is now ready after a transition, dispatch event
-    if op == 22 do
+    if Dave.Manager.transitioned_to_dave?(state.dave_manager, updated_manager) do
       EDA.Gateway.Events.dispatch("VOICE_DAVE_READY", %{
         "guild_id" => state.guild_id,
         "channel_id" => state.channel_id
