@@ -54,4 +54,58 @@ defmodule EDA.API.User do
   def create_dm(user_id) do
     post("/users/@me/channels", %{recipient_id: user_id})
   end
+
+  @guild_keys ~w(before after limit with_counts shard)a
+
+  @doc """
+  Lists the guilds the bot is in, as partial guild objects.
+
+  `GET /users/@me/guilds`. Returns at most 200 per call; `stream_guilds/1` pages through them
+  all.
+
+  ## Options
+
+    * `:before`, `:after` — guild id cursors
+    * `:limit` — 1–200, default 200
+    * `:with_counts` — include `approximate_member_count` and `approximate_presence_count`
+    * `:shard` — only the guilds of this shard, `0` to `max_concurrency - 1`. **Required** for a
+      bot using large bot sharding: Discord answers `400` without it since September 2026
+  """
+  @spec guilds(keyword()) :: {:ok, [map()]} | {:error, term()}
+  def guilds(opts \\ []) do
+    EDA.HTTP.Client.get(with_query("/users/@me/guilds", opts, @guild_keys))
+  end
+
+  @doc """
+  Streams every guild the bot is in, 200 per request, lazily.
+
+  Takes the options of `guilds/1` except `:before`, `:after` and `:limit`.
+
+      EDA.API.User.stream_guilds(with_counts: true) |> Enum.count()
+  """
+  @spec stream_guilds(keyword()) :: Enumerable.t()
+  def stream_guilds(opts \\ []) do
+    check_options!(opts, [:with_counts, :shard], "EDA.API.User.stream_guilds/1")
+
+    EDA.Paginator.stream(
+      fetch: fn cursor ->
+        guilds(opts ++ [limit: 200] ++ if(cursor, do: [after: cursor], else: []))
+      end,
+      direction: :after,
+      per_page: 200
+    )
+  end
+
+  @doc """
+  Leaves a guild. Discord then sends `GUILD_DELETE` for it.
+
+  `DELETE /users/@me/guilds/{guild_id}`. The bot cannot leave a guild it owns.
+  """
+  @spec leave_guild(String.t() | integer()) :: :ok | {:error, term()}
+  def leave_guild(guild_id) do
+    case EDA.HTTP.Client.delete("/users/@me/guilds/#{guild_id}") do
+      {:ok, _} -> :ok
+      error -> error
+    end
+  end
 end

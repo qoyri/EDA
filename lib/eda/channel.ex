@@ -570,4 +570,19 @@ defmodule EDA.Channel do
               "channel info fields are #{inspect(@info_fields)}, got #{inspect(unknown)}"
     end
   end
+
+  @doc """
+  Follows an announcement channel, posting its published messages to `target`. Returns the
+  webhook Discord created there, `%{"channel_id" => ..., "webhook_id" => ...}`.
+
+  ## Options
+
+    * `:reason` — audit log reason
+  """
+  @spec follow(t() | String.t() | integer(), t() | String.t() | integer(), keyword()) ::
+          {:ok, map()} | {:error, term()}
+  def follow(channel, target, opts \\ [])
+  def follow(%__MODULE__{id: id}, target, opts), do: follow(id, target, opts)
+  def follow(channel_id, %__MODULE__{id: id}, opts), do: follow(channel_id, id, opts)
+  def follow(channel_id, target_id, opts), do: EDA.API.Channel.follow(channel_id, target_id, opts)
 end
