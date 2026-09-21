@@ -6,6 +6,8 @@ defmodule EDA.Member do
     :user,
     :nick,
     :avatar,
+    :banner,
+    :bio,
     :roles,
     :joined_at,
     :premium_since,
@@ -20,6 +22,8 @@ defmodule EDA.Member do
           user: EDA.User.t() | nil,
           nick: String.t() | nil,
           avatar: String.t() | nil,
+          banner: String.t() | nil,
+          bio: String.t() | nil,
           roles: [String.t()] | nil,
           joined_at: String.t() | nil,
           premium_since: String.t() | nil,
@@ -36,6 +40,8 @@ defmodule EDA.Member do
       user: parse_user(raw["user"]),
       nick: raw["nick"],
       avatar: raw["avatar"],
+      banner: raw["banner"],
+      bio: raw["bio"],
       roles: raw["roles"],
       joined_at: raw["joined_at"],
       premium_since: raw["premium_since"],
@@ -150,6 +156,29 @@ defmodule EDA.Member do
   def modify(guild_id, user_id, payload, opts)
       when (is_binary(user_id) or is_integer(user_id)) and is_map(payload) do
     EDA.API.Member.modify(guild_id, user_id, payload, opts) |> parse_response()
+  end
+
+  @doc """
+  Modifies the bot's own member in a guild — its per-guild profile.
+
+  Returns a `t:t/0`. Takes the same options as `EDA.API.Member.modify_me/2`: `:nick`,
+  `:avatar`, `:banner`, `:bio` and `:reason`. `:avatar` and `:banner` accept a path, raw
+  image bytes or a data URI, and `nil` clears the field so the account-wide value shows
+  again.
+
+  Only `:nick` needs a permission (`CHANGE_NICKNAME`); the appearance fields need none.
+
+      EDA.Member.modify_me(guild_id, nick: "EDA", avatar: "priv/avatar.png")
+
+  Fields you leave out are untouched, so setting a bio alone keeps the avatar and banner.
+
+  `:bio` comes back on **this** response but not on a later `fetch_member/2`: Discord omits
+  it from the guild member object. Read it from the struct this returns, or keep your own
+  copy — a round trip will not give it back.
+  """
+  @spec modify_me(String.t() | integer(), keyword() | map()) :: {:ok, t()} | {:error, term()}
+  def modify_me(guild_id, opts \\ []) do
+    EDA.API.Member.modify_me(guild_id, opts) |> parse_response()
   end
 
   @doc """

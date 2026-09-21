@@ -123,6 +123,64 @@ defmodule EDA.Message do
   end
 
   @doc """
+  Searches a guild's message history, returning structs.
+
+  Takes the same options as `EDA.API.Message.search/2`, and flattens the nesting that
+  endpoint returns:
+
+      {:ok, found} = EDA.Message.search(guild_id, content: "deploy", has: [:link])
+
+      found.total_results   #=> 1034 (approximate, see below)
+      found.results         #=> [%EDA.Message{}, ...] — the matches themselves
+      found.groups          #=> [[%EDA.Message{}], ...] — each match with its neighbours
+      found.indexing?       #=> false
+
+  `:results` is what you almost always want. `:groups` keeps the surrounding messages
+  Discord sends for context; a group is usually one message, but that is not promised, and
+  the match inside it is the one `:results` picked.
+
+  `:total_results` is Discord's own count and is approximate while messages are being
+  created or deleted. `:indexing?` is true while Discord is still walking the guild's older
+  history, which means more results may appear later for the same query.
+
+  Requires `READ_MESSAGE_HISTORY` and the `MESSAGE_CONTENT` intent. A guild that is not
+  indexed yet answers `{:error, {:index_pending, retry_after_seconds}}`.
+  """
+  @spec search(String.t() | integer(), keyword()) ::
+          {:ok,
+           %{results: [t()], groups: [[t()]], total_results: integer(), indexing?: boolean()}}
+          | {:error, term()}
+  def search(guild_id, opts \\ []) do
+    case EDA.API.Message.search(guild_id, opts) do
+      {:ok, body} when is_map(body) -> {:ok, parse_search(body)}
+      {:error, _} = err -> err
+    end
+  end
+
+  defp parse_search(body) do
+    raw_groups =
+      body
+      |> Map.get("messages", [])
+      |> Enum.map(&as_group/1)
+
+    %{
+      results: Enum.map(raw_groups, &(&1 |> pick_hit() |> from_raw())),
+      groups: Enum.map(raw_groups, fn group -> Enum.map(group, &from_raw/1) end),
+      total_results: body["total_results"] || 0,
+      indexing?: body["doing_deep_historical_index"] == true
+    }
+  end
+
+  # Discord nests each result in a context group; a bare map would still parse.
+  defp as_group(group) when is_list(group), do: group
+  defp as_group(raw) when is_map(raw), do: [raw]
+
+  # `hit` marks the match inside its group. It is not a field of a message object, so
+  # `from_raw/1` drops it — the choice has to be made on the raw map, before parsing.
+  defp pick_hit([single]), do: single
+  defp pick_hit(group), do: Enum.find(group, &(&1["hit"] == true)) || List.first(group)
+
+  @doc """
   Deletes a message.
 
   ## Options

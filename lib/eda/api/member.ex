@@ -7,6 +7,9 @@ defmodule EDA.API.Member do
 
   import EDA.HTTP.Client
 
+  @profile_keys ~w(nick avatar banner bio reason)a
+  @max_nick_length 32
+
   @doc "Gets a member of a guild."
   @spec get(String.t() | integer(), String.t() | integer()) ::
           {:ok, map()} | {:error, term()}
@@ -35,6 +38,98 @@ defmodule EDA.API.Member do
   def modify(guild_id, user_id, payload, opts \\ []) do
     patch("/guilds/#{guild_id}/members/#{user_id}", payload, opts)
   end
+
+  @doc """
+  Modifies the bot's own member in a guild — its per-guild profile.
+
+  `PATCH /guilds/{guild_id}/members/@me`. This is a different endpoint from `modify/4`, and
+  the only one that can set the bot's avatar, banner and bio *for one guild*. The bot keeps
+  its account-wide identity from `EDA.API.User.modify_me/1`; what is set here overrides it
+  in this guild alone.
+
+  ## Options
+
+    * `:nick` - guild nickname. The only field that needs a permission: `CHANGE_NICKNAME`
+    * `:avatar` - guild avatar, as image data
+    * `:banner` - guild banner, as image data
+    * `:bio` - guild bio
+    * `:reason` - audit log reason
+
+  Pass `nil` for any of them to clear it and fall back to the account-wide value. Fields
+  you leave out are untouched, so setting a bio alone keeps the avatar and banner.
+
+  `bio` is echoed by this endpoint's own response but is **not** part of the guild member
+  object Discord returns from `get/2` — reading the member back will not give it to you.
+
+  ## Images
+
+  `:avatar` and `:banner` are *image data*, a base64 data URI rather than a file upload.
+  A path or raw bytes is converted for you, and the media type comes from the bytes rather
+  than the extension — see `EDA.ImageData`:
+
+      EDA.API.Member.modify_me(guild_id,
+        nick: "EDA",
+        avatar: "priv/avatar.png",
+        bio: "Built on OTP",
+        reason: "profile refresh"
+      )
+
+      # clears the guild avatar, restoring the account-wide one
+      EDA.API.Member.modify_me(guild_id, avatar: nil)
+
+  """
+  @spec modify_me(String.t() | integer(), map() | keyword()) :: {:ok, map()} | {:error, term()}
+  def modify_me(guild_id, opts \\ [])
+
+  def modify_me(guild_id, opts) when is_list(opts) do
+    modify_me(guild_id, Map.new(opts))
+  end
+
+  def modify_me(guild_id, payload) when is_map(payload) do
+    validate_profile!(payload)
+    {reason, payload} = Map.pop(payload, :reason)
+
+    payload =
+      payload
+      |> Enum.map(&coerce_profile_field/1)
+      |> Map.new()
+
+    patch("/guilds/#{guild_id}/members/@me", payload, reason_opts(reason))
+  end
+
+  # Silently dropping an unknown key would make `nickname:` a no-op that still answers
+  # {:ok, member} with nothing changed — confirmed against the live API on 2026-09-20.
+  defp validate_profile!(payload) do
+    check_options!(payload, @profile_keys, "EDA.API.Member.modify_me/2")
+    validate_nick!(Map.get(payload, :nick))
+  end
+
+  # Discord enforces this one and answers 50035 past it. It does **not** enforce a bio
+  # length: 200 characters were accepted on 2026-09-20, so none is imposed here either.
+  defp validate_nick!(nil), do: :ok
+
+  defp validate_nick!(nick) when is_binary(nick) do
+    if String.length(nick) > @max_nick_length do
+      raise ArgumentError,
+            ":nick is limited to #{@max_nick_length} characters, got #{String.length(nick)}"
+    end
+
+    :ok
+  end
+
+  defp validate_nick!(other) do
+    raise ArgumentError, ":nick must be a string or nil, got: #{inspect(other)}"
+  end
+
+  # Only the image fields need coercion; a nil stays nil, because Discord reads it as "clear".
+  defp coerce_profile_field({key, value}) when key in [:avatar, :banner, "avatar", "banner"] do
+    {key, EDA.ImageData.coerce(value)}
+  end
+
+  defp coerce_profile_field(pair), do: pair
+
+  defp reason_opts(nil), do: []
+  defp reason_opts(reason), do: [reason: reason]
 
   @doc "Removes a member from a guild (kick)."
   @spec remove(String.t() | integer(), String.t() | integer(), keyword()) ::
