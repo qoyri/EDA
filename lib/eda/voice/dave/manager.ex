@@ -43,7 +43,7 @@ defmodule EDA.Voice.Dave.Manager do
   def new(protocol_version, user_id, channel_id) do
     session =
       if protocol_version > 0 do
-        case Native.new_session(protocol_version, user_id, channel_id) do
+        case safe_new_session(protocol_version, user_id, channel_id) do
           {:ok, ref} when is_reference(ref) ->
             ref
 
@@ -482,5 +482,14 @@ defmodule EDA.Voice.Dave.Manager do
       {:ok, result} -> result
       nil -> :timeout
     end
+  end
+
+  # Without the NIF the stub raises rather than returning, and the fallback above only
+  # handles returned values. Voice/event.ex already avoids advertising DAVE in that case;
+  # this keeps a stray call from taking the voice session down with it.
+  defp safe_new_session(protocol_version, user_id, channel_id) do
+    Native.new_session(protocol_version, user_id, channel_id)
+  rescue
+    e in ErlangError -> {:error, e.original}
   end
 end

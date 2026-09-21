@@ -32,7 +32,7 @@ defmodule EDA.Voice.Event do
         "session=#{state.session_id} token=#{String.slice(state.token || "", 0..7)}..."
     )
 
-    dave_version = if Application.get_env(:eda, :dave, false), do: 1, else: 0
+    dave_version = dave_version()
 
     identify =
       Payload.identify(
@@ -243,5 +243,26 @@ defmodule EDA.Voice.Event do
           Logger.error("IP discovery failed: #{inspect(reason)}")
       end
     end)
+  end
+
+  # Advertising DAVE commits the session to MLS: Discord will expect end-to-end encrypted
+  # media. Without the NIF that cannot be honoured, so it is only advertised when it can be.
+  defp dave_version do
+    cond do
+      not Application.get_env(:eda, :dave, false) ->
+        0
+
+      EDA.Voice.Dave.Native.available?() ->
+        1
+
+      true ->
+        Logger.warning(
+          "[EDA] config :eda, dave: true, but the DAVE NIF is not available — add " <>
+            "{:rustler, \"~> 0.35\"} to your deps and install a Rust toolchain. " <>
+            "Connecting to voice without end-to-end encryption."
+        )
+
+        0
+    end
   end
 end
