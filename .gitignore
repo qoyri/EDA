@@ -34,6 +34,10 @@ eda-*.tar
 # Rust NIF build artifacts
 native/*/target/
 
+# The DAVE NIF, built here from native/eda_dave or downloaded precompiled by consumers.
+# Never committed: a stale copy loads with missing functions until the next forced rebuild.
+/priv/native/
+
 # Hex build unpacked directory
 /eda-*/
 
