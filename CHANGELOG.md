@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`EDA.API.Message.search/2`** and **`EDA.Message.search/2`** — search a guild's message
+  history (`GET /guilds/{id}/messages/search`). Every documented filter is supported, including
+  the multi-valued ones, and options take atoms (`has: [:image]`, `sort_by: :relevance`) rather
+  than Discord's strings
+- `EDA.Message.search/2` flattens what the endpoint returns: `messages` is a list of *context
+  groups*, not of messages, with the match marked `"hit" => true`. It answers with `:results`
+  (the matches, as structs), `:groups` (each match with its neighbours), `:total_results` and
+  `:indexing?`
+- An option `search/2` does not define is refused rather than forwarded, since Discord ignores
+  a query parameter it does not recognise — a typo would otherwise return the guild's whole
+  history while looking like a filtered search
+- The filter limits Discord documents are checked before the request — `:limit` 1–25, `:offset`
+  ≤ 9975, `:content` ≤ 1024 characters, 500 channels, 100 authors — with a message naming the
+  option, rather than an opaque `50035`
+- JSON error code `110000` (search index not yet available)
+
 ### Changed
 
 - **Breaking: an option a route does not define now raises `ArgumentError`, and nothing is
@@ -44,6 +62,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Joining a call no longer logs `Welcome failed` as a warning. A welcome that arrives after the bot
   joined through its own commit is the expected outcome of a race at join, and is logged at debug.
 - Opus silence frames are no longer counted as DAVE decryption errors.
+- The internal query-string builder expands a list value into repeated keys
+  (`channel_id=a&channel_id=b`), which is how Discord expresses a multi-valued filter.
+  `URI.encode_query/1` raises on a list, so any endpoint needing one was unreachable
 
 ### Security
 
