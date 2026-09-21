@@ -28,13 +28,42 @@ defmodule EDA.API.Guild do
   @doc "Gets the number of members that would be pruned."
   @spec prune_count(String.t() | integer(), keyword()) :: {:ok, map()} | {:error, term()}
   def prune_count(guild_id, opts \\ []) do
-    EDA.HTTP.Client.get(with_query("/guilds/#{guild_id}/prune", opts))
+    EDA.HTTP.Client.get(with_query("/guilds/#{guild_id}/prune", opts, [:days, :include_roles]))
   end
 
-  @doc "Begins a guild prune."
-  @spec prune(String.t() | integer(), map()) :: {:ok, map()} | {:error, term()}
+  @prune_keys ~w(days compute_prune_count include_roles)a
+
+  @doc """
+  Begins a guild prune. **This kicks members.**
+
+  ## Options
+
+    * `:days` - inactivity threshold, 1–30, default 7
+    * `:compute_prune_count` - whether the response reports how many were removed. Discord
+      advises `false` on large guilds
+    * `:include_roles` - role ids whose members are eligible; without it, members with any
+      role are spared
+    * `:reason` - audit log reason
+
+  Accepts a keyword list or a map. An option this endpoint does not define is reported with
+  a warning: Discord ignores an unrecognised body field, so `day: 30` prunes on the **default
+  7 days** instead — a destructive call doing more than it was asked. EDA 0.5 will refuse it.
+  """
+  @spec prune(String.t() | integer(), map() | keyword()) :: {:ok, map()} | {:error, term()}
   def prune(guild_id, opts) do
-    post("/guilds/#{guild_id}/prune", opts)
+    {reason, body} = pop_prune_reason(opts)
+    check_options(body, @prune_keys, "EDA.API.Guild.prune/2")
+    post("/guilds/#{guild_id}/prune", body, reason)
+  end
+
+  defp pop_prune_reason(opts) when is_list(opts) do
+    {reason, rest} = Keyword.pop(opts, :reason)
+    {if(reason, do: [reason: reason], else: []), Map.new(rest)}
+  end
+
+  defp pop_prune_reason(opts) when is_map(opts) do
+    {reason, rest} = Map.pop(opts, :reason)
+    {if(reason, do: [reason: reason], else: []), rest}
   end
 
   @doc "Gets invites for a guild."
@@ -59,7 +88,15 @@ defmodule EDA.API.Guild do
   def audit_log(guild_id, opts \\ []) do
     opts = resolve_action_type(opts)
 
-    case EDA.HTTP.Client.get(with_query("/guilds/#{guild_id}/audit-logs", opts)) do
+    case EDA.HTTP.Client.get(
+           with_query("/guilds/#{guild_id}/audit-logs", opts, [
+             :user_id,
+             :action_type,
+             :before,
+             :after,
+             :limit
+           ])
+         ) do
       {:ok, data} ->
         entries =
           (data["audit_log_entries"] || [])

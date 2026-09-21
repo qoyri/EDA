@@ -63,7 +63,11 @@ defmodule EDA.API.Reaction do
     emoji = emoji |> resolve_emoji() |> URI.encode()
 
     EDA.HTTP.Client.get(
-      with_query("/channels/#{channel_id}/messages/#{message_id}/reactions/#{emoji}", opts)
+      with_query("/channels/#{channel_id}/messages/#{message_id}/reactions/#{emoji}", opts, [
+        :type,
+        :after,
+        :limit
+      ])
     )
   end
 

@@ -17,6 +17,14 @@ defmodule EDA.API.Invite do
   @spec create(String.t() | integer(), keyword() | map()) :: {:ok, map()} | {:error, term()}
   def create(channel_id, opts \\ []) do
     body = if is_list(opts), do: Map.new(opts), else: opts
+
+    # `max_ages: 3600` would give the default 24-hour invite while looking like one hour.
+    check_options(
+      body,
+      ~w(max_age max_uses temporary unique target_type target_user_id target_application_id role_ids)a,
+      "EDA.API.Invite.create/2"
+    )
+
     post("/channels/#{channel_id}/invites", body)
   end
 

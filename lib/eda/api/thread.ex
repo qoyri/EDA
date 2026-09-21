@@ -7,17 +7,32 @@ defmodule EDA.API.Thread do
 
   import EDA.HTTP.Client
 
+  # From Discord's published request types.
+  @from_message_keys ~w(name auto_archive_duration rate_limit_per_user)a
+  @thread_keys ~w(name auto_archive_duration rate_limit_per_user type invitable)a
+  @forum_keys ~w(name auto_archive_duration rate_limit_per_user applied_tags)a
+
+  # A forum post's starter message takes the full message body, plus the keys EDA's
+  # payload builder interprets.
+  @post_message_keys ~w(content nonce tts embeds allowed_mentions message_reference
+                        components sticker_ids attachments flags enforce_nonce poll
+                        shared_client_theme embed file files v2)a
+
   @doc "Starts a thread from an existing message."
-  @spec start_from_message(String.t() | integer(), String.t() | integer(), map()) ::
+  @spec start_from_message(String.t() | integer(), String.t() | integer(), map() | keyword()) ::
           {:ok, map()} | {:error, term()}
   def start_from_message(channel_id, message_id, opts) do
-    post("/channels/#{channel_id}/messages/#{message_id}/threads", opts)
+    body = Map.new(opts)
+    check_options(body, @from_message_keys, "EDA.API.Thread.start_from_message/3")
+    post("/channels/#{channel_id}/messages/#{message_id}/threads", body)
   end
 
   @doc "Starts a thread without a message."
-  @spec start(String.t() | integer(), map()) :: {:ok, map()} | {:error, term()}
+  @spec start(String.t() | integer(), map() | keyword()) :: {:ok, map()} | {:error, term()}
   def start(channel_id, opts) do
-    post("/channels/#{channel_id}/threads", opts)
+    body = Map.new(opts)
+    check_options(body, @thread_keys, "EDA.API.Thread.start/2")
+    post("/channels/#{channel_id}/threads", body)
   end
 
   @doc """
@@ -65,6 +80,8 @@ defmodule EDA.API.Thread do
   @spec create_post(String.t() | integer(), keyword(), keyword()) ::
           {:ok, map()} | {:error, term()}
   def create_post(channel_id, opts, message_opts \\ []) do
+    check_options(opts, @forum_keys, "EDA.API.Thread.create_post/3")
+    check_options(message_opts, @post_message_keys, "EDA.API.Thread.create_post/3 (message)")
     path = "/channels/#{channel_id}/threads"
 
     case build_message_payload(message_opts) do

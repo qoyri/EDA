@@ -10,7 +10,7 @@ defmodule EDA.API.Ban do
   @doc "Gets bans for a guild."
   @spec list(String.t() | integer(), keyword()) :: {:ok, [map()]} | {:error, term()}
   def list(guild_id, opts \\ []) do
-    EDA.HTTP.Client.get(with_query("/guilds/#{guild_id}/bans", opts))
+    EDA.HTTP.Client.get(with_query("/guilds/#{guild_id}/bans", opts, [:before, :after, :limit]))
   end
 
   @doc "Gets a specific ban for a guild."
