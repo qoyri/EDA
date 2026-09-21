@@ -13,8 +13,6 @@ defmodule EDA.Gateway.ShardSupervisor do
 
   use Supervisor
 
-  require Logger
-
   def start_link(opts) do
     Supervisor.start_link(__MODULE__, opts, name: __MODULE__)
   end
@@ -31,7 +29,7 @@ defmodule EDA.Gateway.ShardSupervisor do
           {EDA.Gateway.ShardManager, token: token}
         ]
       else
-        Logger.warning("No token provided, Gateway will not connect")
+        # EDA.Application has already warned about the missing token.
         []
       end
 
