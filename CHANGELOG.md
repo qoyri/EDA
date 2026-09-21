@@ -77,6 +77,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of raw maps
 - `EDA.Channel` gained `permissions`, `app_permissions` and `last_pin_timestamp` — fields Discord
   sends only on the partial channel objects inside an interaction
+- **`EDA.Subscription`** — the monetization endpoints returned raw maps with a status integer
+  and nothing to interpret it. `status/1` names it `:active`, `:inactive` or `:ending`, with
+  `status_value/1`, `renewing?/1`, `canceled?/1` and `changing_plan?/1` over it, plus
+  `fetch_subscription/2` and `list/2` returning structs. Discord **renumbered** this enum on
+  2026-06-16 — `INACTIVE` and `ENDING` swapped values — so code comparing the raw integer kept
+  running and started meaning the opposite; the moduledoc says so
+- **`EDA.User.premium_type/1`** and `nitro?/1` — names the Nitro tier. The field needs the
+  `identify.premium` OAuth2 scope, so it is absent from every user a bot sees; `nil` means
+  *not known* and is deliberately a different answer from `:none`
+- `EDA.User` now keeps `premium_type`, `mfa_enabled`, `locale`, `verified`, `email`,
+  `avatar_decoration_data` and `collectibles`, which `from_raw/1` was dropping. On a real guild
+  the last two are set on 129 and 111 of 573 users
 
 ### Changed
 
@@ -126,6 +138,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   GHSA-435g-fcv3-8j26 and GHSA-g433-pq76-6cmf — and 0.1.4 also brings the library's encryption in
   line with Discord's reference implementation. Only projects that compile the NIF (voice with
   `dave: true`) are affected; they pick this up on the next build.
+
+### Documentation
+
+- `EDA.User.display_name/1` explains why it does not read Discord's own `display_name` field:
+  that field is null whenever the user has no global name — 46 of 573 users on a real guild —
+  while this falls back to the username and always names somebody
 
 ## [0.4.1] - 2026-09-21
 

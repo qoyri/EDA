@@ -16,7 +16,14 @@ defmodule EDA.User do
     :system,
     :banner,
     :global_name,
-    :primary_guild
+    :primary_guild,
+    :premium_type,
+    :mfa_enabled,
+    :locale,
+    :verified,
+    :email,
+    :avatar_decoration_data,
+    :collectibles
   ]
 
   @type t :: %__MODULE__{
@@ -31,7 +38,14 @@ defmodule EDA.User do
           system: boolean() | nil,
           banner: String.t() | nil,
           global_name: String.t() | nil,
-          primary_guild: EDA.User.PrimaryGuild.t() | nil
+          primary_guild: EDA.User.PrimaryGuild.t() | nil,
+          premium_type: integer() | nil,
+          mfa_enabled: boolean() | nil,
+          locale: String.t() | nil,
+          verified: boolean() | nil,
+          email: String.t() | nil,
+          avatar_decoration_data: map() | nil,
+          collectibles: map() | nil
         }
 
   @spec from_raw(map()) :: t()
@@ -48,9 +62,70 @@ defmodule EDA.User do
       system: raw["system"],
       banner: raw["banner"],
       global_name: raw["global_name"],
-      primary_guild: EDA.User.PrimaryGuild.from_raw(raw["primary_guild"])
+      primary_guild: EDA.User.PrimaryGuild.from_raw(raw["primary_guild"]),
+      premium_type: raw["premium_type"],
+      mfa_enabled: raw["mfa_enabled"],
+      locale: raw["locale"],
+      verified: raw["verified"],
+      email: raw["email"],
+      avatar_decoration_data: raw["avatar_decoration_data"],
+      collectibles: raw["collectibles"]
     }
   end
+
+  @premium_types %{0 => :none, 1 => :nitro_classic, 2 => :nitro, 3 => :nitro_basic}
+
+  @typedoc "A Nitro tier name."
+  @type premium_type :: :none | :nitro_classic | :nitro | :nitro_basic | :unknown | nil
+
+  @doc """
+  Names the user's Nitro tier.
+
+  Returns `nil` when Discord did not send the field, which is the usual case: `premium_type`
+  needs the `identify.premium` OAuth2 scope and never appears on a user seen through the
+  gateway or the REST API. `nil` therefore means *not known*, and is not the same answer as
+  `:none`, which means the user has no Nitro.
+
+  ## Examples
+
+      iex> EDA.User.premium_type(%EDA.User{premium_type: 2})
+      :nitro
+
+      iex> EDA.User.premium_type(%EDA.User{premium_type: 0})
+      :none
+
+      iex> EDA.User.premium_type(%EDA.User{})
+      nil
+
+      iex> EDA.User.premium_type(%EDA.User{premium_type: 99})
+      :unknown
+  """
+  @spec premium_type(t() | map() | integer() | nil) :: premium_type()
+  def premium_type(%__MODULE__{premium_type: value}), do: premium_type(value)
+  def premium_type(%{"premium_type" => value}), do: premium_type(value)
+  def premium_type(nil), do: nil
+  def premium_type(value) when is_integer(value), do: Map.get(@premium_types, value, :unknown)
+  def premium_type(_other), do: nil
+
+  @doc """
+  Returns `true` if the user is known to have some form of Nitro.
+
+  `false` covers both "no Nitro" and "not told", since neither entitles the user to
+  anything — see `premium_type/1` if you need to tell those apart.
+
+  ## Examples
+
+      iex> EDA.User.nitro?(%EDA.User{premium_type: 3})
+      true
+
+      iex> EDA.User.nitro?(%EDA.User{premium_type: 0})
+      false
+
+      iex> EDA.User.nitro?(%EDA.User{})
+      false
+  """
+  @spec nitro?(t() | map() | integer() | nil) :: boolean()
+  def nitro?(user), do: premium_type(user) in [:nitro_classic, :nitro, :nitro_basic]
 
   @doc "Returns a mention string like `<@id>`. Accepts structs and raw maps."
   @spec mention(t() | map()) :: String.t()
@@ -138,6 +213,14 @@ defmodule EDA.User do
   Returns the display name (global_name if set, otherwise username).
 
   Accepts both `%EDA.User{}` structs and raw maps (from cache).
+
+  > #### Not the raw `display_name` field {: .info}
+  >
+  > Discord also sends an undocumented `display_name` on the user object, and it is **not**
+  > the same answer: it is null whenever the user has no global name. Measured on a real
+  > guild on 2026-09-19, 46 of 573 cached users had `display_name: null` — every bot among
+  > them. This function falls back to the username instead, so it always names somebody.
+  > Do not "fix" it by reading the raw field.
   """
   @spec display_name(t() | map()) :: String.t() | nil
   def display_name(%__MODULE__{global_name: name}) when is_binary(name), do: name
