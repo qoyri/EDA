@@ -12,6 +12,7 @@ A complete, production-grade Discord library for Elixir. 24 API modules, 68+ eve
 - **Full Discord API coverage** — 24 resource-based REST modules: messages, guilds, channels, members, roles, commands, interactions, webhooks, threads, stages, polls, stickers, emojis, scheduled events, auto-moderation, monetization (SKU/entitlements/subscriptions), and more
 - **Typed event structs** — 68+ gateway events across 7 categories (Guild, Message, Channel, Voice, Thread, Stage, Invite) with pattern matching, not raw maps
 - **Voice with DAVE E2EE** — Opus audio send/receive, OGG playback, AES-256-GCM and XChaCha20-Poly1305 transport encryption, plus DAVE (Discord's end-to-end encryption, required for voice since March 2026) via a precompiled native library — no Rust toolchain needed
+- **Modals with every field Discord offers** — labels, text fields, select menus, file uploads, radio groups, checkbox groups and checkboxes, checked against Discord's limits when the modal is built, and a `get_values/1` that returns each answer in its natural shape
 - **Smart sharding** — Auto shard count from `/gateway/bot`, staggered startup respecting `max_concurrency`, per-shard ready tracking, exponential backoff with jitter
 - **Configurable cache** — ETS-backed O(1) lookups for 7 entity types (guilds, channels, users, members, roles, presences, voice states) with admission policies and LRW eviction
 - **ETF + zlib** — Binary ETF encoding and zlib-stream compression for lower bandwidth and faster deserialization

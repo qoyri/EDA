@@ -98,6 +98,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The filters are validated before Discord sees them: `"pdf"` written without its dot, a group
   name that does not exist, and an eleventh filter are all refused with a message naming the
   fix. Discord takes the first two without complaint and then shows the user nothing
+- **Modal components** — every field Discord now offers in a modal, in `EDA.Modal`: `label/3`
+  (type 18) carries a field's label and description; inside it go `text_field/3`, the select
+  menus of `EDA.Component`, `file_upload/2` (19), `radio_group/3` (21), `checkbox_group/3` (22)
+  and `checkbox/2` (23), with `choice/3` for the options of the two groups.
+  `EDA.Component.text_display/1` can sit between fields. Discord's limits — lengths, option
+  counts, 0–10 files, one default per radio group, `min_values: 0` only when optional, no
+  disabled component, what may go in a label and what must — are checked when the modal is
+  built, with a message naming the fix instead of an opaque `50035`
+- `EDA.Modal.modal/3` takes a list of components. The positional form and `text_input/4` with
+  its action rows keep working; Discord still accepts them but no longer recommends them
+- `EDA.Modal.get_values/1` reads label-based submissions and returns each value in the shape of
+  its component: a string for a text field, a list for a select, checkbox group or file upload,
+  a string or `nil` for a radio group, a boolean for a checkbox
+- `EDA.Modal.get_attachments/2` — the files a file upload received, as `EDA.Attachment` structs
+- `:required` on every select menu (modal only), and `:default_values` on user, role,
+  mentionable and channel selects, to prefill them. A mentionable select takes `{:user, id}` or
+  `{:role, id}`, and defaults beyond `:max_values` — which Discord sets to 1 — are refused
 
 ### Changed
 

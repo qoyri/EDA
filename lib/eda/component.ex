@@ -404,7 +404,9 @@ defmodule EDA.Component do
     * `:placeholder` - Placeholder text shown when nothing is selected
     * `:min_values` - Minimum selections required (default 1)
     * `:max_values` - Maximum selections allowed (default 1)
-    * `:disabled` - If `true`, select is greyed out
+    * `:disabled` - If `true`, select is greyed out. Messages only: a modal refuses it
+    * `:required` - In a modal, whether a choice is needed to submit (Discord defaults to
+      `true`). Ignored in messages
 
   ## Example
 
@@ -427,7 +429,8 @@ defmodule EDA.Component do
     map = put_if(map, :placeholder, opts[:placeholder])
     map = put_if(map, :min_values, opts[:min_values])
     map = put_if(map, :max_values, opts[:max_values])
-    put_if(map, :disabled, opts[:disabled])
+    map = put_if(map, :disabled, opts[:disabled])
+    put_required(map, opts)
   end
 
   @doc """
@@ -472,11 +475,20 @@ defmodule EDA.Component do
 
     * `:placeholder` - Placeholder text
     * `:min_values` / `:max_values` - Selection range
-    * `:disabled` - If `true`, select is greyed out
+    * `:disabled` - If `true`, select is greyed out. Messages only: a modal refuses it
+    * `:required` - In a modal, whether a choice is needed to submit (Discord defaults to
+      `true`). Ignored in messages
+    * `:default_values` - Users selected up front, as a list of ids. No more than
+      `:max_values`, which Discord defaults to 1
+
+  The same options apply to `role_select/2`, `mentionable_select/2` and `channel_select/2`.
+  A mentionable select mixes users and roles, so its defaults are `{:user, id}` or
+  `{:role, id}` tuples.
 
   ## Example
 
       user_select("pick_user", placeholder: "Choose a user")
+      user_select("reviewers", max_values: 3, default_values: [author_id])
   """
   @spec user_select(String.t(), keyword()) :: map()
   def user_select(custom_id, opts \\ []) when is_binary(custom_id) do
@@ -513,7 +525,7 @@ defmodule EDA.Component do
   ## Options
 
     * `:channel_types` - List of channel type atoms to filter
-    * Plus all common select options (`:placeholder`, `:min_values`, `:max_values`, `:disabled`)
+    * Plus the options of `user_select/2`, with channel ids as `:default_values`
 
   ## Example
 
@@ -543,6 +555,8 @@ defmodule EDA.Component do
     map = put_if(map, :min_values, opts[:min_values])
     map = put_if(map, :max_values, opts[:max_values])
     map = put_if(map, :disabled, opts[:disabled])
+    map = put_required(map, opts)
+    map = put_default_values(map, @channel_select, opts)
 
     case opts[:channel_types] do
       nil ->
@@ -568,8 +582,62 @@ defmodule EDA.Component do
     map = put_if(map, :placeholder, opts[:placeholder])
     map = put_if(map, :min_values, opts[:min_values])
     map = put_if(map, :max_values, opts[:max_values])
-    put_if(map, :disabled, opts[:disabled])
+    map = put_if(map, :disabled, opts[:disabled])
+    map = put_required(map, opts)
+    put_default_values(map, type, opts)
   end
+
+  defp put_required(map, opts) do
+    case opts[:required] do
+      nil -> map
+      value when is_boolean(value) -> Map.put(map, :required, value)
+      other -> raise ArgumentError, "required must be boolean, got: #{inspect(other)}"
+    end
+  end
+
+  @default_value_types %{
+    @user_select => "user",
+    @role_select => "role",
+    @channel_select => "channel"
+  }
+
+  # Discord takes default values as `%{id, type}` objects, and refuses more of them than
+  # max_values allows — which it defaults to 1.
+  defp put_default_values(map, select_type, opts) do
+    case opts[:default_values] do
+      nil ->
+        map
+
+      values when is_list(values) ->
+        max = opts[:max_values] || 1
+
+        if length(values) > max do
+          raise ArgumentError,
+                "#{length(values)} default_values exceed max_values (#{max}); " <>
+                  "raise :max_values to preselect more"
+        end
+
+        Map.put(map, :default_values, Enum.map(values, &default_value(select_type, &1)))
+
+      other ->
+        raise ArgumentError, "default_values must be a list, got: #{inspect(other)}"
+    end
+  end
+
+  defp default_value(@mentionable_select, {type, id}) when type in [:user, :role],
+    do: %{id: to_string(id), type: Atom.to_string(type)}
+
+  defp default_value(@mentionable_select, other) do
+    raise ArgumentError,
+          "a mentionable select mixes users and roles, so each default value must be " <>
+            "{:user, id} or {:role, id}, got: #{inspect(other)}"
+  end
+
+  defp default_value(select_type, id) when is_binary(id) or is_integer(id),
+    do: %{id: to_string(id), type: Map.fetch!(@default_value_types, select_type)}
+
+  defp default_value(_select_type, other),
+    do: raise(ArgumentError, "a default value must be an id, got: #{inspect(other)}")
 
   defp put_button_identifier(map, :link, opts) do
     url = opts[:url] || raise ArgumentError, "link button requires :url"
