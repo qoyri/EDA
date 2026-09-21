@@ -42,9 +42,37 @@ defmodule EDA.HTTP.Multipart do
   Each uploaded file gets an entry with `id` matching the file index, `filename`, and
   optional `description`. Entries already in the payload's `attachments` array — the
   attachments an edit is retaining — are preserved and come first.
+
+  `attachments_in: :data` puts the array inside the payload's `data` instead of at its top
+  level, which is where an interaction callback carries its message.
   """
-  @spec encode(map(), [EDA.File.t()]) :: {iodata(), String.t()}
-  def encode(json_payload, files) when is_map(json_payload) and is_list(files) do
+  @spec encode(map(), [EDA.File.t()], keyword()) :: {iodata(), String.t()}
+  def encode(json_payload, files, opts \\ [])
+      when is_map(json_payload) and is_list(files) and is_list(opts) do
+    case opts[:attachments_in] do
+      nil ->
+        do_encode(json_payload, files)
+
+      # An interaction callback nests the message under `data`, and that is where Discord reads
+      # `attachments` — at the top level it is ignored, taking descriptions and spoilers with it.
+      key ->
+        {nested, rest} = pop_nested(json_payload, key)
+        {body, content_type} = do_encode(nested, files, rest, key)
+        {body, content_type}
+    end
+  end
+
+  defp pop_nested(payload, key) do
+    string_key = to_string(key)
+
+    cond do
+      Map.has_key?(payload, key) -> Map.pop(payload, key)
+      Map.has_key?(payload, string_key) -> Map.pop(payload, string_key)
+      true -> {%{}, payload}
+    end
+  end
+
+  defp do_encode(json_payload, files, outer \\ nil, key \\ nil) do
     boundary = generate_boundary()
 
     {retained, json_payload} = pop_attachments(json_payload)
@@ -59,6 +87,7 @@ defmodule EDA.HTTP.Multipart do
       end)
 
     json_payload = put_attachments(json_payload, retained ++ uploaded)
+    json_payload = if outer, do: Map.put(outer, key, json_payload), else: json_payload
 
     body =
       [

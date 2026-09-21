@@ -192,6 +192,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fifteen audit log action types: soundboard (130–132), automod quarantine (146), creator
   monetization (150–151), onboarding (163–167), home settings (190–191), voice channel status
   (192–193)
+- **`EDA.Error.not_found?/1`** — a 404, or one of Discord's *Unknown …* codes (10001–10999)
+- **`EDA.Member.top_role/2`** and **`top_role_position/2`** — the member's highest role in a
+  guild, ordered as Discord orders the hierarchy
+- **`EDA.Cache.get_role/2`** and `EDA.Cache.Role.get/2` — a role looked up by guild and role id
+  in one read, `nil` for a role of another guild
 
 ### Changed
 
@@ -243,6 +248,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `URI.encode_query/1` raises on a list, so any endpoint needing one was unreachable
 - **`EDA.Cache.me/0` follows `USER_UPDATE`.** Renaming the bot or changing its avatar left the
   cached bot user as it was at `READY` for the rest of the session
+- **An interaction response with files lost its attachment metadata.** The `attachments` array
+  went at the top of the callback payload, where Discord ignores it, instead of inside `data` —
+  so file descriptions and spoilers were dropped. It now goes inside `data`
+- **An interaction is never dropped when EDA is at `max_event_concurrency`.** Discord waits three
+  seconds for an answer and does not redeliver, so a dropped `INTERACTION_CREATE` was a failure
+  shown to the user. Interactions still count towards the limit; other events are still dropped
+- **`EDA.Cache.fetch_member/2` caches what it fetches.** A member returned by REST carries no
+  `guild_id`, so the REST fallback never stored it and every call went back to the API
+- A consumer that `exit`s or `throw`s is logged with the event it was handling, like one that
+  raises; only exceptions were caught
 
 ### Security
 
