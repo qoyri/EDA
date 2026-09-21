@@ -23,10 +23,13 @@ A complete, production-grade Discord library for Elixir. 27 API modules, 85+ eve
 
 ## Installation
 
+0.5 is in beta; the stable release is `0.4.1`. Hex installs a beta only for a requirement that
+names one:
+
 ```elixir
 def deps do
   [
-    {:eda, "~> 0.4.1"}
+    {:eda, "~> 0.5.0-beta.1"}
   ]
 end
 ```

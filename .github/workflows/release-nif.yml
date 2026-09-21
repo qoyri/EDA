@@ -75,3 +75,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.build-crate.outputs.file-path }}
+          # A tag with a pre-release part (v0.5.0-beta.1, v0.5.0-rc.1) is marked as a pre-release,
+          # so it never becomes the repository's "Latest" release ahead of the stable one.
+          prerelease: ${{ contains(github.ref_name, '-') }}

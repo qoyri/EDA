@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0-beta.1] - 2026-09-21
+
+The first beta of 0.5: a large minor release. Voice needs neither Rust nor configuration any
+more, every gateway event Discord documents is a typed struct, and EDA now covers every route of
+Discord's reference that a bot token can use — modal components, the soundboard, onboarding, the
+bot's own application, message search, guild administration and more. One change is breaking:
+an option a route does not define now raises instead of warning.
+
+### Installation
+
+```elixir
+def deps do
+  [
+    {:eda, "~> 0.5.0-beta.1"}
+  ]
+end
+```
+
+Hex installs a pre-release only for a requirement that names one, as above.
+
+### Upgrading from 0.4
+
+- **An unknown option now raises `ArgumentError`** and nothing is sent. 0.4.1 already logged
+  `unknown option` for each such call: a project that saw none of those warnings is unaffected.
+- **DAVE is on whenever its NIF is loaded**, and the NIF is now downloaded precompiled. Remove
+  `config :eda, dave: true` if you like, and `{:rustler, ...}` if you added it only for voice.
+  `dave: false` still turns DAVE off.
+- **`EDA.File`'s `spoiler: true` keeps the filename** instead of prefixing `SPOILER_`; code that
+  read the prefix back should use `EDA.Attachment.spoiler?/1`.
+- **`EDA.Interaction.resolved_channel/2` and `resolved_channels/1` return `%EDA.Channel{}`
+  structs.** Their fields stay reachable with string keys (`channel["name"]`).
+
 ### Added
 
 - **Attachment flags** — `EDA.Attachment.spoiler?/1`, `clip?/1`, `thumbnail?/1`, `remix?/1`,
