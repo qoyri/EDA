@@ -247,34 +247,33 @@ defmodule EDA.Voice.Event do
   # Advertising DAVE commits the session to MLS: Discord will expect end-to-end encrypted
   # media. Without the NIF that cannot be honoured, so it is only advertised when it can be.
   #
-  # Discord refuses voice without DAVE outside Stage channels (close code 4017), so connecting
-  # without it deserves a warning in both cases — including the default, where `:dave` is not
-  # set at all and nothing used to be said until the connection was refused. Once per VM: it is
-  # configuration advice, not an event, and a bot may join many channels.
+  # Discord refuses voice without DAVE outside Stage channels (close code 4017), so DAVE is on
+  # whenever the NIF is loaded, unless `config :eda, dave: false` turns it off. Connecting without
+  # it is announced once per VM: it is configuration advice, not an event, and a bot may join many
+  # channels.
   @voice_docs "https://hexdocs.pm/eda/readme.html#voice"
 
   defp dave_version do
-    cond do
-      not Application.get_env(:eda, :dave, false) ->
+    case {Application.get_env(:eda, :dave), EDA.Voice.Dave.Native.available?()} do
+      {false, _} ->
         warn_once(
           :dave_disabled,
-          "[EDA] Connecting to voice without DAVE, because config :eda, dave is not enabled. " <>
-            "Discord refuses voice without DAVE end-to-end encryption everywhere but Stage " <>
-            "channels (close code 4017). See #{@voice_docs}"
+          "[EDA] Connecting to voice without DAVE, because config :eda, dave: false turns it " <>
+            "off. Discord refuses voice without DAVE end-to-end encryption everywhere but " <>
+            "Stage channels (close code 4017). See #{@voice_docs}"
         )
 
         0
 
-      EDA.Voice.Dave.Native.available?() ->
+      {_, true} ->
         1
 
-      true ->
+      {_, false} ->
         warn_once(
           :dave_nif_missing,
-          "[EDA] config :eda, dave: true, but the DAVE NIF is not available — add " <>
-            "{:rustler, \"~> 0.35\"} to your deps and install a Rust toolchain. " <>
-            "Discord requires DAVE for voice everywhere but Stage channels, so this " <>
-            "connection will be refused with close code 4017. See #{@voice_docs}"
+          "[EDA] Connecting to voice without DAVE, because the DAVE NIF is not available. " <>
+            "Discord refuses voice without it everywhere but Stage channels (close code 4017). " <>
+            "See #{@voice_docs}"
         )
 
         0

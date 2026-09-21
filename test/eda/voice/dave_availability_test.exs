@@ -65,20 +65,20 @@ defmodule EDA.Voice.DaveAvailabilityTest do
     capture_log(fn -> assert advertised_version() == nil end)
   end
 
-  test "an unset :dave advertises nothing" do
+  test "an unset :dave advertises protocol version 1 when the NIF is loaded" do
+    # Discord refuses voice without DAVE outside Stage channels, so it is on by default.
     Application.delete_env(:eda, :dave)
-    capture_log(fn -> assert advertised_version() == nil end)
+    assert advertised_version() == 1
   end
 
   describe "connecting without DAVE is announced before Discord refuses it" do
-    test "the default configuration warns, naming 4017 and where to read more" do
-      # Discord refuses voice without DAVE outside Stage channels. With :dave unset, nothing
-      # used to be said until the connection was refused.
-      Application.delete_env(:eda, :dave)
+    test "dave: false warns, naming 4017 and where to read more" do
+      Application.put_env(:eda, :dave, false)
 
       log = capture_log(fn -> advertised_version() end)
 
       assert log =~ "without DAVE"
+      assert log =~ "dave: false"
       assert log =~ "4017"
       assert log =~ "Stage"
       assert log =~ "https://hexdocs.pm/eda/readme.html#voice"
@@ -94,12 +94,16 @@ defmodule EDA.Voice.DaveAvailabilityTest do
       refute second =~ "without DAVE"
     end
 
-    test "with DAVE enabled and the NIF loaded, nothing is said" do
-      Application.put_env(:eda, :dave, true)
+    for setting <- [true, :unset] do
+      test "with the NIF loaded and dave #{inspect(setting)}, nothing is said" do
+        if unquote(setting) == :unset,
+          do: Application.delete_env(:eda, :dave),
+          else: Application.put_env(:eda, :dave, unquote(setting))
 
-      log = capture_log(fn -> assert advertised_version() == 1 end)
+        log = capture_log(fn -> assert advertised_version() == 1 end)
 
-      refute log =~ "DAVE"
+        refute log =~ "DAVE"
+      end
     end
   end
 end
