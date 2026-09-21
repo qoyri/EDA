@@ -48,6 +48,11 @@ defmodule EDA.Event do
     "GUILD_SCHEDULED_EVENT_USER_REMOVE" => EDA.Event.GuildScheduledEventUserRemove,
     "GUILD_EMOJIS_UPDATE" => EDA.Event.GuildEmojisUpdate,
     "GUILD_STICKERS_UPDATE" => EDA.Event.GuildStickersUpdate,
+    "GUILD_SOUNDBOARD_SOUND_CREATE" => EDA.Event.GuildSoundboardSoundCreate,
+    "GUILD_SOUNDBOARD_SOUND_UPDATE" => EDA.Event.GuildSoundboardSoundUpdate,
+    "GUILD_SOUNDBOARD_SOUND_DELETE" => EDA.Event.GuildSoundboardSoundDelete,
+    "GUILD_SOUNDBOARD_SOUNDS_UPDATE" => EDA.Event.GuildSoundboardSoundsUpdate,
+    "SOUNDBOARD_SOUNDS" => EDA.Event.SoundboardSounds,
     "GUILD_AUDIT_LOG_ENTRY_CREATE" => EDA.Event.GuildAuditLogEntryCreate,
     "STAGE_INSTANCE_CREATE" => EDA.Event.StageInstanceCreate,
     "STAGE_INSTANCE_UPDATE" => EDA.Event.StageInstanceUpdate,
@@ -64,6 +69,7 @@ defmodule EDA.Event do
     "VOICE_AUDIO" => EDA.Event.VoiceAudio,
     "VOICE_PLAYBACK_FINISHED" => EDA.Event.VoicePlaybackFinished,
     "VOICE_CHANNEL_STATUS_UPDATE" => EDA.Event.VoiceChannelStatusUpdate,
+    "VOICE_CHANNEL_EFFECT_SEND" => EDA.Event.VoiceChannelEffectSend,
     "GUILD_AVAILABLE" => EDA.Event.GuildCreate,
     "GUILD_UNAVAILABLE" => EDA.Event.GuildDelete,
     "GATEWAY_CLOSE" => EDA.Event.GatewayClose,
@@ -120,6 +126,11 @@ defmodule EDA.Event do
           | EDA.Event.GuildScheduledEventUserRemove.t()
           | EDA.Event.GuildEmojisUpdate.t()
           | EDA.Event.GuildStickersUpdate.t()
+          | EDA.Event.GuildSoundboardSoundCreate.t()
+          | EDA.Event.GuildSoundboardSoundUpdate.t()
+          | EDA.Event.GuildSoundboardSoundDelete.t()
+          | EDA.Event.GuildSoundboardSoundsUpdate.t()
+          | EDA.Event.SoundboardSounds.t()
           | EDA.Event.GuildAuditLogEntryCreate.t()
           | EDA.Event.StageInstanceCreate.t()
           | EDA.Event.StageInstanceUpdate.t()
@@ -136,6 +147,7 @@ defmodule EDA.Event do
           | EDA.Event.VoiceAudio.t()
           | EDA.Event.VoicePlaybackFinished.t()
           | EDA.Event.VoiceChannelStatusUpdate.t()
+          | EDA.Event.VoiceChannelEffectSend.t()
           | EDA.Event.RateLimited.t()
           | EDA.Event.ShardReady.t()
           | EDA.Event.AllShardsReady.t()

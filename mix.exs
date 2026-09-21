@@ -133,6 +133,7 @@ defmodule EDA.MixProject do
           EDA.Reaction,
           EDA.Role,
           EDA.Role.Colors,
+          EDA.SoundboardSound,
           EDA.Sticker,
           EDA.Sticker.Pack,
           EDA.User,

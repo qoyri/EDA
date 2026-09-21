@@ -99,6 +99,23 @@ defmodule EDA.Gateway.Connection do
     WebSockex.cast(via(shard_id), {:update_voice_state, guild_id, channel_id, opts})
   end
 
+  @doc """
+  Sends OP 31 (Request Soundboard Sounds) for the given guilds.
+
+  Guilds are grouped by the shard that owns them, one request per shard. Each guild is
+  answered by a `SOUNDBOARD_SOUNDS` dispatch.
+  """
+  @spec request_soundboard_sounds([String.t() | integer()]) :: :ok
+  def request_soundboard_sounds(guild_ids) when is_list(guild_ids) do
+    guild_ids
+    |> Enum.map(&to_string/1)
+    |> Enum.uniq()
+    |> Enum.group_by(&ShardManager.shard_for_guild/1)
+    |> Enum.each(fn {shard_id, ids} ->
+      WebSockex.cast(via(shard_id), {:request_soundboard_sounds, ids})
+    end)
+  end
+
   defp via(shard_id), do: {:via, Registry, {EDA.Gateway.Registry, shard_id}}
 
   # WebSockex Callbacks
@@ -326,6 +343,11 @@ defmodule EDA.Gateway.Connection do
 
   def handle_cast({:request_guild_members, payload}, state) do
     frame = %{op: 8, d: payload}
+    {:reply, state.encoding.encode(frame), state}
+  end
+
+  def handle_cast({:request_soundboard_sounds, guild_ids}, state) do
+    frame = %{op: 31, d: %{guild_ids: guild_ids}}
     {:reply, state.encoding.encode(frame), state}
   end
 

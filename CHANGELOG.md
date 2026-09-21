@@ -140,6 +140,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `:required` on every select menu (modal only), and `:default_values` on user, role,
   mentionable and channel selects, to prefill them. A mentionable select takes `{:user, id}` or
   `{:role, id}`, and defaults beyond `:max_values` — which Discord sets to 1 — are refused
+- **Soundboard** — `EDA.API.Soundboard` covers all seven routes: `default_sounds/0`, `list/1`,
+  `get/2`, `create/2`, `modify/3`, `delete/3`, and `send_sound/3`, which plays a sound into a voice
+  channel the bot has joined. `EDA.SoundboardSound` is the struct, with `list/1`,
+  `default_sounds/0`, `fetch_sound/2`, `play/3` — which supplies the source guild of a guild's
+  sound itself — `url/1` and `default?/1`
+- **`EDA.SoundData`** — builds the MP3 or Ogg data URI a sound is uploaded as. `:sound` on
+  `create/2` takes a path, raw bytes or a URI; the format is read from the audio's header, not
+  its extension, and a sound over Discord's 512 KiB is refused before it is sent
+- **Soundboard events** — `GUILD_SOUNDBOARD_SOUND_CREATE`, `_UPDATE`, `_DELETE`,
+  `GUILD_SOUNDBOARD_SOUNDS_UPDATE` and `SOUNDBOARD_SOUNDS`, as typed structs holding
+  `EDA.SoundboardSound`s. They fell through to `EDA.Event.Raw` before
+- **`EDA.SoundboardSound.request/1`** — asks the gateway for several guilds' sounds at once
+  (opcode 31), one request per shard, answered by a `SOUNDBOARD_SOUNDS` event per guild
+- **`VOICE_CHANNEL_EFFECT_SEND`** — `EDA.Event.VoiceChannelEffectSend`, sent when someone in the
+  bot's voice channel plays a sound or sends an emoji reaction. `soundboard?/1` tells the two
+  apart, and the animation type is `:premium` or `:basic`
 
 ### Changed
 
