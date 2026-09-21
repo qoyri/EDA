@@ -203,4 +203,172 @@ defmodule EDA.API.Guild do
         rest
     end
   end
+
+  # ── Integrations ───────────────────────────────────────────────────
+
+  @doc """
+  Lists a guild's integrations — Twitch, YouTube, and bot or OAuth2 applications. Requires
+  `MANAGE_GUILD`. Discord returns at most 50; `EDA.Integration.from_raw/1` parses each.
+  """
+  @spec integrations(String.t() | integer()) :: {:ok, [map()]} | {:error, term()}
+  def integrations(guild_id), do: EDA.HTTP.Client.get("/guilds/#{guild_id}/integrations")
+
+  @doc """
+  Deletes a guild integration, with its webhooks — and **kicks its bot**, if it has one. Requires
+  `MANAGE_GUILD`.
+
+  ## Options
+
+    * `:reason` — audit log reason
+  """
+  @spec delete_integration(String.t() | integer(), String.t() | integer(), keyword()) ::
+          :ok | {:error, term()}
+  def delete_integration(guild_id, integration_id, opts \\ []) do
+    check_options!(opts, [:reason], "EDA.API.Guild.delete_integration/3")
+
+    case EDA.HTTP.Client.delete("/guilds/#{guild_id}/integrations/#{integration_id}", opts) do
+      {:ok, _} -> :ok
+      error -> error
+    end
+  end
+
+  # ── Welcome screen, preview, vanity URL ────────────────────────────
+
+  @doc """
+  Gets a guild's welcome screen: its description and the channels it recommends. Needs
+  `MANAGE_GUILD` while the welcome screen is disabled.
+  """
+  @spec welcome_screen(String.t() | integer()) :: {:ok, map()} | {:error, term()}
+  def welcome_screen(guild_id), do: EDA.HTTP.Client.get("/guilds/#{guild_id}/welcome-screen")
+
+  @doc """
+  Modifies a guild's welcome screen. Requires `MANAGE_GUILD`. Every field is optional.
+
+  ## Options
+
+    * `:enabled` — whether the welcome screen is shown
+    * `:description` — the server description it shows
+    * `:welcome_channels` — the channels it recommends, each
+      `%{channel_id: ..., description: ..., emoji_id: ..., emoji_name: ...}`
+    * `:reason` — audit log reason
+  """
+  @spec modify_welcome_screen(String.t() | integer(), keyword() | map()) ::
+          {:ok, map()} | {:error, term()}
+  def modify_welcome_screen(guild_id, opts) do
+    {reason, body} = pop_prune_reason(opts)
+
+    check_options!(
+      body,
+      [:enabled, :description, :welcome_channels],
+      "EDA.API.Guild.modify_welcome_screen/2"
+    )
+
+    patch("/guilds/#{guild_id}/welcome-screen", body, reason)
+  end
+
+  @doc """
+  Gets a guild's preview: name, icon, emojis, stickers, features and approximate counts. For a
+  guild the bot is not in, the guild must be discoverable.
+  """
+  @spec preview(String.t() | integer()) :: {:ok, map()} | {:error, term()}
+  def preview(guild_id), do: EDA.HTTP.Client.get("/guilds/#{guild_id}/preview")
+
+  @doc """
+  Gets a guild's vanity invite and how many times it was used, `%{"code" => ..., "uses" => ...}`.
+  Requires `MANAGE_GUILD` and the `VANITY_URL` feature. The code alone is on the guild object as
+  `vanity_url_code`; this route is the only way to the use count.
+  """
+  @spec vanity_url(String.t() | integer()) :: {:ok, map()} | {:error, term()}
+  def vanity_url(guild_id), do: EDA.HTTP.Client.get("/guilds/#{guild_id}/vanity-url")
+
+  @doc "Lists the voice regions available to a guild, VIP ones included. See `EDA.API.Voice.regions/0`."
+  @spec voice_regions(String.t() | integer()) :: {:ok, [map()]} | {:error, term()}
+  def voice_regions(guild_id), do: EDA.HTTP.Client.get("/guilds/#{guild_id}/regions")
+
+  # ── Widget ─────────────────────────────────────────────────────────
+
+  @doc "Gets a guild's widget settings, `%{\"enabled\" => ..., \"channel_id\" => ...}`. Requires `MANAGE_GUILD`."
+  @spec widget_settings(String.t() | integer()) :: {:ok, map()} | {:error, term()}
+  def widget_settings(guild_id), do: EDA.HTTP.Client.get("/guilds/#{guild_id}/widget")
+
+  @doc """
+  Modifies a guild's widget settings. Requires `MANAGE_GUILD`.
+
+  ## Options
+
+    * `:enabled` — whether the widget is on
+    * `:channel_id` — the channel its invite leads to, or `nil`
+    * `:reason` — audit log reason
+  """
+  @spec modify_widget(String.t() | integer(), keyword() | map()) ::
+          {:ok, map()} | {:error, term()}
+  def modify_widget(guild_id, opts) do
+    {reason, body} = pop_prune_reason(opts)
+    check_options!(body, [:enabled, :channel_id], "EDA.API.Guild.modify_widget/2")
+    patch("/guilds/#{guild_id}/widget", body, reason)
+  end
+
+  @doc """
+  Gets a guild's public widget: its name, online members and instant invite. Needs the widget to
+  be enabled, and nothing else — no permission, no authentication.
+  """
+  @spec widget(String.t() | integer()) :: {:ok, map()} | {:error, term()}
+  def widget(guild_id), do: EDA.HTTP.Client.get("/guilds/#{guild_id}/widget.json")
+
+  @widget_styles ~w(shield banner1 banner2 banner3 banner4)a
+
+  @doc """
+  The URL of a guild's widget image, a PNG anyone can load while the widget is enabled — for a
+  website or a README. Builds the URL; nothing is fetched.
+
+  `style` is one of `:shield` (the default), `:banner1` to `:banner4`.
+
+      iex> EDA.API.Guild.widget_image_url("1", :banner2)
+      "https://discord.com/api/v10/guilds/1/widget.png?style=banner2"
+  """
+  @spec widget_image_url(String.t() | integer(), atom()) :: String.t()
+  def widget_image_url(guild_id, style \\ :shield) when style in @widget_styles do
+    "https://discord.com/api/v10/guilds/#{guild_id}/widget.png?style=#{style}"
+  end
+
+  # ── Incident actions ───────────────────────────────────────────────
+
+  @doc """
+  Pauses invites or direct messages in a guild during a raid, for up to 24 hours. Requires
+  `MANAGE_GUILD`.
+
+  ## Options
+
+    * `:invites_disabled_until` — a `DateTime` (or ISO8601 string) at most 24 hours ahead, or
+      `nil` to allow invites again
+    * `:dms_disabled_until` — the same, for direct messages between members
+
+  Returns the guild's incidents data.
+
+      until = DateTime.add(DateTime.utc_now(), 3600)
+      EDA.API.Guild.modify_incident_actions(guild_id, invites_disabled_until: until)
+  """
+  @spec modify_incident_actions(String.t() | integer(), keyword()) ::
+          {:ok, map()} | {:error, term()}
+  def modify_incident_actions(guild_id, opts) do
+    check_options!(
+      opts,
+      [:invites_disabled_until, :dms_disabled_until],
+      "EDA.API.Guild.modify_incident_actions/2"
+    )
+
+    body = Map.new(opts, fn {key, value} -> {key, incident_until!(key, value)} end)
+    put("/guilds/#{guild_id}/incident-actions", body)
+  end
+
+  defp incident_until!(_key, nil), do: nil
+  defp incident_until!(_key, iso) when is_binary(iso), do: iso
+
+  defp incident_until!(key, %DateTime{} = until) do
+    if DateTime.diff(until, DateTime.utc_now()) > 24 * 3600 do
+      raise ArgumentError, "#{key} is at most 24 hours ahead, got #{DateTime.to_iso8601(until)}"
+    end
+
+    DateTime.to_iso8601(until)
+  end
 end

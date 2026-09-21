@@ -177,4 +177,69 @@ defmodule EDA.API.Application do
     raise ArgumentError,
           "event_webhooks_status is :enabled or :disabled, got #{inspect(other)}"
   end
+
+  # ── Role connection metadata ───────────────────────────────────────
+
+  @metadata_types %{
+    integer_less_than_or_equal: 1,
+    integer_greater_than_or_equal: 2,
+    integer_equal: 3,
+    integer_not_equal: 4,
+    datetime_less_than_or_equal: 5,
+    datetime_greater_than_or_equal: 6,
+    boolean_equal: 7,
+    boolean_not_equal: 8
+  }
+
+  @doc """
+  Gets the app's role connection metadata: the fields a guild can require of a linked account to
+  grant a role.
+  """
+  @spec role_connection_metadata() :: {:ok, [map()]} | {:error, term()}
+  def role_connection_metadata do
+    EDA.HTTP.Client.get("/applications/#{app_id()}/role-connections/metadata")
+  end
+
+  @doc """
+  Replaces the app's role connection metadata — the list sent is the whole list, at most 5.
+
+  Each record is a map with `:type`, `:key`, `:name`, `:description`, and optionally
+  `:name_localizations` and `:description_localizations`. `:type` may be an atom:
+  `:integer_less_than_or_equal`, `:integer_greater_than_or_equal`, `:integer_equal`,
+  `:integer_not_equal`, `:datetime_less_than_or_equal`, `:datetime_greater_than_or_equal`,
+  `:boolean_equal`, `:boolean_not_equal`. A `:key` is 1–50 characters of `a-z`, `0-9` and `_`.
+
+      EDA.API.Application.update_role_connection_metadata([
+        %{type: :integer_greater_than_or_equal, key: "level", name: "Level", description: "Minimum level"}
+      ])
+  """
+  @spec update_role_connection_metadata([map()]) :: {:ok, [map()]} | {:error, term()}
+  def update_role_connection_metadata(records) when is_list(records) do
+    if length(records) > 5 do
+      raise ArgumentError,
+            "an app has at most 5 role connection metadata records, got #{length(records)}"
+    end
+
+    put(
+      "/applications/#{app_id()}/role-connections/metadata",
+      Enum.map(records, &metadata_record!/1)
+    )
+  end
+
+  defp metadata_record!(record) do
+    record = Map.new(record)
+    key = record[:key] || record["key"]
+
+    unless is_binary(key) and key =~ ~r/^[a-z0-9_]{1,50}$/ do
+      raise ArgumentError,
+            "a role connection metadata key is 1–50 characters of a-z, 0-9 and _, got #{inspect(key)}"
+    end
+
+    Map.update(record, :type, nil, fn
+      type when is_map_key(@metadata_types, type) -> Map.fetch!(@metadata_types, type)
+      type when type in 1..8 -> type
+      other -> raise ArgumentError, "unknown role connection metadata type #{inspect(other)}"
+    end)
+    |> Map.reject(fn {_k, v} -> is_nil(v) end)
+  end
 end
