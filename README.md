@@ -5,11 +5,11 @@
 [![Hex Docs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/eda)
 [![License: MIT](https://img.shields.io/hexpm/l/eda.svg)](https://opensource.org/licenses/MIT)
 
-A complete, production-grade Discord library for Elixir. 26 API modules, 85+ event types, full voice with DAVE E2EE, automatic sharding, and 1500+ tests.
+A complete, production-grade Discord library for Elixir. 27 API modules, 85+ event types, full voice with DAVE E2EE, automatic sharding, and 1500+ tests.
 
 ## Why EDA?
 
-- **Full Discord API coverage** — 26 resource-based REST modules: the bot's own application, messages, guilds, channels, members, roles, commands, interactions, webhooks, threads, stages, polls, stickers, emojis, soundboard, scheduled events, auto-moderation, monetization (SKU/entitlements/subscriptions), and more
+- **Full Discord API coverage** — 27 resource-based REST modules: the bot's own application, messages, guilds, channels, members, roles, commands, interactions, webhooks, threads, stages, polls, stickers, emojis, soundboard, voice, scheduled events, auto-moderation, monetization (SKU/entitlements/subscriptions), and more
 - **Typed event structs** — every gateway event Discord documents, 85+ of them across 10 categories (Guild, Message, Channel, Voice, Thread, Stage, Invite, Soundboard, Monetization, Integrations) with pattern matching, not raw maps
 - **Voice with DAVE E2EE** — Opus audio send/receive, OGG playback, AES-256-GCM and XChaCha20-Poly1305 transport encryption, plus DAVE (Discord's end-to-end encryption, required for voice since March 2026) via a precompiled native library — no Rust toolchain needed
 - **Modals with every field Discord offers** — labels, text fields, select menus, file uploads, radio groups, checkbox groups and checkboxes, checked against Discord's limits when the modal is built, and a `get_values/1` that returns each answer in its natural shape

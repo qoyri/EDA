@@ -83,4 +83,25 @@ defmodule EDA.API.Command do
       Enum.map(commands, &command_to_map/1)
     )
   end
+
+  @doc """
+  Gets who may use each of the app's commands in a guild — every command with permissions set
+  there, and the app-wide entry whose `id` is the application id.
+
+  `EDA.Command.Permissions.from_raw/1` parses each. Setting them needs a user's OAuth2 token, not
+  a bot's, so there is no write counterpart here.
+  """
+  @spec permissions(String.t() | integer()) :: {:ok, [map()]} | {:error, term()}
+  def permissions(guild_id) do
+    EDA.HTTP.Client.get("/applications/#{app_id()}/guilds/#{guild_id}/commands/permissions")
+  end
+
+  @doc "Gets who may use one of the app's commands in a guild. See `permissions/1`."
+  @spec permissions(String.t() | integer(), String.t() | integer()) ::
+          {:ok, map()} | {:error, term()}
+  def permissions(guild_id, command_id) do
+    EDA.HTTP.Client.get(
+      "/applications/#{app_id()}/guilds/#{guild_id}/commands/#{command_id}/permissions"
+    )
+  end
 end

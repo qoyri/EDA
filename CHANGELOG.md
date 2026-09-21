@@ -210,6 +210,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Application emojis** — `EDA.API.Emoji.list_application/0`, `get_application/1`,
   `create_application/2` (image as a path, bytes or data URI), `modify_application/2` and
   `delete_application/1`
+- **`EDA.API.Voice`** — `regions/0`, and Stage voice states: `voice_state/2` for the bot (`:me`)
+  or a user, and `modify_voice_state/3` to move someone on or off stage, or raise the bot's hand
+- **Guild administration** in `EDA.API.Guild`: `integrations/1` and `delete_integration/3`;
+  `welcome_screen/1` and `modify_welcome_screen/2`; `preview/1`; `vanity_url/1` (the only way to
+  the vanity invite's use count); `voice_regions/1`; `widget_settings/1`, `modify_widget/2`,
+  `widget/1` and `widget_image_url/2`; and `modify_incident_actions/2`, which pauses invites or
+  DMs during a raid and refuses a pause over Discord's 24 hours before sending
+- **Command permissions** — `EDA.API.Command.permissions/1,2` read who may use the app's commands
+  in a guild. Writing them needs a user's OAuth2 token, not a bot's
+- **Role connection metadata** — `EDA.API.Application.role_connection_metadata/0` and
+  `update_role_connection_metadata/1`, with named types and Discord's limits checked: 5 records,
+  keys of `a-z`, `0-9` and `_`
 
 ### Changed
 
