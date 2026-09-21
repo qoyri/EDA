@@ -108,13 +108,11 @@ defmodule EDA.Voice.Dave.Manager do
         Logger.warning("DAVE: encrypt_opus not ready, aborting media send")
         {:error, :not_ready, manager}
 
+      # normalize_encrypt_result/1 already turns any other shape into {:error, _}, so this
+      # clause is the last one that can match.
       {:error, reason} ->
         Logger.warning("DAVE: encrypt_opus failed (#{inspect(reason)}), aborting media send")
         {:error, reason, manager}
-
-      other ->
-        Logger.warning("DAVE: encrypt_opus failed (#{inspect(other)}), aborting media send")
-        {:error, other, manager}
     end
   end
 
