@@ -64,6 +64,20 @@ defmodule EDA.API.Message do
 
   Creates a message reference with `type: 1` (forward) pointing to the original message.
 
+  ## The bot must be able to read the message it forwards
+
+  Forwarding is not a way to relay a message out of a channel the bot cannot see. Discord
+  checks read access to the **source** message's content at forward time and rejects the
+  request with code `160014` otherwise — typically a missing `view_channel` or
+  `read_message_history` in the source channel, or a source channel the bot is no longer in:
+
+      case EDA.API.Message.forward(target_id, source_id, message_id) do
+        {:ok, message} -> message
+        {:error, %{code: 160_014}} -> :cannot_read_source
+      end
+
+  `EDA.Error.cannot_forward_unreadable_message/0` names that code.
+
   ## Examples
 
       EDA.API.Message.forward(target_channel_id, source_channel_id, message_id)
@@ -297,7 +311,42 @@ defmodule EDA.API.Message do
     end
   end
 
-  @doc "Edits a message."
+  @doc """
+  Edits a message.
+
+  Accepts a keyword list of options (which may upload files) or a raw payload map.
+
+  ## The `attachments` array replaces, it does not merge
+
+  Discord treats `attachments` as the complete list the message should end up with, so an
+  attachment left out of it is deleted. Uploading a file without naming the existing ones
+  therefore removes them:
+
+      # keeps only the newly uploaded file — the message's other attachments are gone
+      EDA.API.Message.edit(channel_id, message_id, files: [EDA.File.from_path("new.png")])
+
+  Name them with `EDA.Attachment.keep/2` to hold on to them, and the upload is appended:
+
+      EDA.API.Message.edit(channel_id, message_id,
+        attachments: Enum.map(message.attachments, &EDA.Attachment.keep/1),
+        files: [EDA.File.from_path("new.png")]
+      )
+
+  `:attachments` also takes bare ids and raw attachment maps. `EDA.Message.edit/2` has the
+  shorter `attachments: :keep` for a message struct you already hold.
+
+  Omitting `:attachments` entirely leaves the message's attachments untouched — it is only
+  sending the array that is destructive.
+
+  ## Changing an existing attachment
+
+  `EDA.Attachment.keep/2` carries the two fields Discord lets an edit update, so a spoiler
+  can be applied after the fact without re-uploading the file:
+
+      EDA.API.Message.edit(channel_id, message_id,
+        attachments: [EDA.Attachment.keep(attachment, is_spoiler: true, description: "Ending")]
+      )
+  """
   @spec edit(String.t() | integer(), String.t() | integer(), map() | keyword()) ::
           {:ok, map()} | {:error, term()}
   def edit(channel_id, message_id, opts) when is_list(opts) do

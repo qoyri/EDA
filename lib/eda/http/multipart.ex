@@ -4,6 +4,11 @@ defmodule EDA.HTTP.Multipart do
 
   Produces iodata bodies with a `payload_json` part and indexed `files[n]` parts.
   Automatically injects the `attachments` array into the JSON payload.
+
+  An `attachments` array already present in the payload is **kept** and the uploaded files
+  are appended to it. That is how a message edit retains the attachments it already has:
+  Discord deletes any attachment missing from the array, so `EDA.Attachment.keep/2` entries
+  go in the payload and the new files are indexed after them.
   """
 
   @mime_types %{
@@ -34,25 +39,26 @@ defmodule EDA.HTTP.Multipart do
 
   Returns `{body_iodata, content_type}` where content_type includes the boundary.
 
-  The `attachments` array is automatically injected into the JSON payload
-  with `id` matching the file index, `filename`, and optional `description`.
+  Each uploaded file gets an entry with `id` matching the file index, `filename`, and
+  optional `description`. Entries already in the payload's `attachments` array — the
+  attachments an edit is retaining — are preserved and come first.
   """
   @spec encode(map(), [EDA.File.t()]) :: {iodata(), String.t()}
   def encode(json_payload, files) when is_map(json_payload) and is_list(files) do
     boundary = generate_boundary()
 
-    attachments =
+    {retained, json_payload} = pop_attachments(json_payload)
+
+    uploaded =
       files
       |> Enum.with_index()
       |> Enum.map(fn {file, index} ->
-        attachment = %{id: index, filename: EDA.File.effective_name(file)}
-
-        if file.description,
-          do: Map.put(attachment, :description, file.description),
-          else: attachment
+        %{id: index, filename: EDA.File.effective_name(file)}
+        |> maybe_put(:description, file.description)
+        |> maybe_put(:is_spoiler, if(file.spoiler, do: true))
       end)
 
-    json_payload = Map.put(json_payload, :attachments, attachments)
+    json_payload = put_attachments(json_payload, retained ++ uploaded)
 
     body =
       [
@@ -156,6 +162,27 @@ defmodule EDA.HTTP.Multipart do
   end
 
   # -- Helpers --
+
+  # Callers build payloads with atom keys, but `encode/2` is reachable with a hand-written
+  # map, so accept either spelling and settle on one.
+  defp pop_attachments(payload) do
+    {atom, payload} = Map.pop(payload, :attachments)
+    {string, payload} = Map.pop(payload, "attachments")
+
+    case atom || string do
+      nil -> {[], payload}
+      list when is_list(list) -> {list, payload}
+      other -> raise ArgumentError, "attachments must be a list, got: #{inspect(other)}"
+    end
+  end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  # An empty array deletes every attachment on a message being edited, so only send the key
+  # when there is something to say.
+  defp put_attachments(payload, []), do: payload
+  defp put_attachments(payload, attachments), do: Map.put(payload, :attachments, attachments)
 
   defp generate_boundary do
     :crypto.strong_rand_bytes(16) |> Base.hex_encode32(case: :lower, padding: false)

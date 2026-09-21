@@ -115,11 +115,55 @@ defmodule EDA.Message do
   end
 
   @doc """
-  Edits a message. Accepts a struct or channel_id + message_id.
+  Edits a message. Accepts a raw payload map or a keyword list of options.
+
+  The keyword form supports everything `EDA.API.Message.edit/3` does, including `:files`
+  and `:attachments`.
+
+  ## Attachments are replaced, not merged
+
+  Discord deletes any attachment missing from the `attachments` array, so uploading a file
+  to a message that already has some wipes them unless they are named. Since the struct
+  already carries them, `attachments: :keep` says "everything this message has now", with
+  no extra request:
+
+      EDA.Message.edit(message,
+        content: "one more",
+        attachments: :keep,
+        files: [EDA.File.from_path("extra.png")]
+      )
+
+  Pass a list instead to keep only part of them, or to change what an attachment says —
+  see `EDA.Attachment.keep/2`:
+
+      EDA.Message.edit(message,
+        attachments: [EDA.Attachment.keep(hd(message.attachments), is_spoiler: true)]
+      )
   """
-  @spec edit(t(), map()) :: {:ok, t()} | {:error, term()}
+  @spec edit(t(), map() | keyword()) :: {:ok, t()} | {:error, term()}
+  def edit(message, payload)
+
   def edit(%__MODULE__{channel_id: cid, id: mid}, payload) when is_map(payload) do
     EDA.API.Message.edit(cid, mid, payload) |> parse_response()
+  end
+
+  def edit(%__MODULE__{channel_id: cid, id: mid} = message, opts) when is_list(opts) do
+    EDA.API.Message.edit(cid, mid, resolve_keep(opts, message)) |> parse_response()
+  end
+
+  # `attachments: :keep` is shorthand for the attachments the struct already holds. An empty
+  # array would delete them all, so a message with none drops the key entirely.
+  defp resolve_keep(opts, %__MODULE__{attachments: attachments}) do
+    case Keyword.fetch(opts, :attachments) do
+      {:ok, :keep} when attachments in [nil, []] ->
+        Keyword.delete(opts, :attachments)
+
+      {:ok, :keep} ->
+        Keyword.put(opts, :attachments, Enum.map(attachments, &EDA.Attachment.keep/1))
+
+      _ ->
+        opts
+    end
   end
 
   @doc """

@@ -79,8 +79,13 @@ defmodule EDA.FileTest do
       assert F.effective_name(file) == "image.png"
     end
 
-    test "prefixes SPOILER_ when spoiler" do
+    test "a spoiler keeps its name — the blur is asked for with is_spoiler" do
       file = F.from_binary("data", "image.png", spoiler: true)
+      assert F.effective_name(file) == "image.png"
+    end
+
+    test "a name the caller prefixed itself is passed through" do
+      file = F.from_binary("data", "SPOILER_image.png")
       assert F.effective_name(file) == "SPOILER_image.png"
     end
   end
