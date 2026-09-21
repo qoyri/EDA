@@ -121,10 +121,14 @@ defmodule EDA.HTTP.Client do
 
   # A map may be string-keyed (`%{"username" => "x"}`), as a decoded JSON body is; such a key
   # counts as the atom of the same name. `Keyword.keys/1` would raise on it.
+  #
+  # Sorted, so the message does not depend on map order: since OTP 26 a small map orders atom
+  # keys by when each atom was created, which varies with what the VM loaded first.
   defp unknown_keys(opts, allowed) do
     accepted = MapSet.new(allowed, &to_string/1)
 
-    for {key, _value} <- opts, not MapSet.member?(accepted, to_string(key)), do: key
+    for({key, _value} <- opts, not MapSet.member?(accepted, to_string(key)), do: key)
+    |> Enum.sort_by(&to_string/1)
   end
 
   def with_query(path, opts) do
