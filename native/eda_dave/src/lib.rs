@@ -1,5 +1,8 @@
-use davey::{errors::EncryptError, DaveSession, ProposalsOperationType, SessionStatus, DAVE_PROTOCOL_VERSION};
-use rustler::{Atom, Binary, Env, NewBinary, ResourceArc};
+use davey::{
+    errors::{EncryptError, ProcessCommitError, ProcessWelcomeError},
+    DaveSession, ProposalsOperationType, SessionStatus, DAVE_PROTOCOL_VERSION,
+};
+use rustler::{Atom, Binary, Encoder, Env, NewBinary, ResourceArc, Term};
 use std::num::NonZeroU16;
 use std::sync::Mutex;
 
@@ -16,6 +19,11 @@ mod atoms {
         pending,
         awaiting_response,
         active,
+        already_in_group,
+        no_external_sender,
+        no_group,
+        pending_group,
+        invalid,
     }
 }
 
@@ -30,7 +38,9 @@ fn to_binary<'a>(env: Env<'a>, data: &[u8]) -> Binary<'a> {
     bin.into()
 }
 
-#[rustler::nif]
+// Session creation and re-initialisation generate a signing key pair, so they run on a dirty
+// scheduler like the other MLS operations.
+#[rustler::nif(schedule = "DirtyCpu")]
 fn new_session(
     protocol_version: u16,
     user_id: u64,
@@ -105,33 +115,51 @@ fn process_proposals<'a>(
     }
 }
 
+// Commit and welcome failures carry a reason, because they call for different handling: a welcome
+// refused as `already_in_group` is the expected outcome of a commit race, while a malformed one is not.
 #[rustler::nif(schedule = "DirtyCpu")]
-fn process_commit(
+fn process_commit<'a>(
+    env: Env<'a>,
     resource: ResourceArc<DaveSessionResource>,
     commit: Binary,
-) -> Atom {
+) -> Term<'a> {
     let mut session = match resource.0.lock() {
         Ok(s) => s,
-        Err(_) => return atoms::error(),
+        Err(_) => return atoms::error().encode(env),
     };
     match session.process_commit(commit.as_slice()) {
-        Ok(()) => atoms::ok(),
-        Err(_) => atoms::error(),
+        Ok(()) => atoms::ok().encode(env),
+        Err(e) => {
+            let reason = match e {
+                ProcessCommitError::NoGroup => atoms::no_group(),
+                ProcessCommitError::PendingGroup => atoms::pending_group(),
+                _ => atoms::invalid(),
+            };
+            (atoms::error(), reason).encode(env)
+        }
     }
 }
 
 #[rustler::nif(schedule = "DirtyCpu")]
-fn process_welcome(
+fn process_welcome<'a>(
+    env: Env<'a>,
     resource: ResourceArc<DaveSessionResource>,
     welcome: Binary,
-) -> Atom {
+) -> Term<'a> {
     let mut session = match resource.0.lock() {
         Ok(s) => s,
-        Err(_) => return atoms::error(),
+        Err(_) => return atoms::error().encode(env),
     };
     match session.process_welcome(welcome.as_slice()) {
-        Ok(()) => atoms::ok(),
-        Err(_) => atoms::error(),
+        Ok(()) => atoms::ok().encode(env),
+        Err(e) => {
+            let reason = match e {
+                ProcessWelcomeError::AlreadyInGroup => atoms::already_in_group(),
+                ProcessWelcomeError::NoExternalSender => atoms::no_external_sender(),
+                _ => atoms::invalid(),
+            };
+            (atoms::error(), reason).encode(env)
+        }
     }
 }
 
@@ -195,12 +223,13 @@ fn is_ready(resource: ResourceArc<DaveSessionResource>) -> Result<bool, Atom> {
 fn set_passthrough_mode(
     resource: ResourceArc<DaveSessionResource>,
     passthrough: bool,
+    transition_expiry: u32,
 ) -> Atom {
     let mut session = match resource.0.lock() {
         Ok(s) => s,
         Err(_) => return atoms::error(),
     };
-    session.set_passthrough_mode(passthrough, None);
+    session.set_passthrough_mode(passthrough, Some(transition_expiry));
     atoms::ok()
 }
 
@@ -216,7 +245,7 @@ fn reset(resource: ResourceArc<DaveSessionResource>) -> Atom {
     }
 }
 
-#[rustler::nif]
+#[rustler::nif(schedule = "DirtyCpu")]
 fn reinit(
     resource: ResourceArc<DaveSessionResource>,
     protocol_version: u16,

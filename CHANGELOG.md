@@ -16,6 +16,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `user_id` mistyped on an entitlement listing returned everybody's, and `day: 30` on a prune kicked
   on the default seven days. The error names the function and the accepted keys. A project that
   saw no `unknown option` warning on 0.4.1 is unaffected.
+- **Voice works without Rust and without configuration.** The DAVE NIF is now downloaded precompiled
+  when EDA compiles — Linux (x86-64, ARM64, ARMv7, RISC-V; glibc and musl), macOS, Windows and
+  FreeBSD — and checked against checksums shipped in the package. A project that added
+  `{:rustler, ...}` for voice can drop it. Building from source remains available with
+  `config :rustler_precompiled, :force_build, eda: true`. If the NIF can be neither downloaded nor
+  built, EDA still compiles, with a warning, and only voice is affected.
+- **DAVE is on by default whenever the NIF is loaded.** Discord refuses voice without it outside
+  Stage channels, so `config :eda, dave: true` is no longer needed; `dave: false` turns it off.
+- The 4017 refusal now says why DAVE was not offered: turned off by `dave: false`, or the NIF not
+  loaded.
 
 ### Fixed
 
@@ -23,6 +33,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   — no longer crashes the option check with an opaque "expected a keyword list" error. Every route
   validating a map body was affected since 0.4.1. A string key now counts as the atom of the same
   name.
+- DAVE transitions are followed as the protocol specifies. A downgrade to protocol 0 is
+  acknowledged — before, it went unanswered and the transition stalled — and then sends media
+  unencrypted, as Discord expects; an upgrade restores end-to-end encryption, including for playback
+  already under way.
+- A refused MLS commit now recovers the way a refused welcome does, by re-initialising and offering a
+  new key package. Recovery happens once per failure, not once per message.
+- Recovery and a new group (epoch 1) re-initialise the MLS session instead of resetting it. A reset
+  left no pending group, so a session that then had to commit failed.
+- Joining a call no longer logs `Welcome failed` as a warning. A welcome that arrives after the bot
+  joined through its own commit is the expected outcome of a race at join, and is logged at debug.
+- Opus silence frames are no longer counted as DAVE decryption errors.
+
+### Security
+
+- The DAVE NIF now builds against `davey` 0.1.4 instead of 0.1.1. The older lock pulled in OpenMLS
+  and cryptography crates with published advisories — GHSA-8x3w-qj7j-gqhf (high),
+  GHSA-435g-fcv3-8j26 and GHSA-g433-pq76-6cmf — and 0.1.4 also brings the library's encryption in
+  line with Discord's reference implementation. Only projects that compile the NIF (voice with
+  `dave: true`) are affected; they pick this up on the next build.
 
 ## [0.4.1] - 2026-09-21
 

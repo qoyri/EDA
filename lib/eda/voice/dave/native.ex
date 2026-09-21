@@ -5,29 +5,42 @@ defmodule EDA.Voice.Dave.Native do
   Wraps the `davey` Rust crate which implements the MLS (RFC 9420) key
   exchange protocol used by Discord's DAVE protocol.
 
-  The NIF is compiled and loaded automatically via Rustler when Rust is
-  available. If the NIF cannot be loaded, all functions raise `:nif_not_loaded`
-  and `available?/0` returns false.
+  The NIF is downloaded precompiled when EDA compiles, from the GitHub release of EDA's version,
+  and verified against the checksums shipped in the package. Binaries exist for Linux (x86-64,
+  ARM64, ARMv7, RISC-V; glibc and musl), macOS, Windows and FreeBSD, so no Rust toolchain is needed.
 
-  ## DAVE is optional
+  ## Building from source
 
-  `:rustler` is an optional dependency, so a bot that never uses end-to-end encrypted voice
-  does not need a Rust toolchain. To enable DAVE, add it to your own project and install Rust:
+  On another platform, or without network access at compile time, build it from source. That needs
+  Rust and Rustler:
 
       {:rustler, "~> 0.35"}
 
-  Without it, EDA compiles normally and this module keeps its stubs. `config :eda, dave: true`
-  then logs a warning instead of crashing the voice session.
+      config :rustler_precompiled, :force_build, eda: true
 
-  Note that Discord has required DAVE for voice since March 2026 — DMs, group DMs, voice
-  channels and Go Live; only Stage channels are exempt — and refuses a connection that does
-  not offer it with close code 4017. A bot that joins voice therefore needs the NIF.
+  ## Without the NIF
+
+  If the NIF can be neither downloaded nor built, EDA still compiles, with a warning, and this
+  module keeps its stubs: every function raises `:nif_not_loaded` and `available?/0` returns false.
+  Voice is then connected without offering DAVE, which Discord refuses with close code 4017 —
+  it has required DAVE since March 2026 for DMs, group DMs, voice channels and Go Live; only Stage
+  channels are exempt.
   """
 
-  # `:rustler` is optional in EDA's mix.exs, so a consumer who did not add it has no Rustler
-  # module at all — an unconditional `use Rustler` made EDA itself fail to compile. See
-  # EDA.Voice.Dave.NativeLoader for why a plain `if` around the `use` is not enough.
-  use EDA.Voice.Dave.NativeLoader, otp_app: :eda, crate: "eda_dave"
+  # See EDA.Voice.Dave.NativeLoader for how the NIF is obtained, and why failing to obtain it does
+  # not fail compilation.
+  version = Mix.Project.config()[:version]
+
+  use EDA.Voice.Dave.NativeLoader,
+    otp_app: :eda,
+    crate: "eda_dave",
+    base_url: "https://github.com/qoyri/EDA/releases/download/v#{version}",
+    version: version,
+    targets: ["x86_64-unknown-freebsd" | RustlerPrecompiled.Config.default_targets()],
+    nif_versions: ["2.15"],
+    # EDA's own dev and test environments build the NIF they are working on. As a dependency,
+    # EDA is compiled in :prod and downloads the binary published for its version.
+    force_build: Mix.env() in [:dev, :test]
 
   # Return shapes: the Rust side returns `Result<T, Atom>`, and Rustler encodes that
   # as `{:ok, T}` / `{:error, atom}`. For the NIFs whose `T` is itself an `{:ok, ...}`
@@ -70,12 +83,24 @@ defmodule EDA.Voice.Dave.Native do
   def process_proposals(_ref, _operation_type, _proposals, _user_ids),
     do: :erlang.nif_error(:nif_not_loaded)
 
-  @doc "Processes an MLS commit from the gateway."
-  @spec process_commit(reference(), binary()) :: :ok | :error
+  @doc """
+  Processes an MLS commit from the gateway.
+
+  A failure names its cause: `:no_group` or `:pending_group` when the session has not joined a group
+  the commit could apply to, `:invalid` otherwise.
+  """
+  @spec process_commit(reference(), binary()) ::
+          :ok | :error | {:error, :no_group | :pending_group | :invalid}
   def process_commit(_ref, _commit), do: :erlang.nif_error(:nif_not_loaded)
 
-  @doc "Processes an MLS welcome message from the gateway."
-  @spec process_welcome(reference(), binary()) :: :ok | :error
+  @doc """
+  Processes an MLS welcome message from the gateway.
+
+  A failure names its cause: `:already_in_group` when the session had already joined through a
+  commit of its own — the expected outcome of a commit race — `:no_external_sender`, or `:invalid`.
+  """
+  @spec process_welcome(reference(), binary()) ::
+          :ok | :error | {:error, :already_in_group | :no_external_sender | :invalid}
   def process_welcome(_ref, _welcome), do: :erlang.nif_error(:nif_not_loaded)
 
   @doc """
@@ -108,11 +133,21 @@ defmodule EDA.Voice.Dave.Native do
   @spec ready?(reference()) :: {:ok, boolean()} | {:error, atom()} | boolean()
   def ready?(_ref), do: :erlang.nif_error(:nif_not_loaded)
 
-  @doc "Sets passthrough mode (disable/enable E2EE without destroying the session)."
-  @spec set_passthrough_mode(reference(), boolean()) :: :ok | :error
-  def set_passthrough_mode(_ref, _passthrough), do: :erlang.nif_error(:nif_not_loaded)
+  @doc """
+  Sets passthrough mode on every decryptor: while it is on, unencrypted frames are accepted.
 
-  @doc "Resets the MLS group state without losing key material or external sender."
+  Turning it on is immediate; `transition_expiry` is how many seconds decryptors keep accepting
+  unencrypted frames once it is turned off again.
+  """
+  @spec set_passthrough_mode(reference(), boolean(), non_neg_integer()) :: :ok | :error
+  def set_passthrough_mode(_ref, _passthrough, _transition_expiry),
+    do: :erlang.nif_error(:nif_not_loaded)
+
+  @doc """
+  Leaves the MLS group and clears the session's key storage, keeping the external sender.
+
+  It does not prepare a new pending group, so a session that must commit again needs `reinit/4`.
+  """
   @spec reset(reference()) :: :ok | :error
   def reset(_ref), do: :erlang.nif_error(:nif_not_loaded)
 
