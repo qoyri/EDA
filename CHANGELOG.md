@@ -197,6 +197,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guild, ordered as Discord orders the hierarchy
 - **`EDA.Cache.get_role/2`** and `EDA.Cache.Role.get/2` — a role looked up by guild and role id
   in one read, `nil` for a role of another guild
+- **The bot's guilds** — `EDA.API.User.guilds/1` (`GET /users/@me/guilds`, with `:shard`, which
+  Discord requires under large bot sharding since September 2026, and `:with_counts`),
+  `stream_guilds/1` past the 200-per-call limit, and **leaving a guild** with
+  `EDA.API.User.leave_guild/1` / `EDA.Guild.leave/1`
+- **Announcements** — `EDA.API.Message.crosspost/2` / `EDA.Message.crosspost/1` publish a message
+  to the channels following it; `EDA.API.Channel.follow/3` / `EDA.Channel.follow/3` follow an
+  announcement channel into another
+- **Archived threads** — `EDA.API.Thread.list_public_archived/2`, `list_private_archived/2`,
+  `list_joined_private_archived/2`, and `stream_archived/3` paging on each kind's own cursor. A
+  `DateTime` is accepted for `:before`
+- **Application emojis** — `EDA.API.Emoji.list_application/0`, `get_application/1`,
+  `create_application/2` (image as a path, bytes or data URI), `modify_application/2` and
+  `delete_application/1`
 
 ### Changed
 

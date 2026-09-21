@@ -133,6 +133,14 @@ defmodule EDA.Guild do
   end
 
   @doc """
+  Makes the bot leave a guild. Discord then sends `GUILD_DELETE`. The bot cannot leave a guild
+  it owns.
+  """
+  @spec leave(t() | String.t() | integer()) :: :ok | {:error, term()}
+  def leave(%__MODULE__{id: id}), do: leave(id)
+  def leave(guild_id), do: EDA.API.User.leave_guild(guild_id)
+
+  @doc """
   Gets channels for a guild, returned as `%EDA.Channel{}` structs.
   """
   @spec channels(t() | String.t() | integer()) :: {:ok, [EDA.Channel.t()]} | {:error, term()}

@@ -91,4 +91,27 @@ defmodule EDA.API.Channel do
       error -> error
     end
   end
+
+  @doc """
+  Follows an announcement channel: its published messages are then posted to `target_channel_id`
+  through a webhook Discord creates there.
+
+  `POST /channels/{channel_id}/followers`. Needs `MANAGE_WEBHOOKS` in the target channel. Returns
+  `%{"channel_id" => source, "webhook_id" => id}`.
+
+  ## Options
+
+    * `:reason` — audit log reason
+  """
+  @spec follow(String.t() | integer(), String.t() | integer(), keyword()) ::
+          {:ok, map()} | {:error, term()}
+  def follow(channel_id, target_channel_id, opts \\ []) do
+    check_options!(opts, [:reason], "EDA.API.Channel.follow/3")
+
+    post(
+      "/channels/#{channel_id}/followers",
+      %{webhook_channel_id: to_string(target_channel_id)},
+      opts
+    )
+  end
 end

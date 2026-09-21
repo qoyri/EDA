@@ -188,4 +188,106 @@ defmodule EDA.API.Thread do
   def list_active(guild_id) do
     EDA.HTTP.Client.get("/guilds/#{guild_id}/threads/active")
   end
+
+  @archived_keys ~w(before limit)a
+
+  @doc """
+  Lists a channel's public archived threads, most recently archived first.
+
+  `GET /channels/{channel_id}/threads/archived/public`. Answers
+  `%{"threads" => [...], "members" => [...], "has_more" => boolean}` — `members` holds the
+  bot's own thread member for each thread it joined. Needs `READ_MESSAGE_HISTORY`.
+
+  ## Options
+
+    * `:before` — threads archived before this time, a `DateTime` or an ISO8601 string
+    * `:limit` — how many to return
+  """
+  @spec list_public_archived(String.t() | integer(), keyword()) :: {:ok, map()} | {:error, term()}
+  def list_public_archived(channel_id, opts \\ []) do
+    list_archived(
+      "/channels/#{channel_id}/threads/archived/public",
+      opts,
+      "list_public_archived/2"
+    )
+  end
+
+  @doc """
+  Lists a channel's private archived threads, most recently archived first. Needs
+  `READ_MESSAGE_HISTORY` and `MANAGE_THREADS`. Same options and answer as
+  `list_public_archived/2`.
+  """
+  @spec list_private_archived(String.t() | integer(), keyword()) ::
+          {:ok, map()} | {:error, term()}
+  def list_private_archived(channel_id, opts \\ []) do
+    list_archived(
+      "/channels/#{channel_id}/threads/archived/private",
+      opts,
+      "list_private_archived/2"
+    )
+  end
+
+  @doc """
+  Lists the private archived threads of a channel that the bot has joined, newest id first.
+  Needs `READ_MESSAGE_HISTORY`.
+
+  Same answer as `list_public_archived/2`, but `:before` is a **thread id** here, not a time.
+  """
+  @spec list_joined_private_archived(String.t() | integer(), keyword()) ::
+          {:ok, map()} | {:error, term()}
+  def list_joined_private_archived(channel_id, opts \\ []) do
+    check_options!(opts, @archived_keys, "EDA.API.Thread.list_joined_private_archived/2")
+
+    EDA.HTTP.Client.get(
+      with_query("/channels/#{channel_id}/users/@me/threads/archived/private", opts)
+    )
+  end
+
+  @doc """
+  Streams a channel's archived threads, lazily, page after page.
+
+  `kind` is `:public`, `:private` or `:joined_private`. Pages follow Discord's own cursor for
+  each kind — the archive time, or the thread id for joined private threads.
+
+      EDA.API.Thread.stream_archived(channel_id, :public) |> Enum.take(250)
+  """
+  @spec stream_archived(String.t() | integer(), :public | :private | :joined_private, keyword()) ::
+          Enumerable.t()
+  def stream_archived(channel_id, kind, opts \\ [])
+      when kind in [:public, :private, :joined_private] do
+    check_options!(opts, [:per_page], "EDA.API.Thread.stream_archived/3")
+    per_page = Keyword.get(opts, :per_page, 100)
+
+    {fetch, cursor_key} =
+      case kind do
+        :public -> {&list_public_archived/2, &archive_timestamp/1}
+        :private -> {&list_private_archived/2, &archive_timestamp/1}
+        :joined_private -> {&list_joined_private_archived/2, "id"}
+      end
+
+    EDA.Paginator.stream(
+      fetch: fn cursor ->
+        query = [limit: per_page] ++ if(cursor, do: [before: cursor], else: [])
+
+        with {:ok, %{"threads" => threads}} <- fetch.(channel_id, query), do: {:ok, threads}
+      end,
+      cursor_key: cursor_key,
+      direction: :before,
+      per_page: per_page
+    )
+  end
+
+  defp list_archived(path, opts, function) do
+    check_options!(opts, @archived_keys, "EDA.API.Thread." <> function)
+
+    opts =
+      case opts[:before] do
+        %DateTime{} = before -> Keyword.put(opts, :before, DateTime.to_iso8601(before))
+        _ -> opts
+      end
+
+    EDA.HTTP.Client.get(with_query(path, opts))
+  end
+
+  defp archive_timestamp(thread), do: get_in(thread, ["thread_metadata", "archive_timestamp"])
 end

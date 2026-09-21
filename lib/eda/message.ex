@@ -251,6 +251,18 @@ defmodule EDA.Message do
   end
 
   @doc """
+  Publishes a message from an announcement channel to every channel following it, and returns it
+  updated. See `EDA.API.Message.crosspost/2` for the permissions.
+  """
+  @spec crosspost(t()) :: {:ok, t()} | {:error, term()}
+  def crosspost(%__MODULE__{channel_id: cid, id: mid}) do
+    case EDA.API.Message.crosspost(cid, mid) do
+      {:ok, raw} -> {:ok, from_raw(raw)}
+      error -> error
+    end
+  end
+
+  @doc """
   Unpins a message from its channel.
 
   ## Options

@@ -95,6 +95,19 @@ defmodule EDA.API.Message do
   end
 
   @doc """
+  Publishes a message in an announcement channel to every channel following it.
+
+  `POST /channels/{channel_id}/messages/{message_id}/crosspost`. Needs `SEND_MESSAGES` for the
+  bot's own message, and `MANAGE_MESSAGES` as well for anyone else's. A message is published
+  once; publishing it again fails with `40033` (`EDA.Error.message_already_crossposted/0`).
+  """
+  @spec crosspost(String.t() | integer(), String.t() | integer()) ::
+          {:ok, map()} | {:error, term()}
+  def crosspost(channel_id, message_id) do
+    post("/channels/#{channel_id}/messages/#{message_id}/crosspost", %{})
+  end
+
+  @doc """
   Searches a guild's message history.
 
   `GET /guilds/{guild_id}/messages/search`. Requires `READ_MESSAGE_HISTORY` in the channels
