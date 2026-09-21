@@ -19,9 +19,20 @@ defmodule EDA.HTTP.Client do
   def delete(path, opts \\ []), do: request(:delete, path, nil, opts)
 
   def request_multipart(method, path, json_payload, files, opts \\ []) do
+    send_multipart(method, path, EDA.HTTP.Multipart.encode(json_payload, files), opts)
+  end
+
+  @doc """
+  Like `request_multipart/5`, but for endpoints wanting a file under a name of its own
+  rather than Discord's `files[n]` attachment convention.
+  """
+  def request_form(method, path, json_payload, fields, opts \\ []) do
+    send_multipart(method, path, EDA.HTTP.Multipart.encode_named(json_payload, fields), opts)
+  end
+
+  defp send_multipart(method, path, {body, content_type}, opts) do
     {reason, opts} = Keyword.pop(opts, :reason)
     url = base_url() <> path
-    {body, content_type} = EDA.HTTP.Multipart.encode(json_payload, files)
     binary_body = IO.iodata_to_binary(body)
     bucket = EDA.HTTP.Bucket.key(method, path)
 
@@ -135,10 +146,20 @@ defmodule EDA.HTTP.Client do
     params =
       opts
       |> Enum.reject(fn {_, v} -> is_nil(v) end)
+      |> Enum.flat_map(&expand_query_param/1)
       |> URI.encode_query()
 
     if params == "", do: path, else: path <> "?" <> params
   end
+
+  # Discord expresses a multi-valued filter as a repeated key — `channel_id=a&channel_id=b`
+  # — which URI.encode_query/1 cannot express, and raises on. Verified against the live
+  # search endpoint on 2026-09-20.
+  defp expand_query_param({key, values}) when is_list(values) do
+    Enum.map(values, fn value -> {key, value} end)
+  end
+
+  defp expand_query_param(pair), do: [pair]
 
   def build_message_payload(opts) do
     {files, opts} = extract_files(opts)

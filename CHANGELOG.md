@@ -9,6 +9,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`EDA.API.Message.search/2`** and **`EDA.Message.search/2`** — search a guild's message
+  history (`GET /guilds/{id}/messages/search`). Every documented filter is supported, including
+  the multi-valued ones, and options take atoms (`has: [:image]`, `sort_by: :relevance`) rather
+  than Discord's strings
+- `EDA.Message.search/2` flattens what the endpoint returns: `messages` is a list of *context
+  groups*, not of messages, with the match marked `"hit" => true`. It answers with `:results`
+  (the matches, as structs), `:groups` (each match with its neighbours), `:total_results` and
+  `:indexing?`
+- An option `search/2` does not define is refused rather than forwarded, since Discord ignores
+  a query parameter it does not recognise — a typo would otherwise return the guild's whole
+  history while looking like a filtered search
+- The filter limits Discord documents are checked before the request — `:limit` 1–25, `:offset`
+  ≤ 9975, `:content` ≤ 1024 characters, 500 channels, 100 authors — with a message naming the
+  option, rather than an opaque `50035`
+- JSON error code `110000` (search index not yet available)
+- **Invite target users** — an invite can be restricted to a named list of people.
+  `EDA.API.Invite.target_users/1`, `update_target_users/2` and `target_users_job_status/1`,
+  plus `:target_users` on `create/2`. Discord carries the list as a CSV file uploaded as
+  `multipart/form-data`; EDA takes and returns plain lists of user ids and handles the file on
+  both sides. The upload is asynchronous, so the job status names its states — `:processing`,
+  `:completed`, `:failed`
+- **`EDA.API.Invite.get/2`** — `GET /invites/{code}`, with `:with_counts` and
+  `:guild_scheduled_event_id`. It had no wrapper at all
+- `:role_ids` on `EDA.API.Invite.create/2` — roles granted to whoever accepts the invite
+  (requires `MANAGE_ROLES`), and `:reason` on `create/2` and `delete/2`
+- **`EDA.Invite` entity functions** — `fetch_invite/2`, `create/2`, `delete/2`,
+  `target_users/1`, `set_target_users/2`, all returning structs
+- `EDA.Invite` gained `type`, `flags`, `roles`, `expires_at`, `created_at`, `guild`, `channel`,
+  `target_application`, `guild_scheduled_event` and the two approximate counts, plus
+  `type/1`, `target_type/1`, `guest_invite?/1`, `has_target_users?/1`, `permanent?/1` and
+  `url/1`. `guild_id` and `channel_id` are derived from the nested objects when Discord sends
+  the REST shape rather than the gateway one
+- An option `create/2` or `get/2` does not define is refused rather than forwarded: Discord
+  ignores a body field or query parameter it does not recognise, so `max_ages:` would quietly
+  produce the default 24-hour invite while looking like it asked for an hour
+- `EDA.HTTP.Multipart.encode_named/2`, and a matching sender in the internal HTTP client, for
+  endpoints wanting a file under a name of its own rather than the `files[n]` attachment
+  convention
 - **`EDA.API.Member.modify_me/2`** and **`EDA.Member.modify_me/2`** — the bot's per-guild profile
   (`PATCH /guilds/{id}/members/@me`). Sets `nick`, `avatar`, `banner` and `bio` for one guild,
   overriding the account-wide identity there. Only `:nick` needs a permission
@@ -34,6 +72,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `user_id` mistyped on an entitlement listing returned everybody's, and `day: 30` on a prune kicked
   on the default seven days. The error names the function and the accepted keys. A project that
   saw no `unknown option` warning on 0.4.1 is unaffected.
+- **Voice works without Rust and without configuration.** The DAVE NIF is now downloaded precompiled
+  when EDA compiles — Linux (x86-64, ARM64, ARMv7, RISC-V; glibc and musl), macOS, Windows and
+  FreeBSD — and checked against checksums shipped in the package. A project that added
+  `{:rustler, ...}` for voice can drop it. Building from source remains available with
+  `config :rustler_precompiled, :force_build, eda: true`. If the NIF can be neither downloaded nor
+  built, EDA still compiles, with a warning, and only voice is affected.
+- **DAVE is on by default whenever the NIF is loaded.** Discord refuses voice without it outside
+  Stage channels, so `config :eda, dave: true` is no longer needed; `dave: false` turns it off.
+- The 4017 refusal now says why DAVE was not offered: turned off by `dave: false`, or the NIF not
+  loaded.
 
 ### Fixed
 
@@ -41,6 +89,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   — no longer crashes the option check with an opaque "expected a keyword list" error. Every route
   validating a map body was affected since 0.4.1. A string key now counts as the atom of the same
   name.
+- DAVE transitions are followed as the protocol specifies. A downgrade to protocol 0 is
+  acknowledged — before, it went unanswered and the transition stalled — and then sends media
+  unencrypted, as Discord expects; an upgrade restores end-to-end encryption, including for playback
+  already under way.
+- A refused MLS commit now recovers the way a refused welcome does, by re-initialising and offering a
+  new key package. Recovery happens once per failure, not once per message.
+- Recovery and a new group (epoch 1) re-initialise the MLS session instead of resetting it. A reset
+  left no pending group, so a session that then had to commit failed.
+- Joining a call no longer logs `Welcome failed` as a warning. A welcome that arrives after the bot
+  joined through its own commit is the expected outcome of a race at join, and is logged at debug.
+- Opus silence frames are no longer counted as DAVE decryption errors.
+- The internal query-string builder expands a list value into repeated keys
+  (`channel_id=a&channel_id=b`), which is how Discord expresses a multi-valued filter.
+  `URI.encode_query/1` raises on a list, so any endpoint needing one was unreachable
+
+### Security
+
+- The DAVE NIF now builds against `davey` 0.1.4 instead of 0.1.1. The older lock pulled in OpenMLS
+  and cryptography crates with published advisories — GHSA-8x3w-qj7j-gqhf (high),
+  GHSA-435g-fcv3-8j26 and GHSA-g433-pq76-6cmf — and 0.1.4 also brings the library's encryption in
+  line with Discord's reference implementation. Only projects that compile the NIF (voice with
+  `dave: true`) are affected; they pick this up on the next build.
 
 ## [0.4.1] - 2026-09-21
 

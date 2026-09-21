@@ -60,7 +60,9 @@ defmodule EDA.MixProject do
       # HTTP testing
       {:bypass, "~> 2.1", only: :test},
 
-      # Rustler for DAVE (E2EE voice) NIF — optional, only needed if dave: true
+      # DAVE (E2EE voice) NIF: precompiled binaries are downloaded at compile time, so a bot
+      # needs no Rust toolchain. Rustler is only needed to build the NIF from source.
+      {:rustler_precompiled, "~> 0.8"},
       {:rustler, "~> 0.35", optional: true, runtime: false}
     ]
   end
@@ -71,7 +73,7 @@ defmodule EDA.MixProject do
       licenses: ["MIT"],
       links: %{"GitHub" => @source_url, "HexDocs" => "https://hexdocs.pm/eda"},
       files:
-        ~w(lib native/eda_dave/src native/eda_dave/Cargo.toml native/eda_dave/Cargo.lock .formatter.exs mix.exs README.md LICENSE CHANGELOG.md)
+        ~w(lib native/eda_dave/src native/eda_dave/.cargo native/eda_dave/Cargo.toml native/eda_dave/Cargo.lock checksum-*.exs .formatter.exs mix.exs README.md LICENSE CHANGELOG.md)
     ]
   end
 

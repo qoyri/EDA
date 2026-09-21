@@ -63,11 +63,21 @@ defmodule EDA.Voice.Dave.NativeTest do
     end
   end
 
-  describe "set_passthrough_mode/2" do
-    test "sets passthrough without error" do
+  describe "set_passthrough_mode/3" do
+    test "sets passthrough with a transition expiry" do
       ref = create_session()
-      assert :ok = Native.set_passthrough_mode(ref, true)
-      assert :ok = Native.set_passthrough_mode(ref, false)
+      assert :ok = Native.set_passthrough_mode(ref, true, 24)
+      assert :ok = Native.set_passthrough_mode(ref, false, 10)
+    end
+  end
+
+  describe "failure reasons" do
+    test "a welcome before the external sender is known says so" do
+      assert {:error, :no_external_sender} = Native.process_welcome(create_session(), "garbage")
+    end
+
+    test "a commit before joining a group says so" do
+      assert {:error, :no_group} = Native.process_commit(create_session(), "garbage")
     end
   end
 

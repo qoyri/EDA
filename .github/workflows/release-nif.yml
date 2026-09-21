@@ -1,0 +1,77 @@
+name: Precompiled DAVE NIF
+
+# Builds the DAVE NIF for every platform EDA downloads it on, so a bot needs no Rust toolchain.
+#
+# On a version tag the archives are attached to that tag's GitHub release, which is where
+# EDA.Voice.Dave.Native downloads them from. A change to the crate also builds them — without
+# publishing — so that a platform which stops cross-compiling is caught before a release.
+
+on:
+  push:
+    tags:
+      - "v*"
+    branches:
+      - "**"
+    paths:
+      - "native/**"
+      - ".github/workflows/release-nif.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: NIF ${{ matrix.nif }} - ${{ matrix.job.target }}
+    runs-on: ${{ matrix.job.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        nif: ["2.15"]
+        job:
+          - { target: aarch64-apple-darwin, os: macos-latest }
+          - { target: x86_64-apple-darwin, os: macos-latest }
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-latest, use-cross: true }
+          - { target: x86_64-unknown-linux-musl, os: ubuntu-latest, use-cross: true }
+          - { target: aarch64-unknown-linux-musl, os: ubuntu-latest, use-cross: true }
+          - { target: arm-unknown-linux-gnueabihf, os: ubuntu-latest, use-cross: true }
+          - { target: riscv64gc-unknown-linux-gnu, os: ubuntu-latest, use-cross: true }
+          - { target: x86_64-unknown-freebsd, os: ubuntu-latest, use-cross: true, cross-version: v0.2.5 }
+          - { target: x86_64-pc-windows-gnu, os: windows-latest }
+          - { target: x86_64-pc-windows-msvc, os: windows-latest }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the version from mix.exs
+        shell: bash
+        run: echo "PROJECT_VERSION=$(sed -n 's/^  @version "\(.*\)"/\1/p' mix.exs | head -n1)" >> "$GITHUB_ENV"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          target: ${{ matrix.job.target }}
+
+      - name: Build the NIF
+        id: build-crate
+        uses: philss/rustler-precompiled-action@v1.1.4
+        with:
+          project-name: eda_dave
+          project-version: ${{ env.PROJECT_VERSION }}
+          target: ${{ matrix.job.target }}
+          nif-version: ${{ matrix.nif }}
+          use-cross: ${{ matrix.job.use-cross }}
+          cross-version: ${{ matrix.job.cross-version || 'v0.2.4' }}
+          project-dir: native/eda_dave
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.build-crate.outputs.file-name }}
+          path: ${{ steps.build-crate.outputs.file-path }}
+
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.build-crate.outputs.file-path }}
