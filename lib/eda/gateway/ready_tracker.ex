@@ -19,6 +19,7 @@ defmodule EDA.Gateway.ReadyTracker do
   defstruct pending_counts: %{},
             guild_to_shard: %{},
             ready_shards: MapSet.new(),
+            down_shards: MapSet.new(),
             expected_shards: nil,
             waiters: [],
             globally_ready: false,
@@ -92,7 +93,37 @@ defmodule EDA.Gateway.ReadyTracker do
   end
 
   @doc """
-  Returns `true` if all shards have finished loading their guilds.
+  Reports that a shard's gateway connection closed.
+
+  Called by `EDA.Gateway.Connection` on every disconnect. A shard that had finished loading
+  stops counting as ready until it resumes or completes a fresh READY, so `ready?/0` stops
+  answering `true` for a bot that has lost its gateway.
+  """
+  @spec shard_disconnected(non_neg_integer()) :: :ok
+  def shard_disconnected(shard_id) do
+    GenServer.cast(__MODULE__, {:shard_disconnected, shard_id})
+  end
+
+  @doc """
+  Reports that a shard resumed its session.
+
+  A resume carries on the same session, so Discord sends RESUMED rather than READY and does
+  not reload the guilds. A shard that was ready before the disconnect is ready again at
+  once. `SHARD_READY` and `ALL_SHARDS_READY` are not dispatched a second time, because from
+  the consumer's side nothing restarted.
+  """
+  @spec shard_resumed(non_neg_integer()) :: :ok
+  def shard_resumed(shard_id) do
+    GenServer.cast(__MODULE__, {:shard_resumed, shard_id})
+  end
+
+  @doc """
+  Returns `true` if every shard is connected and has finished loading its guilds.
+
+  Goes back to `false` while any shard's gateway connection is down, and returns to `true`
+  once it resumes or completes a fresh READY — so it is safe to use as a readiness check.
+  REST calls do not depend on the gateway and keep working while this is `false`; events,
+  voice and member chunking do not.
 
   Non-blocking — reads from `:persistent_term` (O(1)).
   """
@@ -144,7 +175,43 @@ defmodule EDA.Gateway.ReadyTracker do
   end
 
   @impl true
+  def handle_cast({:shard_disconnected, shard_id}, state) do
+    was_ready = MapSet.member?(state.ready_shards, shard_id)
+
+    if state.globally_ready do
+      :persistent_term.put(:eda_globally_ready, false)
+      Logger.info("[ReadyTracker] Shard #{shard_id} disconnected — no longer ready")
+    end
+
+    {:noreply,
+     %{
+       state
+       | ready_shards: MapSet.delete(state.ready_shards, shard_id),
+         down_shards:
+           if(was_ready, do: MapSet.put(state.down_shards, shard_id), else: state.down_shards),
+         globally_ready: false
+     }}
+  end
+
+  # A shard that had not finished loading when it dropped just carries on loading: Discord
+  # replays the missed GUILD_CREATEs after a resume, and they are counted as before.
+  def handle_cast({:shard_resumed, shard_id}, state) do
+    if MapSet.member?(state.down_shards, shard_id) do
+      state = %{
+        state
+        | ready_shards: MapSet.put(state.ready_shards, shard_id),
+          down_shards: MapSet.delete(state.down_shards, shard_id)
+      }
+
+      {:noreply, maybe_restore_ready(state)}
+    else
+      {:noreply, state}
+    end
+  end
+
   def handle_cast({:shard_ready, shard_id, guild_ids}, state) do
+    state = %{state | down_shards: MapSet.delete(state.down_shards, shard_id)}
+
     # Refresh expected_shards if not yet known
     state = maybe_refresh_expected(state)
 
@@ -323,6 +390,19 @@ defmodule EDA.Gateway.ReadyTracker do
     )
 
     %{state | globally_ready: true, waiters: []}
+  end
+
+  defp maybe_restore_ready(state) do
+    state = maybe_refresh_expected(state)
+
+    if state.expected_shards && MapSet.size(state.ready_shards) >= state.expected_shards do
+      :persistent_term.put(:eda_globally_ready, true)
+      for from <- state.waiters, do: GenServer.reply(from, :ok)
+      Logger.info("[ReadyTracker] All shards ready again after resuming")
+      %{state | globally_ready: true, waiters: []}
+    else
+      state
+    end
   end
 
   defp maybe_refresh_expected(%{expected_shards: nil} = state) do
