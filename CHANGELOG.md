@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`EDA.Cache.Adapter`** — the cache storage backend is now a behaviour with swappable
+  implementations, configured with `config :eda, cache_adapter: ...`. Ships
+  `EDA.Cache.Adapter.ETS` (the default, unchanged behaviour) and `EDA.Cache.Adapter.NoOp`
+  (stores nothing — useful for memory-constrained or stateless bots)
+- **`EDA.Cache.Adapter.Mnesia`** — a cluster-wide cache backend. A bot running several nodes
+  gets one view of the cache: an entity seen by one node's shards is readable from every other
+  node, and a restarting node rejoins a populated cache instead of a cold one. Configurable
+  through `config :eda, cache_mnesia: [copies: ..., nodes: ..., wait_timeout: ...]`. `:mnesia`
+  stays out of EDA's `:extra_applications` on purpose, so bots that never select this adapter
+  never start it
+- Admission policy, size limits, eviction and telemetry now live **above** the adapter rather
+  than inside it, so a third-party backend inherits all four for free — a backend only has to
+  answer where an entity lives
 - **`EDA.API.Message.search/2`** and **`EDA.Message.search/2`** — search a guild's message
   history (`GET /guilds/{id}/messages/search`). Every documented filter is supported, including
   the multi-valued ones, and options take atoms (`has: [:image]`, `sort_by: :relevance`) rather

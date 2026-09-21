@@ -19,6 +19,18 @@ defmodule EDA.Cache do
       # Get the bot user
       me = EDA.Cache.me()
 
+  ## Storage backend
+
+  Where entities live is pluggable; *which* ones are kept and *how many* is not. The
+  admission policy, the size limit and eviction, and the telemetry all sit **above**
+  the backend, so any adapter inherits them:
+
+      config :eda, cache_adapter: EDA.Cache.Adapter.ETS   # default
+      config :eda, cache_adapter: EDA.Cache.Adapter.NoOp  # store nothing
+
+  A backend only answers "where does this live", so it never has to reimplement the
+  filtering or the memory bounds. See `EDA.Cache.Adapter` to write your own.
+
   ## Obfuscated channels
 
   From **2026-11-16** Discord redacts channels the bot cannot view rather than hiding

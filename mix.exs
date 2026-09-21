@@ -16,7 +16,7 @@ defmodule EDA.MixProject do
       package: package(),
       docs: docs(),
       dialyzer: [
-        plt_add_apps: [:mix],
+        plt_add_apps: [:mix, :mnesia],
         plt_file: {:no_warn, "priv/plts/dialyzer.plt"}
       ]
     ]
@@ -24,10 +24,19 @@ defmodule EDA.MixProject do
 
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: extra_applications(Mix.env()),
       mod: {EDA.Application, []}
     ]
   end
+
+  # :mnesia is deliberately NOT a runtime dependency of the library: listing it would
+  # start Mnesia for every EDA user, including those who never touch
+  # EDA.Cache.Adapter.Mnesia. Applications that do use that adapter add :mnesia to their
+  # own :extra_applications. As a dependency EDA compiles in :prod, so only EDA's own dev
+  # and test environments get it: the suite exercises the adapter, and Dialyzer needs it on
+  # the code path to check the calls — an app it cannot find is left out of the PLT.
+  defp extra_applications(env) when env in [:dev, :test], do: [:logger, :mnesia]
+  defp extra_applications(_env), do: [:logger]
 
   defp deps do
     [
