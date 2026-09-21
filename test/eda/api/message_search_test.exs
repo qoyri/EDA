@@ -126,7 +126,7 @@ defmodule EDA.API.MessageSearchTest do
         Message.search("111", contnet: "typo")
       end
 
-      assert_raise ArgumentError, ~r/unknown options \[:foo, :bar\]/, fn ->
+      assert_raise ArgumentError, ~r/unknown options \[:bar, :foo\]/, fn ->
         Message.search("111", foo: 1, bar: 2)
       end
     end
