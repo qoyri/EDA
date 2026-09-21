@@ -19,9 +19,20 @@ defmodule EDA.HTTP.Client do
   def delete(path, opts \\ []), do: request(:delete, path, nil, opts)
 
   def request_multipart(method, path, json_payload, files, opts \\ []) do
+    send_multipart(method, path, EDA.HTTP.Multipart.encode(json_payload, files), opts)
+  end
+
+  @doc """
+  Like `request_multipart/5`, but for endpoints wanting a file under a name of its own
+  rather than Discord's `files[n]` attachment convention.
+  """
+  def request_form(method, path, json_payload, fields, opts \\ []) do
+    send_multipart(method, path, EDA.HTTP.Multipart.encode_named(json_payload, fields), opts)
+  end
+
+  defp send_multipart(method, path, {body, content_type}, opts) do
     {reason, opts} = Keyword.pop(opts, :reason)
     url = base_url() <> path
-    {body, content_type} = EDA.HTTP.Multipart.encode(json_payload, files)
     binary_body = IO.iodata_to_binary(body)
     bucket = EDA.HTTP.Bucket.key(method, path)
 

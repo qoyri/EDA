@@ -24,6 +24,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ≤ 9975, `:content` ≤ 1024 characters, 500 channels, 100 authors — with a message naming the
   option, rather than an opaque `50035`
 - JSON error code `110000` (search index not yet available)
+- **Invite target users** — an invite can be restricted to a named list of people.
+  `EDA.API.Invite.target_users/1`, `update_target_users/2` and `target_users_job_status/1`,
+  plus `:target_users` on `create/2`. Discord carries the list as a CSV file uploaded as
+  `multipart/form-data`; EDA takes and returns plain lists of user ids and handles the file on
+  both sides. The upload is asynchronous, so the job status names its states — `:processing`,
+  `:completed`, `:failed`
+- **`EDA.API.Invite.get/2`** — `GET /invites/{code}`, with `:with_counts` and
+  `:guild_scheduled_event_id`. It had no wrapper at all
+- `:role_ids` on `EDA.API.Invite.create/2` — roles granted to whoever accepts the invite
+  (requires `MANAGE_ROLES`), and `:reason` on `create/2` and `delete/2`
+- **`EDA.Invite` entity functions** — `fetch_invite/2`, `create/2`, `delete/2`,
+  `target_users/1`, `set_target_users/2`, all returning structs
+- `EDA.Invite` gained `type`, `flags`, `roles`, `expires_at`, `created_at`, `guild`, `channel`,
+  `target_application`, `guild_scheduled_event` and the two approximate counts, plus
+  `type/1`, `target_type/1`, `guest_invite?/1`, `has_target_users?/1`, `permanent?/1` and
+  `url/1`. `guild_id` and `channel_id` are derived from the nested objects when Discord sends
+  the REST shape rather than the gateway one
+- An option `create/2` or `get/2` does not define is refused rather than forwarded: Discord
+  ignores a body field or query parameter it does not recognise, so `max_ages:` would quietly
+  produce the default 24-hour invite while looking like it asked for an hour
+- `EDA.HTTP.Multipart.encode_named/2`, and a matching sender in the internal HTTP client, for
+  endpoints wanting a file under a name of its own rather than the `files[n]` attachment
+  convention
 
 ### Changed
 
