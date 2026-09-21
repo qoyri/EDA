@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking: an option a route does not define now raises `ArgumentError`, and nothing is
+  sent.** 0.4.1 logged a warning and sent the request unchanged, as announced there. Discord
+  ignores a field or query parameter it does not recognise, so a misspelt option never failed —
+  it silently did nothing, or worse: `limit` mistyped on a member listing returned one member,
+  `user_id` mistyped on an entitlement listing returned everybody's, and `day: 30` on a prune kicked
+  on the default seven days. The error names the function and the accepted keys. A project that
+  saw no `unknown option` warning on 0.4.1 is unaffected.
 - **Voice works without Rust and without configuration.** The DAVE NIF is now downloaded precompiled
   when EDA compiles — Linux (x86-64, ARM64, ARMv7, RISC-V; glibc and musl), macOS, Windows and
   FreeBSD — and checked against checksums shipped in the package. A project that added
@@ -22,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A string-keyed map — a decoded JSON body, such as `EDA.API.User.modify_me(%{"username" => "x"})`
+  — no longer crashes the option check with an opaque "expected a keyword list" error. Every route
+  validating a map body was affected since 0.4.1. A string key now counts as the atom of the same
+  name.
 - DAVE transitions are followed as the protocol specifies. A downgrade to protocol 0 is
   acknowledged — before, it went unanswered and the transition stalled — and then sends media
   unencrypted, as Discord expects; an upgrade restores end-to-end encryption, including for playback

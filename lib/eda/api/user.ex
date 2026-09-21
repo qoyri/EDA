@@ -17,7 +17,7 @@ defmodule EDA.API.User do
   @spec modify_me(map() | keyword()) :: {:ok, map()} | {:error, term()}
   def modify_me(opts) do
     body = Map.new(opts)
-    check_options(body, [:username, :avatar, :banner], "EDA.API.User.modify_me/1")
+    check_options!(body, [:username, :avatar, :banner], "EDA.API.User.modify_me/1")
     patch("/users/@me", body)
   end
 

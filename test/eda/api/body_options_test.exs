@@ -9,14 +9,12 @@ defmodule EDA.API.BodyOptionsTest do
   and `avatar_url` never arrived, which is most of the point of a webhook.
 
   These tests assert the body on the wire, because each of those failures returned
-  `{:ok, message}`. An option a route does not define is reported with a warning and still
-  sent, so a patch release never stops a call that works; 0.5 will refuse it.
+  `{:ok, message}`. An option a route does not define raises `ArgumentError`, and nothing is
+  sent.
   """
 
   # NOT async — Bypass and the Application env are global.
   use ExUnit.Case
-
-  import ExUnit.CaptureLog
 
   setup do
     bypass = Bypass.open()
@@ -111,68 +109,63 @@ defmodule EDA.API.BodyOptionsTest do
     end
   end
 
-  describe "message routes warn about what they do not define" do
+  describe "message routes refuse what they do not define" do
     setup %{bypass: bypass} do
       Bypass.down(bypass)
       :ok
     end
 
-    test "create warns about a misspelt key, naming the function" do
-      log =
-        capture_log(fn ->
+    test "create refuses a misspelt key, naming the function" do
+      error =
+        assert_raise ArgumentError, fn ->
           EDA.API.Message.create("111", content: "x", allowed_mention: %{parse: []})
-        end)
+        end
 
-      assert log =~ "EDA.API.Message.create/2"
-      assert log =~ "unknown option [:allowed_mention]"
-      assert log =~ ":allowed_mentions"
+      assert error.message =~ "EDA.API.Message.create/2"
+      assert error.message =~ "unknown option [:allowed_mention]"
+      assert error.message =~ ":allowed_mentions"
     end
 
-    test "edit warns about fields Discord only accepts on create" do
+    test "edit refuses fields Discord only accepts on create" do
       # tts and sticker_ids are create-only; Discord ignores them on an edit.
-      assert capture_log(fn -> EDA.API.Message.edit("111", "222", content: "x", tts: true) end) =~
-               "unknown option [:tts]"
+      assert_raise ArgumentError, ~r/unknown option \[:tts\]/, fn ->
+        EDA.API.Message.edit("111", "222", content: "x", tts: true)
+      end
 
-      assert capture_log(fn -> EDA.API.Message.edit("111", "222", sticker_ids: ["1"]) end) =~
-               "unknown option [:sticker_ids]"
+      assert_raise ArgumentError, ~r/unknown option \[:sticker_ids\]/, fn ->
+        EDA.API.Message.edit("111", "222", sticker_ids: ["1"])
+      end
     end
 
-    test "reply warns about a misspelt key" do
-      log =
-        capture_log(fn -> EDA.API.Message.reply(%{channel_id: "111", id: "222"}, contnet: "x") end)
+    test "reply refuses a misspelt key" do
+      error =
+        assert_raise ArgumentError, fn ->
+          EDA.API.Message.reply(%{channel_id: "111", id: "222"}, contnet: "x")
+        end
 
-      assert log =~ "EDA.API.Message.reply/2"
-      assert log =~ "unknown option [:contnet]"
+      assert error.message =~ "EDA.API.Message.reply/2"
+      assert error.message =~ "unknown option [:contnet]"
     end
 
-    test "a correct call warns about nothing" do
-      log =
-        capture_log(fn ->
-          EDA.API.Message.create("111",
-            content: "x",
-            allowed_mentions: %{parse: []},
-            flags: 4096,
-            embed: %{title: "t"},
-            delete_after: 5_000
-          )
-        end)
-
-      refute log =~ "unknown option"
+    test "a correct call is let through" do
+      # Bypass is down, so an accepted call fails at the transport instead of raising.
+      assert {:error, _} =
+               EDA.API.Message.create("111",
+                 content: "x",
+                 allowed_mentions: %{parse: []},
+                 flags: 4096,
+                 embed: %{title: "t"},
+                 delete_after: 5_000
+               )
     end
   end
 
-  describe "an unknown key is still sent" do
-    test "so a field EDA does not list yet still reaches Discord", %{bypass: bypass} do
-      capture(bypass, "POST", "/channels/111/messages")
-
-      log =
-        capture_log(fn ->
-          assert {:ok, _} = EDA.API.Message.create("111", content: "x", brand_new_field: true)
-        end)
-
-      assert_receive {:captured, body, _}
-      assert body["brand_new_field"] == true
-      assert log =~ "unknown option [:brand_new_field]"
+  describe "an unknown key is not sent" do
+    test "nothing reaches Discord", %{bypass: _bypass} do
+      # No expectation is set: a request reaching Bypass would fail the test on exit.
+      assert_raise ArgumentError, fn ->
+        EDA.API.Message.create("111", content: "x", brand_new_field: true)
+      end
     end
   end
 
@@ -248,14 +241,16 @@ defmodule EDA.API.BodyOptionsTest do
       assert body == %{"content" => "x"}
     end
 
-    test "an unknown key is reported", %{bypass: bypass} do
+    test "an unknown key is refused", %{bypass: bypass} do
       Bypass.down(bypass)
 
-      log =
-        capture_log(fn -> EDA.API.Webhook.execute("1", "tok", content: "x", user_name: "Bob") end)
+      error =
+        assert_raise ArgumentError, fn ->
+          EDA.API.Webhook.execute("1", "tok", content: "x", user_name: "Bob")
+        end
 
-      assert log =~ "EDA.API.Webhook.execute/3"
-      assert log =~ "unknown option [:user_name]"
+      assert error.message =~ "EDA.API.Webhook.execute/3"
+      assert error.message =~ "unknown option [:user_name]"
     end
   end
 
@@ -277,13 +272,16 @@ defmodule EDA.API.BodyOptionsTest do
       refute Map.has_key?(body, "thread_id")
     end
 
-    test "execute-only fields are reported on an edit", %{bypass: bypass} do
+    test "execute-only fields are refused on an edit", %{bypass: bypass} do
       Bypass.down(bypass)
 
-      log = capture_log(fn -> EDA.API.Webhook.edit_message("1", "tok", "9", username: "Bob") end)
+      error =
+        assert_raise ArgumentError, fn ->
+          EDA.API.Webhook.edit_message("1", "tok", "9", username: "Bob")
+        end
 
-      assert log =~ "EDA.API.Webhook.edit_message/4"
-      assert log =~ "unknown option [:username]"
+      assert error.message =~ "EDA.API.Webhook.edit_message/4"
+      assert error.message =~ "unknown option [:username]"
     end
   end
 
@@ -293,7 +291,7 @@ defmodule EDA.API.BodyOptionsTest do
       :ok
     end
 
-    test "each warns about an unknown key and names what it accepts" do
+    test "each refuses an unknown key and names what it accepts" do
       cases = [
         {"EDA.API.Webhook.create/2", fn -> EDA.API.Webhook.create("1", name: "x", avatr: "y") end,
          ":avatar"},
@@ -332,11 +330,11 @@ defmodule EDA.API.BodyOptionsTest do
       end)
 
       for {label, call, expected_hint} <- cases do
-        log = capture_log(call)
+        error = assert_raise ArgumentError, call
 
-        assert log =~ label, "#{label} should name itself: #{log}"
-        assert log =~ "unknown option", "#{label} did not warn: #{log}"
-        assert log =~ expected_hint, "#{label} should name #{expected_hint}"
+        assert error.message =~ label, "#{label} should name itself: #{error.message}"
+        assert error.message =~ "unknown option"
+        assert error.message =~ expected_hint, "#{label} should name #{expected_hint}"
       end
     end
   end
@@ -366,6 +364,18 @@ defmodule EDA.API.BodyOptionsTest do
       capture(bypass, "PATCH", "/users/@me")
       assert {:ok, _} = EDA.API.User.modify_me(%{username: "eda"})
       assert_receive {:captured, %{"username" => "eda"}, _}
+    end
+
+    test "a string-keyed map is validated like an atom-keyed one", %{bypass: bypass} do
+      # A decoded JSON body is string-keyed. The check used to raise an opaque
+      # "expected a keyword list" error on it, for a perfectly valid call.
+      capture(bypass, "PATCH", "/users/@me")
+      assert {:ok, _} = EDA.API.User.modify_me(%{"username" => "eda"})
+      assert_receive {:captured, %{"username" => "eda"}, _}
+
+      assert_raise ArgumentError, ~r/unknown option \["user_name"\]/, fn ->
+        EDA.API.User.modify_me(%{"user_name" => "eda"})
+      end
     end
   end
 end
