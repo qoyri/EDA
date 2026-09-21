@@ -411,6 +411,7 @@ defmodule EDA.Gateway.Connection do
       "RESUMED" ->
         {shard_id, _} = state.shard
         Logger.info("#{shard_label(state)} Successfully resumed session")
+        EDA.Gateway.ReadyTracker.shard_resumed(shard_id)
         Events.dispatch("SESSION_RESUMED", %{"shard_id" => shard_id})
         {:ok, new_state}
 
@@ -615,6 +616,10 @@ defmodule EDA.Gateway.Connection do
   defp dispatch_gateway_close(state, code, action) do
     {shard_id, _} = state.shard
     will_reconnect = action != :fatal
+
+    # Every disconnect path comes through here, so this is where the shard stops counting
+    # as ready. It counts again on RESUMED, or on a fresh READY.
+    EDA.Gateway.ReadyTracker.shard_disconnected(shard_id)
 
     Events.dispatch("GATEWAY_CLOSE", %{
       "shard_id" => shard_id,

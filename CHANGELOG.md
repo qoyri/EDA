@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-21
+
+A patch release: bug fixes and a dependency security update. Nothing is removed and no signature
+changes. Upgrading needs no configuration change — though a project that added `{:rustler, ...}` only
+because EDA would not compile without it can now drop it, and Rust with it.
+
+### Installation
+
+```elixir
+def deps do
+  [
+    {:eda, "~> 0.4.1"}
+  ]
+end
+```
+
+### Security
+
+- **httpoison 3 is accepted, and a fresh project resolves to it.** hackney 1.25.0, reached through
+  httpoison 2, carries EEF-CVE-2026-47069, -47071 (high), -47075 and -47076, and the fixes exist only
+  from hackney 4.0.1 — which httpoison 2 cannot use. EDA now requires `~> 2.0 or ~> 3.0`: a project
+  held on httpoison 2 by another dependency still resolves, and everyone else gets hackney 4. Run
+  `mix deps.update httpoison hackney` to move an existing lock
+
+### Fixed
+
+- **EDA compiled only if you added Rustler yourself.** `:rustler` is declared optional, but the DAVE
+  NIF module called `use Rustler` unconditionally, so a project without it failed with *module Rustler
+  is not loaded* — and adding it meant installing a Rust toolchain, whether or not the bot used voice.
+  EDA now compiles without it, and the NIF functions raise `:nif_not_loaded` as documented
+- **`dave: true` without the NIF no longer crashes the voice session.** EDA used to advertise DAVE to
+  Discord and then call a stub that raises. It now advertises DAVE only when the NIF is loaded;
+  otherwise it logs which dependency is missing and connects without end-to-end encryption
+- **Message options were silently dropped.** The keyword form of every message send —
+  `EDA.API.Message.create/2`, `edit/3`, `reply/2`, `EDA.API.Webhook.execute/3`, `edit_message/4`,
+  `EDA.API.Thread.create_post/3` — kept five keys and discarded the rest, and still answered
+  `{:ok, message}`:
+  - `allowed_mentions`, so `allowed_mentions: %{parse: []}` — the usual guard against user-supplied
+    text pinging `@everyone` — did nothing, and the ping went out;
+  - `flags`, so a silent message (`flags: 4096`) notified the channel;
+  - `message_reference`, `tts`, `sticker_ids`, `nonce`, `enforce_nonce`;
+  - on webhooks, `username`, `avatar_url`, `thread_name` and `applied_tags`
+- **`v2: true` combines with an explicit `flags:`** instead of overwriting it
+- **Webhook `thread_id`, `wait` and `with_components` travel in the URL**, where Discord reads them.
+  `thread_id` used to be dropped, so a message meant for a thread went to the parent channel;
+  `edit_message/4` accepts it too
+- **`EDA.ready?/0` goes false while a shard is disconnected**, and true again once it resumes or
+  completes a fresh READY. It used to stay true for good after the first READY, so a bot whose gateway
+  had died — including for reasons that never reconnect, such as a revoked token — reported itself
+  ready forever. `await_ready/1` now waits out an outage. REST keeps working meanwhile
+- `EDA.API.Guild.prune/2`, `EDA.API.Webhook.create/2` and `modify/2`, `EDA.API.Thread.start/2` and
+  `start_from_message/3`, `EDA.API.Channel.edit_permissions/3`, `EDA.API.User.modify_me/1` and
+  `EDA.API.Entitlement.create_test/1` accept a keyword list; each raised inside the JSON encoder
+- EDA's own code compiles without warnings on Elixir 1.20 — twenty `size(...)` patterns now pin their
+  variables, ahead of that becoming an error, plus an unused `require` and an unreachable clause
+- Starting without a token logs one line instead of a nine-line block and a second, redundant warning
+
+### Deprecated
+
+- **An option a route does not define now logs a warning, and will raise in 0.5.** Discord ignores a
+  field or query parameter it does not recognise, so a misspelt option never failed — it silently did
+  nothing: `limit` mistyped on a member listing returned one member instead of a thousand, `user_id`
+  mistyped on an entitlement or subscription listing returned everybody's. Every route that takes
+  options now names the ones Discord defines and warns about the rest, naming the function and the
+  accepted keys. The request is still sent unchanged, so nothing that works today stops working
+
 ## [0.4.0] - 2026-09-19
 
 ### Installation

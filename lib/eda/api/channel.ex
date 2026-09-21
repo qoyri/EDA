@@ -41,10 +41,14 @@ defmodule EDA.API.Channel do
   end
 
   @doc "Edits channel permission overwrites for a user or role."
-  @spec edit_permissions(String.t() | integer(), String.t() | integer(), map()) ::
+  @spec edit_permissions(String.t() | integer(), String.t() | integer(), map() | keyword()) ::
           :ok | {:error, term()}
   def edit_permissions(channel_id, overwrite_id, opts) do
-    case put("/channels/#{channel_id}/permissions/#{overwrite_id}", opts) do
+    body = Map.new(opts)
+    # `alow:` would be dropped by Discord, leaving an overwrite that grants nothing.
+    check_options(body, [:allow, :deny, :type], "EDA.API.Channel.edit_permissions/3")
+
+    case put("/channels/#{channel_id}/permissions/#{overwrite_id}", body) do
       {:ok, _} -> :ok
       error -> error
     end

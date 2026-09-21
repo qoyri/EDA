@@ -29,7 +29,18 @@ defmodule EDA.API.Entitlement do
   """
   @spec list(keyword()) :: {:ok, [map()]} | {:error, term()}
   def list(opts \\ []) do
-    EDA.HTTP.Client.get(with_query("/applications/#{app_id()}/entitlements", opts))
+    EDA.HTTP.Client.get(
+      with_query("/applications/#{app_id()}/entitlements", opts, [
+        :user_id,
+        :sku_ids,
+        :before,
+        :after,
+        :limit,
+        :guild_id,
+        :exclude_ended,
+        :exclude_deleted
+      ])
+    )
   end
 
   @doc """
@@ -78,9 +89,11 @@ defmodule EDA.API.Entitlement do
         owner_type: 2
       })
   """
-  @spec create_test(map()) :: {:ok, map()} | {:error, term()}
+  @spec create_test(map() | keyword()) :: {:ok, map()} | {:error, term()}
   def create_test(opts) do
-    post("/applications/#{app_id()}/entitlements", opts)
+    body = Map.new(opts)
+    check_options(body, [:sku_id, :owner_id, :owner_type], "EDA.API.Entitlement.create_test/1")
+    post("/applications/#{app_id()}/entitlements", body)
   end
 
   @doc """

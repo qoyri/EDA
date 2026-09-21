@@ -51,3 +51,87 @@ jobs:
 
       - name: Credo
         run: mix credo
+
+  # EDA's own environment always has Rustler, so nothing in the test suite can notice when
+  # EDA stops compiling without it — which is exactly how 0.4.0 shipped unusable for anyone
+  # who had not added `:rustler` themselves. This job builds EDA the way a consumer does.
+  consumer-without-rustler:
+    name: Consumer project without Rustler
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: eda
+
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.17"
+          otp-version: "27"
+
+      - name: Create a consumer that depends on EDA but not on Rustler
+        run: |
+          mkdir -p consumer/lib
+          cat > consumer/mix.exs <<'EOF'
+          defmodule Consumer.MixProject do
+            use Mix.Project
+
+            def project,
+              do: [app: :consumer, version: "0.1.0", elixir: "~> 1.17", deps: [{:eda, path: "../eda"}]]
+
+            def application, do: [extra_applications: [:logger]]
+          end
+          EOF
+          echo 'defmodule Consumer do end' > consumer/lib/consumer.ex
+          cat > consumer/check.exs <<'EOF'
+          false = EDA.Voice.Dave.Native.available?()
+
+          try do
+            EDA.Voice.Dave.Native.new_session(1, 0, 0)
+            raise "the NIF stub returned instead of raising :nif_not_loaded"
+          rescue
+            e in ErlangError -> :nif_not_loaded = e.original
+          end
+
+          # dave: true without the NIF must not advertise DAVE to Discord.
+          Application.put_env(:eda, :dave, true)
+          EDA.Cache.put_me(%{"id" => "1", "username" => "ci"})
+          state = %{guild_id: "1", session_id: "s", token: "t", heartbeat_interval: nil, heartbeat_ref: nil}
+          hello = %{"op" => 8, "d" => %{"heartbeat_interval" => 41_250}}
+          {:reply, identify, _} = EDA.Voice.Event.handle(hello, state)
+          nil = identify.d[:max_dave_protocol_version]
+
+          IO.puts("EDA compiles and degrades cleanly without Rustler")
+          EOF
+
+      - name: EDA compiles without Rustler
+        working-directory: consumer
+        run: |
+          mix deps.get
+          if [ -d deps/rustler ]; then echo "rustler was pulled in, the check is meaningless"; exit 1; fi
+          mix compile
+
+      - name: DAVE degrades instead of crashing
+        working-directory: consumer
+        run: mix run check.exs
+
+  # Consumers compile EDA on whatever Elixir they run. Warnings that only a newer compiler
+  # reports are usually deprecations on their way to becoming errors, so EDA's own code must
+  # stay warning-free there too. Compile only: the suite is certified on the pinned toolchain.
+  newest-elixir:
+    name: Compiles warning-free on Elixir 1.20 / OTP 29
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.20"
+          otp-version: "29"
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Compile (warnings as errors)
+        run: mix compile --warnings-as-errors

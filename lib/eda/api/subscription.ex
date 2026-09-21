@@ -23,7 +23,10 @@ defmodule EDA.API.Subscription do
   """
   @spec list(String.t() | integer(), keyword()) :: {:ok, [map()]} | {:error, term()}
   def list(sku_id, opts \\ []) do
-    EDA.HTTP.Client.get(with_query("/skus/#{sku_id}/subscriptions", opts))
+    # `user_id` decides whose subscriptions come back; `user:` would return everybody's.
+    EDA.HTTP.Client.get(
+      with_query("/skus/#{sku_id}/subscriptions", opts, [:user_id, :before, :after, :limit])
+    )
   end
 
   @doc """

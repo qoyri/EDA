@@ -17,7 +17,7 @@ defmodule EDA.API.Member do
   @doc "Lists members of a guild."
   @spec list(String.t() | integer(), keyword()) :: {:ok, [map()]} | {:error, term()}
   def list(guild_id, opts \\ []) do
-    EDA.HTTP.Client.get(with_query("/guilds/#{guild_id}/members", opts))
+    EDA.HTTP.Client.get(with_query("/guilds/#{guild_id}/members", opts, [:limit, :after]))
   end
 
   @doc "Searches guild members by username/nickname."
@@ -25,7 +25,7 @@ defmodule EDA.API.Member do
           {:ok, [map()]} | {:error, term()}
   def search(guild_id, query, opts \\ []) do
     EDA.HTTP.Client.get(
-      with_query("/guilds/#{guild_id}/members/search", [{:query, query} | opts])
+      with_query("/guilds/#{guild_id}/members/search", [{:query, query} | opts], [:query, :limit])
     )
   end
 

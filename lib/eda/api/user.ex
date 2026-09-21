@@ -14,9 +14,11 @@ defmodule EDA.API.User do
   end
 
   @doc "Modifies the current bot user."
-  @spec modify_me(map()) :: {:ok, map()} | {:error, term()}
+  @spec modify_me(map() | keyword()) :: {:ok, map()} | {:error, term()}
   def modify_me(opts) do
-    patch("/users/@me", opts)
+    body = Map.new(opts)
+    check_options(body, [:username, :avatar, :banner], "EDA.API.User.modify_me/1")
+    patch("/users/@me", body)
   end
 
   @doc "Gets a user by ID."

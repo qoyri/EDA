@@ -82,7 +82,7 @@ defmodule EDA.Voice.Crypto do
 
   # Strip extension elements from the front and padding from the back
   defp strip_rtp_extras(plaintext, ext_data_size, padding_flag) do
-    <<_ext::binary-size(ext_data_size), rest::binary>> = plaintext
+    <<_ext::binary-size(^ext_data_size), rest::binary>> = plaintext
 
     if padding_flag == 1 and byte_size(rest) > 0 do
       pad_len = :binary.last(rest)
@@ -98,7 +98,7 @@ defmodule EDA.Voice.Crypto do
     base = 12 + cc * 4
 
     if x == 1 and byte_size(packet) >= base + 4 do
-      <<_::binary-size(base), _profile::16, ext_len::16, _::binary>> = packet
+      <<_::binary-size(^base), _profile::16, ext_len::16, _::binary>> = packet
       {base + 4, ext_len * 4}
     else
       {base, 0}

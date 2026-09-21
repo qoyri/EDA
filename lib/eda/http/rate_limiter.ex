@@ -16,8 +16,6 @@ defmodule EDA.HTTP.RateLimiter do
 
   use GenServer
 
-  require Logger
-
   @global_limit 50
   @global_window_ms 1000
   @max_retries 5

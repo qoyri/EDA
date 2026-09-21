@@ -7,6 +7,16 @@ defmodule EDA.API.Message do
 
   import EDA.HTTP.Client
 
+  # Discord's body for each route, plus the keys EDA itself interprets: `embed` and `v2` are
+  # rewritten by the payload builder, `file`/`files` become multipart parts, and
+  # `delete_after` schedules a deletion. From Discord's published request types.
+  @create_keys ~w(content nonce tts embeds allowed_mentions message_reference components
+                  sticker_ids attachments flags enforce_nonce poll shared_client_theme
+                  embed file files v2 delete_after)a
+
+  @edit_keys ~w(content embeds flags allowed_mentions attachments components
+                embed file files v2)a
+
   @doc """
   Creates a message in a channel.
 
@@ -28,6 +38,7 @@ defmodule EDA.API.Message do
   end
 
   def create(channel_id, opts) when is_list(opts) do
+    check_options(opts, @create_keys, "EDA.API.Message.create/2")
     {delete_after, opts} = Keyword.pop(opts, :delete_after)
 
     result =
@@ -79,7 +90,9 @@ defmodule EDA.API.Message do
   @doc "Gets messages from a channel."
   @spec list(String.t() | integer(), keyword()) :: {:ok, [map()]} | {:error, term()}
   def list(channel_id, opts \\ []) do
-    EDA.HTTP.Client.get(with_query("/channels/#{channel_id}/messages", opts))
+    EDA.HTTP.Client.get(
+      with_query("/channels/#{channel_id}/messages", opts, [:around, :before, :after, :limit])
+    )
   end
 
   @doc "Bulk deletes messages (2-100, not older than 14 days)."
@@ -96,6 +109,8 @@ defmodule EDA.API.Message do
   @spec edit(String.t() | integer(), String.t() | integer(), map() | keyword()) ::
           {:ok, map()} | {:error, term()}
   def edit(channel_id, message_id, opts) when is_list(opts) do
+    check_options(opts, @edit_keys, "EDA.API.Message.edit/3")
+
     case build_message_payload(opts) do
       {payload, files} ->
         request_multipart(
@@ -140,7 +155,9 @@ defmodule EDA.API.Message do
   """
   @spec pins(String.t() | integer(), keyword()) :: {:ok, map()} | {:error, term()}
   def pins(channel_id, opts \\ []) do
-    EDA.HTTP.Client.get(with_query("/channels/#{channel_id}/messages/pins", opts))
+    EDA.HTTP.Client.get(
+      with_query("/channels/#{channel_id}/messages/pins", opts, [:before, :limit])
+    )
   end
 
   @doc """
@@ -418,6 +435,7 @@ defmodule EDA.API.Message do
   end
 
   defp do_reply(channel_id, message_id, opts) when is_list(opts) do
+    check_options(opts, @create_keys, "EDA.API.Message.reply/2")
     {delete_after, opts} = Keyword.pop(opts, :delete_after)
 
     payload =

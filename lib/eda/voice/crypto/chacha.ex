@@ -39,14 +39,14 @@ defmodule EDA.Voice.Crypto.ChaCha do
     packet_size = byte_size(packet)
     nonce_offset = packet_size - 4
 
-    <<rtp_header::binary-size(header_size), ciphertext_and_tag::binary>> =
+    <<rtp_header::binary-size(^header_size), ciphertext_and_tag::binary>> =
       binary_part(packet, 0, nonce_offset)
 
     <<nonce_bytes::binary-size(4)>> = binary_part(packet, nonce_offset, 4)
 
     ciphertext_len = nonce_offset - header_size - @tag_length
 
-    <<ciphertext::binary-size(ciphertext_len), tag::binary-size(@tag_length)>> =
+    <<ciphertext::binary-size(^ciphertext_len), tag::binary-size(@tag_length)>> =
       ciphertext_and_tag
 
     iv = nonce_bytes <> <<0::unit(8)-size(20)>>

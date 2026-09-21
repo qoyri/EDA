@@ -57,13 +57,13 @@ defmodule EDA.Voice.Ogg do
     if byte_size(rest) < num_segments do
       :incomplete
     else
-      <<seg_table::binary-size(num_segments), after_table::binary>> = rest
+      <<seg_table::binary-size(^num_segments), after_table::binary>> = rest
       data_size = seg_table |> :binary.bin_to_list() |> Enum.sum()
 
       if byte_size(after_table) < data_size do
         :incomplete
       else
-        <<page_data::binary-size(data_size), remaining::binary>> = after_table
+        <<page_data::binary-size(^data_size), remaining::binary>> = after_table
         {:ok, seg_table, page_data, remaining}
       end
     end
@@ -73,7 +73,7 @@ defmodule EDA.Voice.Ogg do
     # Buffer doesn't start with OggS — try to resync
     case :binary.match(buffer, @ogg_marker) do
       {pos, 4} when pos > 0 ->
-        <<_skip::binary-size(pos), aligned::binary>> = buffer
+        <<_skip::binary-size(^pos), aligned::binary>> = buffer
         parse_page(aligned)
 
       _ ->
@@ -93,7 +93,7 @@ defmodule EDA.Voice.Ogg do
   defp do_extract_packets([], _data, current, acc), do: Enum.reverse([current | acc])
 
   defp do_extract_packets([size | rest], data, current, acc) do
-    <<segment::binary-size(size), remaining::binary>> = data
+    <<segment::binary-size(^size), remaining::binary>> = data
     combined = <<current::binary, segment::binary>>
 
     if size < 255 do

@@ -16,16 +16,14 @@ defmodule EDA.Application do
   def start(_type, _args) do
     token = Application.get_env(:eda, :token)
 
+    # One line, on purpose. This fires on every start without a token — including test
+    # suites where that is deliberate — and used to be a nine-line block followed by a second
+    # warning from the shard supervisor saying the same thing.
     unless token do
-      Logger.warning("""
-      No Discord token configured. Set it in your config:
-
-          config :eda, token: "your_bot_token"
-
-      Or via environment variable:
-
-          config :eda, token: System.get_env("DISCORD_TOKEN")
-      """)
+      Logger.warning(
+        "[EDA] No Discord token configured, so the gateway will not connect. " <>
+          ~s|Set it with config :eda, token: System.get_env("DISCORD_TOKEN").|
+      )
     end
 
     # Event dispatch concurrency counter

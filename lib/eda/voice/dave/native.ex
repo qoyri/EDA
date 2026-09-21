@@ -8,9 +8,22 @@ defmodule EDA.Voice.Dave.Native do
   The NIF is compiled and loaded automatically via Rustler when Rust is
   available. If the NIF cannot be loaded, all functions raise `:nif_not_loaded`
   and `available?/0` returns false.
+
+  ## DAVE is optional
+
+  `:rustler` is an optional dependency, so a bot that never uses end-to-end encrypted voice
+  does not need a Rust toolchain. To enable DAVE, add it to your own project and install Rust:
+
+      {:rustler, "~> 0.35"}
+
+  Without it, EDA compiles normally and this module keeps its stubs. `config :eda, dave: true`
+  then logs a warning and voice connects without DAVE rather than crashing.
   """
 
-  use Rustler, otp_app: :eda, crate: "eda_dave"
+  # `:rustler` is optional in EDA's mix.exs, so a consumer who did not add it has no Rustler
+  # module at all — an unconditional `use Rustler` made EDA itself fail to compile. See
+  # EDA.Voice.Dave.NativeLoader for why a plain `if` around the `use` is not enough.
+  use EDA.Voice.Dave.NativeLoader, otp_app: :eda, crate: "eda_dave"
 
   # Return shapes: the Rust side returns `Result<T, Atom>`, and Rustler encodes that
   # as `{:ok, T}` / `{:error, atom}`. For the NIFs whose `T` is itself an `{:ok, ...}`

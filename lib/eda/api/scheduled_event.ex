@@ -15,7 +15,9 @@ defmodule EDA.API.ScheduledEvent do
   """
   @spec list(String.t() | integer(), keyword()) :: {:ok, [map()]} | {:error, term()}
   def list(guild_id, opts \\ []) do
-    EDA.HTTP.Client.get(with_query("/guilds/#{guild_id}/scheduled-events", opts))
+    EDA.HTTP.Client.get(
+      with_query("/guilds/#{guild_id}/scheduled-events", opts, [:with_user_count])
+    )
   end
 
   @doc """
@@ -27,7 +29,9 @@ defmodule EDA.API.ScheduledEvent do
   @spec get(String.t() | integer(), String.t() | integer(), keyword()) ::
           {:ok, map()} | {:error, term()}
   def get(guild_id, event_id, opts \\ []) do
-    EDA.HTTP.Client.get(with_query("/guilds/#{guild_id}/scheduled-events/#{event_id}", opts))
+    EDA.HTTP.Client.get(
+      with_query("/guilds/#{guild_id}/scheduled-events/#{event_id}", opts, [:with_user_count])
+    )
   end
 
   @doc "Creates a scheduled event in a guild."
@@ -102,7 +106,12 @@ defmodule EDA.API.ScheduledEvent do
           {:ok, [map()]} | {:error, term()}
   def users(guild_id, event_id, opts \\ []) do
     EDA.HTTP.Client.get(
-      with_query("/guilds/#{guild_id}/scheduled-events/#{event_id}/users", opts)
+      with_query("/guilds/#{guild_id}/scheduled-events/#{event_id}/users", opts, [
+        :limit,
+        :with_member,
+        :before,
+        :after
+      ])
     )
   end
 end

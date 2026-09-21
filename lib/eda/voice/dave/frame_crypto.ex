@@ -81,7 +81,7 @@ defmodule EDA.Voice.Dave.FrameCrypto do
 
     # Check magic marker
     marker_offset = frame_size - @magic_marker_size
-    <<_::binary-size(marker_offset), marker::binary-2>> = encrypted_frame
+    <<_::binary-size(^marker_offset), marker::binary-2>> = encrypted_frame
     if marker != @magic_marker, do: throw(:no_marker)
 
     # Read supplemental bytes size
@@ -93,7 +93,7 @@ defmodule EDA.Voice.Dave.FrameCrypto do
     supp_start = frame_size - supplemental_size
     supp_content_size = supplemental_size - @size_byte - @magic_marker_size
 
-    <<_::binary-size(supp_start), supplemental::binary-size(supp_content_size),
+    <<_::binary-size(^supp_start), supplemental::binary-size(^supp_content_size),
       _size_and_marker::binary>> = encrypted_frame
 
     # Parse tag
@@ -103,14 +103,14 @@ defmodule EDA.Voice.Dave.FrameCrypto do
 
     # Parse nonce (LEB128)
     {nonce, nonce_size} = decode_leb128(after_tag)
-    <<_::binary-size(nonce_size), ranges_data::binary>> = after_tag
+    <<_::binary-size(^nonce_size), ranges_data::binary>> = after_tag
 
     # Parse unencrypted ranges
     ranges = parse_unencrypted_ranges(ranges_data)
 
     # Split frame body into unencrypted (AAD) and ciphertext
     body_size = frame_size - supplemental_size
-    <<body::binary-size(body_size), _::binary>> = encrypted_frame
+    <<body::binary-size(^body_size), _::binary>> = encrypted_frame
 
     {authenticated, ciphertext_bytes} = split_by_ranges(body, ranges)
 
@@ -232,8 +232,8 @@ defmodule EDA.Voice.Dave.FrameCrypto do
     tail_start = offset + byte_size(replacement)
     tail_size = byte_size(binary) - tail_start
 
-    <<head::binary-size(offset), _::binary-size(byte_size(replacement)),
-      tail::binary-size(tail_size)>> = binary
+    <<head::binary-size(^offset), _::binary-size(byte_size(^replacement)),
+      tail::binary-size(^tail_size)>> = binary
 
     <<head::binary, replacement::binary, tail::binary>>
   end
@@ -248,9 +248,9 @@ defmodule EDA.Voice.Dave.FrameCrypto do
 
   defp do_parse_ranges(data, acc) do
     {offset, size1} = decode_leb128(data)
-    <<_::binary-size(size1), rest::binary>> = data
+    <<_::binary-size(^size1), rest::binary>> = data
     {range_size, size2} = decode_leb128(rest)
-    <<_::binary-size(size2), remaining::binary>> = rest
+    <<_::binary-size(^size2), remaining::binary>> = rest
     do_parse_ranges(remaining, [{offset, range_size} | acc])
   end
 

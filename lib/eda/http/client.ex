@@ -79,6 +79,51 @@ defmodule EDA.HTTP.Client do
 
   # ── Shared helpers ──
 
+  @doc """
+  Builds a query string, refusing any option outside `allowed`.
+
+  Discord ignores a query parameter it does not recognise, so a misspelt filter does not
+  fail — it silently widens or changes the result set. `limit` mistyped on a member listing
+  returns one member instead of a thousand; `user_id` mistyped on an entitlement listing
+  returns everybody's. Endpoints therefore declare the parameters Discord defines.
+  """
+  def with_query(path, opts, allowed) when is_list(allowed) do
+    check_options(opts, allowed, path)
+    with_query(path, opts)
+  end
+
+  @doc """
+  Logs a warning for every key in `opts` that is not in `allowed`, naming `where`.
+
+  Discord ignores a field or parameter it does not recognise, so an unknown key is never a
+  harmless no-op: it is an option the caller believes they set. `limit` mistyped on a member
+  listing returns one member instead of a thousand; `allowed_mention` instead of
+  `allowed_mentions` lets a ping through.
+
+  The request is **not** altered — an unknown key is still sent. If EDA's list is behind
+  Discord's, the cost is a warning that should not have fired, never a working call that
+  stops working. EDA 0.5 will raise instead of warning.
+
+  Accepts a keyword list or a map, and always returns `:ok`.
+  """
+  def check_options(opts, allowed, where) when is_map(opts),
+    do: check_options(Map.to_list(opts), allowed, where)
+
+  def check_options(opts, allowed, where) when is_list(opts) and is_list(allowed) do
+    case Keyword.keys(opts) -- allowed do
+      [] ->
+        :ok
+
+      unknown ->
+        Logger.warning(
+          "[EDA] #{where}: unknown option#{if length(unknown) > 1, do: "s"} " <>
+            "#{inspect(unknown)} — Discord ignores what it does not recognise, so this " <>
+            "has no effect. Accepted: #{inspect(Enum.sort(allowed))}. " <>
+            "The request was sent unchanged; EDA 0.5 will raise here instead."
+        )
+    end
+  end
+
   def with_query(path, opts) do
     params =
       opts
@@ -248,11 +293,16 @@ defmodule EDA.HTTP.Client do
     ]
   end
 
+  # Keys this builder rewrites before they reach Discord. Every other key passes through
+  # untouched — validating which keys an endpoint accepts is the caller's job, since
+  # message create, edit and the webhook routes each accept a different set.
+  @transformed_keys [:embed, :embeds, :poll, :v2]
+
   defp opts_to_payload(opts) do
-    %{}
-    |> maybe_put(:content, opts[:content])
+    opts
+    |> Keyword.drop(@transformed_keys)
+    |> Map.new()
     |> put_embeds(opts)
-    |> maybe_put(:components, opts[:components])
     |> maybe_put_poll(opts[:poll])
     |> maybe_put_v2(opts[:v2])
   end
@@ -269,7 +319,13 @@ defmodule EDA.HTTP.Client do
   defp maybe_put_poll(payload, nil), do: payload
   defp maybe_put_poll(payload, poll), do: Map.put(payload, :poll, poll_to_raw(poll))
 
-  defp maybe_put_v2(payload, true), do: Map.put(payload, :flags, 32_768)
+  # IS_COMPONENTS_V2. Combined with any explicit `:flags` — `v2: true, flags: 4096` is a
+  # silent components-v2 message, and overwriting would quietly drop the silence.
+  @components_v2 32_768
+
+  defp maybe_put_v2(payload, true),
+    do: Map.update(payload, :flags, @components_v2, &Bitwise.bor(&1, @components_v2))
+
   defp maybe_put_v2(payload, _), do: payload
 
   defp poll_to_raw(%EDA.Poll{} = poll), do: EDA.Poll.to_raw(poll)
