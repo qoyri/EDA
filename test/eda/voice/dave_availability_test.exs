@@ -12,6 +12,8 @@ defmodule EDA.Voice.DaveAvailabilityTest do
   # NOT async — mutates the :dave application env and the cached bot user.
   use ExUnit.Case
 
+  import ExUnit.CaptureLog
+
   @hello %{"op" => 8, "d" => %{"heartbeat_interval" => 41_250}}
   @state %{
     guild_id: "1",
@@ -22,6 +24,8 @@ defmodule EDA.Voice.DaveAvailabilityTest do
   }
 
   setup do
+    EDA.Voice.Event.reset_dave_warnings()
+    on_exit(&EDA.Voice.Event.reset_dave_warnings/0)
     previous_dave = Application.get_env(:eda, :dave)
     previous_me = :persistent_term.get(:eda_current_user_raw, nil)
     EDA.Cache.put_me(%{"id" => "999", "username" => "eda"})
@@ -58,11 +62,44 @@ defmodule EDA.Voice.DaveAvailabilityTest do
 
   test "dave: false advertises nothing" do
     Application.put_env(:eda, :dave, false)
-    assert advertised_version() == nil
+    capture_log(fn -> assert advertised_version() == nil end)
   end
 
   test "an unset :dave advertises nothing" do
     Application.delete_env(:eda, :dave)
-    assert advertised_version() == nil
+    capture_log(fn -> assert advertised_version() == nil end)
+  end
+
+  describe "connecting without DAVE is announced before Discord refuses it" do
+    test "the default configuration warns, naming 4017 and where to read more" do
+      # Discord refuses voice without DAVE outside Stage channels. With :dave unset, nothing
+      # used to be said until the connection was refused.
+      Application.delete_env(:eda, :dave)
+
+      log = capture_log(fn -> advertised_version() end)
+
+      assert log =~ "without DAVE"
+      assert log =~ "4017"
+      assert log =~ "Stage"
+      assert log =~ "https://hexdocs.pm/eda/readme.html#voice"
+    end
+
+    test "it warns once per VM, not on every voice connection" do
+      Application.put_env(:eda, :dave, false)
+
+      first = capture_log(fn -> advertised_version() end)
+      second = capture_log(fn -> advertised_version() end)
+
+      assert first =~ "without DAVE"
+      refute second =~ "without DAVE"
+    end
+
+    test "with DAVE enabled and the NIF loaded, nothing is said" do
+      Application.put_env(:eda, :dave, true)
+
+      log = capture_log(fn -> assert advertised_version() == 1 end)
+
+      refute log =~ "DAVE"
+    end
   end
 end

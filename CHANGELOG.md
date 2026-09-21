@@ -42,6 +42,9 @@ end
   otherwise it logs which dependency is missing. Discord has required DAVE for voice outside Stage
   channels since March 2026, so a bot that joins voice needs Rustler; the README's Voice section
   says what to add
+- **Connecting to voice without DAVE is announced before Discord refuses it** — including in the
+  default configuration, where `:dave` is not set and nothing used to be said. Once per VM, with a
+  link to the README's Voice section
 - **Close code 4017 names its cause.** Discord refuses a voice connection that does not offer DAVE
   with 4017 ("E2EE/DAVE protocol required"). EDA logged it as a generic disconnect; it now logs an
   error saying DAVE is required and how to enable it
