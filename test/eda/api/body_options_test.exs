@@ -365,5 +365,17 @@ defmodule EDA.API.BodyOptionsTest do
       assert {:ok, _} = EDA.API.User.modify_me(%{username: "eda"})
       assert_receive {:captured, %{"username" => "eda"}, _}
     end
+
+    test "a string-keyed map is validated like an atom-keyed one", %{bypass: bypass} do
+      # A decoded JSON body is string-keyed. The check used to raise an opaque
+      # "expected a keyword list" error on it, for a perfectly valid call.
+      capture(bypass, "PATCH", "/users/@me")
+      assert {:ok, _} = EDA.API.User.modify_me(%{"username" => "eda"})
+      assert_receive {:captured, %{"username" => "eda"}, _}
+
+      assert_raise ArgumentError, ~r/unknown option \["user_name"\]/, fn ->
+        EDA.API.User.modify_me(%{"user_name" => "eda"})
+      end
+    end
   end
 end

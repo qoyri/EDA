@@ -107,7 +107,7 @@ defmodule EDA.HTTP.Client do
     do: check_options!(Map.to_list(opts), allowed, where)
 
   def check_options!(opts, allowed, where) when is_list(opts) and is_list(allowed) do
-    case Keyword.keys(opts) -- allowed do
+    case unknown_keys(opts, allowed) do
       [] ->
         :ok
 
@@ -117,6 +117,14 @@ defmodule EDA.HTTP.Client do
                 "#{inspect(unknown)} — Discord ignores what it does not recognise, so it " <>
                 "would have no effect. Accepted: #{inspect(Enum.sort(allowed))}"
     end
+  end
+
+  # A map may be string-keyed (`%{"username" => "x"}`), as a decoded JSON body is; such a key
+  # counts as the atom of the same name. `Keyword.keys/1` would raise on it.
+  defp unknown_keys(opts, allowed) do
+    accepted = MapSet.new(allowed, &to_string/1)
+
+    for {key, _value} <- opts, not MapSet.member?(accepted, to_string(key)), do: key
   end
 
   def with_query(path, opts) do

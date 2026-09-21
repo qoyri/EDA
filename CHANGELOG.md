@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on the default seven days. The error names the function and the accepted keys. A project that
   saw no `unknown option` warning on 0.4.1 is unaffected.
 
+### Fixed
+
+- A string-keyed map — a decoded JSON body, such as `EDA.API.User.modify_me(%{"username" => "x"})`
+  — no longer crashes the option check with an opaque "expected a keyword list" error. Every route
+  validating a map body was affected since 0.4.1. A string key now counts as the atom of the same
+  name.
+
 ## [0.4.1] - 2026-09-21
 
 A patch release: bug fixes and a dependency security update. Nothing is removed and no signature
