@@ -75,6 +75,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.build-crate.outputs.file-path }}
+          # Never replace an archive the release already has. Once its checksums are committed, a
+          # re-run — the tag pushed again, a job re-run — would upload a fresh build, and Rust
+          # builds are not byte-reproducible: every install would then fail its integrity check.
+          # A missing archive is still uploaded, so re-running a failed job completes a release.
+          overwrite_files: false
           # A tag with a pre-release part (v0.5.0-beta.1, v0.5.0-rc.1) is marked as a pre-release,
           # so it never becomes the repository's "Latest" release ahead of the stable one.
           prerelease: ${{ contains(github.ref_name, '-') }}
