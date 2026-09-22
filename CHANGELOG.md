@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   removed from the group and added again — measured at under a second in a live channel. It used
   to stay broken until the bot left the channel. Failures while a transition is pending are
   expected and not counted.
+- A received RTP packet carrying only padding — clients send them to probe bandwidth — was
+  dispatched as `VOICE_AUDIO` with empty `opus`. It is now ignored. Under DAVE, these packets
+  were every decryption failure seen in a live channel — 10 in 40 s of speech, against none among
+  the 920 frames of audio and silence.
 
 ## [0.5.0-beta.1] - 2026-09-21
 

@@ -334,6 +334,11 @@ defmodule EDA.Voice.Session do
     <<_ver, _type, _seq::16, _ts::32, ssrc::32-big, _rest::binary>> = packet
 
     case Crypto.decrypt_packet(packet, state.secret_key, state.encryption_mode) do
+      # Padding only: clients send these to probe bandwidth. No audio, so nothing to decrypt or
+      # dispatch — through DAVE, it would only count as a decryption failure.
+      {:ok, <<>>} ->
+        state
+
       {:ok, opus_data} ->
         user_id = Map.get(state.ssrc_map, ssrc)
 
