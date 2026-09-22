@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `EDA.Permission.for_member/2` computes a member's guild permissions from an `EDA.Member` or a
+  raw member map, such as the one an interaction carries. Unlike `in_guild/2`, the member need not
+  be cached, which without the `GUILD_MEMBERS` intent most are not.
+
 ### Fixed
 
 - `SHARD_READY` and `ALL_SHARDS_READY` report the number of guilds loaded in `guild_count`, and

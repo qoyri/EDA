@@ -180,6 +180,43 @@ defmodule EDA.PermissionTest do
     end
   end
 
+  describe "for_member/2" do
+    setup :setup_guild
+
+    # A member seen through an interaction, never cached: no GUILD_MEMBERS intent needed.
+    @uncached_id "perm_for_member_5"
+
+    test "computes from a member struct that is not cached" do
+      member =
+        EDA.Member.from_raw(%{"user" => %{"id" => @uncached_id}, "roles" => [@role_a_id]})
+
+      assert EDA.Cache.get_member(@guild_id, @uncached_id) == nil
+      assert {:ok, perms} = Permission.for_member(member, @guild_id)
+      assert Permission.has?(perms, :manage_messages)
+      assert Permission.has?(perms, :send_messages)
+      refute Permission.has?(perms, :administrator)
+    end
+
+    test "takes a raw member map, as an interaction payload carries it" do
+      raw = %{"user" => %{"id" => @uncached_id}, "roles" => [@role_b_id]}
+      assert {:ok, perms} = Permission.for_member(raw, @guild_id)
+      assert perms == Permission.all()
+    end
+
+    test "agrees with in_guild/2 for a cached member, the owner included" do
+      for user_id <- [@owner_id, @admin_id, @user_id] do
+        member = EDA.Member.from_raw(EDA.Cache.get_member(@guild_id, user_id))
+        assert Permission.for_member(member, @guild_id) == Permission.in_guild(@guild_id, user_id)
+      end
+    end
+
+    test "errors on a missing guild, or a member without a user" do
+      member = EDA.Member.from_raw(%{"user" => %{"id" => @uncached_id}, "roles" => []})
+      assert {:error, :guild_not_found} = Permission.for_member(member, "nonexistent")
+      assert {:error, :member_without_user} = Permission.for_member(%EDA.Member{}, @guild_id)
+    end
+  end
+
   # ── Channel-Level Permissions ─────────────────────────────────────
 
   describe "in_channel/3 — no overwrites" do
