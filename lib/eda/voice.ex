@@ -430,18 +430,11 @@ defmodule EDA.Voice do
         {:noreply, put_in(state, [:guilds, guild_id], new_vs)}
 
       voice_state ->
-        new_vs =
-          if voice_state.session_id == session_id and voice_state.channel_id == channel_id do
-            %{voice_state | session_id: session_id, channel_id: channel_id}
-          else
-            voice_state
-            |> reset_runtime_state()
-            |> Map.merge(%{session_id: session_id, channel_id: channel_id})
-          end
-
-        new_state = put_in(state, [:guilds, guild_id], new_vs)
-        maybe_start_session(guild_id, new_vs)
-        {:noreply, new_state}
+        if joined_elsewhere?(guild_id, session_id) do
+          {:noreply, let_go(guild_id, voice_state, session_id, state)}
+        else
+          {:noreply, apply_voice_state(guild_id, voice_state, session_id, channel_id, state)}
+        end
     end
   end
 
@@ -624,6 +617,42 @@ defmodule EDA.Voice do
   def handle_info(_msg, state), do: {:noreply, state}
 
   # Private
+
+  defp apply_voice_state(guild_id, voice_state, session_id, channel_id, state) do
+    new_vs =
+      if voice_state.session_id == session_id and voice_state.channel_id == channel_id do
+        %{voice_state | session_id: session_id, channel_id: channel_id}
+      else
+        voice_state
+        |> reset_runtime_state()
+        |> Map.merge(%{session_id: session_id, channel_id: channel_id})
+      end
+
+    maybe_start_session(guild_id, new_vs)
+    put_in(state, [:guilds, guild_id], new_vs)
+  end
+
+  # The bot joined a channel in this guild from another gateway session: another process on the
+  # same token. Discord keeps one voice connection per bot and guild, so answering by rejoining
+  # takes it back, the other process does the same, and the two loop. The one that joined last
+  # keeps it. Only an update that joins a channel counts: one that leaves may still carry the
+  # session this process had before reconnecting.
+  defp joined_elsewhere?(guild_id, session_id) do
+    ours = EDA.Gateway.Connection.session_id(EDA.Gateway.ShardManager.shard_for_guild(guild_id))
+    ours != nil and session_id != ours
+  end
+
+  # Stops this process's session without the opcode 4 that leave/1 sends: that would disconnect
+  # the other process, which holds the connection now.
+  defp let_go(guild_id, voice_state, their_session, state) do
+    Logger.warning(
+      "Another process of this bot joined voice in guild #{guild_id} (gateway session " <>
+        "#{their_session}); leaving the voice connection to it"
+    )
+
+    cleanup_voice(guild_id, voice_state)
+    %{state | guilds: Map.delete(state.guilds, guild_id)}
+  end
 
   defp maybe_restart_after_channel_drop(_guild_id, %State{channel_id: nil}), do: :ok
 

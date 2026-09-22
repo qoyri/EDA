@@ -85,6 +85,54 @@ defmodule EDA.VoiceTest do
     end
   end
 
+  describe "another process of the same bot joining voice" do
+    # Two processes on one token — a deploy overlapping the old instance — used to take the voice
+    # connection from each other in a loop: 16 restarts each in 30 s, live. The update of the one
+    # that joins carries its own gateway session id.
+    @guild_id "7700000000000000555"
+
+    setup do
+      shard = EDA.Gateway.ShardManager.shard_for_guild(@guild_id)
+      key = {EDA.Gateway.Connection, :session_id, shard}
+      previous = :persistent_term.get(key, nil)
+      :persistent_term.put(key, "our_session")
+
+      :sys.replace_state(EDA.Voice, fn state ->
+        vs = %EDA.Voice.State{
+          guild_id: @guild_id,
+          channel_id: "5",
+          session_id: "our_session",
+          ready: true
+        }
+
+        %{state | guilds: Map.put(state.guilds, @guild_id, vs)}
+      end)
+
+      on_exit(fn ->
+        if previous, do: :persistent_term.put(key, previous), else: :persistent_term.erase(key)
+
+        :sys.replace_state(EDA.Voice, fn state ->
+          %{state | guilds: Map.delete(state.guilds, @guild_id)}
+        end)
+      end)
+    end
+
+    defp voice_guild do
+      Map.get(:sys.get_state(EDA.Voice).guilds, @guild_id)
+    end
+
+    test "the process that joined last keeps the connection; this one lets go" do
+      EDA.Voice.voice_state_update(@guild_id, "their_session", "5")
+      assert voice_guild() == nil
+      refute EDA.Voice.ready?(@guild_id)
+    end
+
+    test "an update carrying our own session is handled as before" do
+      EDA.Voice.voice_state_update(@guild_id, "our_session", "5")
+      assert %EDA.Voice.State{session_id: "our_session", channel_id: "5"} = voice_guild()
+    end
+  end
+
   describe "internal state management" do
     test "voice_state_update is a no-op for unknown guild" do
       EDA.Voice.voice_state_update("test_guild", "session_abc")

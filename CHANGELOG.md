@@ -33,6 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dispatched as `VOICE_AUDIO` with empty `opus`. It is now ignored. Under DAVE, these packets
   were every decryption failure seen in a live channel — 10 in 40 s of speech, against none among
   the 920 frames of audio and silence.
+- Two processes running on the same token — a deploy overlapping the old instance — took the
+  voice connection of a guild from each other in a loop once both had joined: each one reacted to
+  the other's voice state as if it were its own, restarted its session, got a `4006`, and rejoined.
+  Measured live: 16 restarts on each side in 30 s. The bot's voice state carries the gateway
+  session that joined, so a process now recognises another's, and the one that joined last keeps
+  the connection; the other stops its session, without disconnecting the new holder, and logs a
+  warning.
 
 ## [0.5.0-beta.1] - 2026-09-21
 

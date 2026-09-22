@@ -490,6 +490,12 @@ defmodule EDA.Gateway.Connection do
     {:ok, state}
   end
 
+  @doc false
+  # The session id of a shard's gateway connection, as Discord puts it in the bot's voice states;
+  # `nil` before its first READY.
+  @spec session_id(non_neg_integer()) :: String.t() | nil
+  def session_id(shard_id), do: :persistent_term.get({__MODULE__, :session_id, shard_id}, nil)
+
   # Event Handlers
 
   defp handle_ready(data, state) do
@@ -511,6 +517,9 @@ defmodule EDA.Gateway.Connection do
 
     # Store current user in cache
     EDA.Cache.put_me(user)
+
+    # EDA.Voice tells its own voice states from another process's on the same token by this id.
+    :persistent_term.put({__MODULE__, :session_id, shard_id}, session_id)
 
     # Dispatch READY event
     Events.dispatch("READY", data)
