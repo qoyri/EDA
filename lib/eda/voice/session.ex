@@ -312,8 +312,7 @@ defmodule EDA.Voice.Session do
         %{listening: true} = state
       )
       when (pt == 0x78 or pt == 0xF8) and byte_size(packet) >= 12 do
-    handle_voice_packet(packet, state)
-    {:ok, state}
+    {:ok, handle_voice_packet(packet, state)}
   end
 
   def handle_info({:udp, _socket, _ip, _port, _packet}, state), do: {:ok, state}
@@ -337,28 +336,44 @@ defmodule EDA.Voice.Session do
     case Crypto.decrypt_packet(packet, state.secret_key, state.encryption_mode) do
       {:ok, opus_data} ->
         user_id = Map.get(state.ssrc_map, ssrc)
-        opus_data = maybe_dave_decrypt(opus_data, state.dave_manager, user_id)
 
-        EDA.Gateway.Events.dispatch("VOICE_AUDIO", %{
-          "guild_id" => state.guild_id,
-          "user_id" => user_id,
-          "ssrc" => ssrc,
-          "opus" => opus_data
-        })
+        case maybe_dave_decrypt(opus_data, state, user_id) do
+          {:ok, opus_data, state} ->
+            EDA.Gateway.Events.dispatch("VOICE_AUDIO", %{
+              "guild_id" => state.guild_id,
+              "user_id" => user_id,
+              "ssrc" => ssrc,
+              "opus" => opus_data
+            })
+
+            state
+
+          # Still DAVE-encrypted: not Opus, so not dispatched as audio.
+          {:drop, state} ->
+            state
+        end
 
       :error ->
         Logger.debug("Decrypt failed size=#{byte_size(packet)} ssrc=#{ssrc}")
+        state
     end
   end
 
-  defp maybe_dave_decrypt(opus_data, %Dave.Manager{} = mgr, user_id) when not is_nil(user_id) do
+  defp maybe_dave_decrypt(opus_data, %{dave_manager: %Dave.Manager{} = mgr} = state, user_id)
+       when not is_nil(user_id) do
     case Dave.Manager.decrypt_frame(mgr, opus_data, String.to_integer(user_id)) do
-      {:ok, decrypted, _updated_mgr} -> decrypted
-      {:error, _} -> opus_data
+      {:ok, decrypted, mgr} ->
+        {:ok, decrypted, %{state | dave_manager: mgr}}
+
+      {:error, _} ->
+        # Enough failures in a row re-initialise the session; its payloads go to the voice gateway.
+        {mgr, replies} = Dave.Manager.decrypt_failed(mgr)
+        Enum.each(replies, &send_payload(state.guild_id, &1))
+        {:drop, %{state | dave_manager: mgr}}
     end
   end
 
-  defp maybe_dave_decrypt(opus_data, _manager, _user_id), do: opus_data
+  defp maybe_dave_decrypt(opus_data, state, _user_id), do: {:ok, opus_data, state}
 
   defp dave_unavailable_reason do
     cond do

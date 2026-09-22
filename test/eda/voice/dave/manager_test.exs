@@ -223,5 +223,67 @@ defmodule EDA.Voice.Dave.ManagerTest do
       assert {:ok, <<0xF8, 0xFF, 0xFE>>, _} =
                Manager.decrypt_frame(manager, <<0xF8, 0xFF, 0xFE>>, 42)
     end
+
+    test "a frame that does not decrypt is an error, not let through as passthrough" do
+      manager = Manager.new(1, 12_345, 67_890)
+      garbage = <<1, 2, 3, 4, 5, 6, 7, 8, 9, 10>>
+
+      # No decryptor for user 42, so no passthrough either.
+      assert {:error, :decrypt_failed} = Manager.decrypt_frame(manager, garbage, 42)
+    end
+
+    test "a frame that decrypts ends a run of failures" do
+      manager = %{Manager.new(1, 12_345, 67_890) | decrypt_failures: 12}
+
+      assert {:ok, _, %Manager{decrypt_failures: 0}} =
+               Manager.decrypt_frame(manager, <<0xF8, 0xFF, 0xFE>>, 42)
+    end
+  end
+
+  describe "decrypt_failed/1" do
+    setup do
+      # Joined through transition 0, as after a welcome: a transition to report exists.
+      {manager, []} =
+        Manager.handle_mls_event(Manager.new(1, 12_345, 67_890), 21, %{
+          "transition_id" => 0,
+          "protocol_version" => 1
+        })
+
+      %{manager: manager}
+    end
+
+    defp fail(manager, times) do
+      Enum.reduce(1..times, {manager, []}, fn _, {m, _} -> Manager.decrypt_failed(m) end)
+    end
+
+    test "tolerates 36 failures in a row", %{manager: manager} do
+      assert {%Manager{decrypt_failures: 36, reinitializing: false}, []} = fail(manager, 36)
+    end
+
+    test "the 37th reports the last transition and offers a new key package", %{manager: manager} do
+      {manager, replies} = fail(manager, 37)
+
+      assert [%{op: 31, d: %{transition_id: 0}}, {:binary, <<26, _::binary>>}] = replies
+      assert manager.reinitializing
+      assert manager.decrypt_failures == 0
+    end
+
+    test "failures while re-initialising are not counted", %{manager: manager} do
+      {manager, [_ | _]} = fail(manager, 37)
+      assert {%Manager{decrypt_failures: 0}, []} = fail(manager, 100)
+    end
+
+    test "failures while a transition is pending are not counted", %{manager: manager} do
+      {manager, _} =
+        Manager.handle_mls_event(manager, 21, %{"transition_id" => 4, "protocol_version" => 1})
+
+      assert {%Manager{decrypt_failures: 0}, []} = fail(manager, 100)
+    end
+
+    test "without a transition to report, keeps counting and sends nothing" do
+      manager = Manager.new(1, 12_345, 67_890)
+      assert manager.last_transition_id == nil
+      assert {%Manager{decrypt_failures: 50}, []} = fail(manager, 50)
+    end
   end
 end
