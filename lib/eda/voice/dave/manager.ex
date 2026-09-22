@@ -27,6 +27,11 @@ defmodule EDA.Voice.Dave.Manager do
   @transition_expiry 10
   @pending_downgrade_expiry 24
 
+  # Frames that may fail to decrypt in a row before the session is re-initialised, as in Discord's
+  # reference client. Failures while re-initialising or during a transition are expected, and not
+  # counted.
+  @decrypt_failure_tolerance 36
+
   # Discord sends Opus silence frames unencrypted.
   @silence <<0xF8, 0xFF, 0xFE>>
 
@@ -40,7 +45,8 @@ defmodule EDA.Voice.Dave.Manager do
     pending_transitions: %{},
     downgraded: false,
     reinitializing: false,
-    transitions: 0
+    transitions: 0,
+    decrypt_failures: 0
   ]
 
   @typedoc """
@@ -49,7 +55,8 @@ defmodule EDA.Voice.Dave.Manager do
   `protocol_version` is the version in effect. The playback process works on a copy of this struct
   taken when the connection became ready, so the version is also held in `version_ref`, an
   `:atomics` shared by every copy: a transition executed by the session reaches playback already
-  under way. `transitions` counts executed transitions.
+  under way. `transitions` counts executed transitions, `decrypt_failures` the frames that failed
+  to decrypt in a row.
   """
   @type t :: %__MODULE__{
           mls_session: reference() | nil,
@@ -61,7 +68,8 @@ defmodule EDA.Voice.Dave.Manager do
           pending_transitions: %{non_neg_integer() => non_neg_integer()},
           downgraded: boolean(),
           reinitializing: boolean(),
-          transitions: non_neg_integer()
+          transitions: non_neg_integer(),
+          decrypt_failures: non_neg_integer()
         }
 
   @doc "Creates a new DAVE manager. Version 0 means passthrough (no E2EE)."
@@ -167,7 +175,8 @@ defmodule EDA.Voice.Dave.Manager do
   Decrypts a DAVE-encrypted frame.
 
   In passthrough mode, returns the frame unchanged.
-  Returns `{:ok, decrypted_frame, updated_manager}` or `{:error, reason}`.
+  Returns `{:ok, decrypted_frame, updated_manager}` or `{:error, reason}`. On an error, pass the
+  manager to `decrypt_failed/1`.
   """
   @spec decrypt_frame(t(), binary(), non_neg_integer()) ::
           {:ok, binary(), t()} | {:error, atom()}
@@ -176,12 +185,12 @@ defmodule EDA.Voice.Dave.Manager do
   end
 
   def decrypt_frame(%__MODULE__{} = manager, @silence, _sender_user_id) do
-    {:ok, @silence, manager}
+    {:ok, @silence, decrypted(manager)}
   end
 
   def decrypt_frame(%__MODULE__{mls_session: session} = manager, frame, sender_user_id) do
     if current_version(manager) == 0 do
-      {:ok, frame, manager}
+      {:ok, frame, decrypted(manager)}
     else
       decrypt_with_session(manager, session, frame, sender_user_id)
     end
@@ -190,11 +199,11 @@ defmodule EDA.Voice.Dave.Manager do
   defp decrypt_with_session(manager, session, frame, sender_user_id) do
     case normalize_decrypt_result(Native.decrypt_audio(session, sender_user_id, frame)) do
       {:ok, decrypted} ->
-        {:ok, decrypted, manager}
+        {:ok, decrypted, decrypted(manager)}
 
       _ ->
-        if Native.can_passthrough?(session, sender_user_id) do
-          {:ok, frame, manager}
+        if passthrough?(session, sender_user_id) do
+          {:ok, frame, decrypted(manager)}
         else
           :telemetry.execute([:eda, :voice, :dave, :frame_decrypt_error], %{count: 1}, %{
             user_id: sender_user_id
@@ -203,6 +212,64 @@ defmodule EDA.Voice.Dave.Manager do
           {:error, :decrypt_failed}
         end
     end
+  end
+
+  # The NIF answers `{:ok, boolean}`: the tuple itself is truthy, so testing it directly let every
+  # frame that failed to decrypt through as if passthrough were allowed.
+  defp passthrough?(session, user_id) do
+    case Native.can_passthrough?(session, user_id) do
+      {:ok, true} -> true
+      true -> true
+      _ -> false
+    end
+  end
+
+  # A frame got through: a run of failures, if any, is over. Leaves the struct untouched otherwise, as
+  # this runs for every frame received.
+  defp decrypted(%__MODULE__{decrypt_failures: 0} = manager), do: manager
+  defp decrypted(manager), do: %{manager | decrypt_failures: 0}
+
+  @doc """
+  Records a frame that failed to decrypt, and recovers once too many fail in a row.
+
+  A session that stops decrypting — the group state out of step with the other members — would
+  otherwise stay broken until the bot leaves the channel. After #{@decrypt_failure_tolerance}
+  failures in a row, the last transition is reported as invalid (OP 31) and the session is
+  re-initialised with a fresh key package, so Discord removes the bot from the group and adds it
+  again. Failures while that is under way, or while a transition is pending, are expected and not
+  counted.
+
+  Returns the updated manager and the payloads to send to the voice gateway.
+  """
+  @spec decrypt_failed(t()) :: {t(), [term()]}
+  def decrypt_failed(%__MODULE__{reinitializing: true} = manager), do: {manager, []}
+
+  def decrypt_failed(%__MODULE__{pending_transitions: pending} = manager)
+      when map_size(pending) > 0,
+      do: {manager, []}
+
+  def decrypt_failed(%__MODULE__{decrypt_failures: failures} = manager)
+      when failures < @decrypt_failure_tolerance,
+      do: {%{manager | decrypt_failures: failures + 1}, []}
+
+  def decrypt_failed(%__MODULE__{last_transition_id: nil, decrypt_failures: failures} = manager) do
+    # Nothing to report yet: the session has not joined a group. Said once, not per frame.
+    if failures == @decrypt_failure_tolerance do
+      Logger.warning(
+        "DAVE: #{failures + 1} frames in a row failed to decrypt before the session joined a group"
+      )
+    end
+
+    {%{manager | decrypt_failures: failures + 1}, []}
+  end
+
+  def decrypt_failed(%__MODULE__{last_transition_id: transition_id} = manager) do
+    Logger.warning(
+      "DAVE: #{manager.decrypt_failures + 1} frames in a row failed to decrypt, " <>
+        "re-initialising the session (transition #{transition_id})"
+    )
+
+    recover_from_invalid_transition(%{manager | decrypt_failures: 0}, transition_id)
   end
 
   @doc """

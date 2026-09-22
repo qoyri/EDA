@@ -14,6 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   arrived, from the counter of guilds still pending. A shard that times out counts the guilds
   that did arrive. When the bot is declared ready is unchanged — it already waited for every
   guild.
+- A received voice frame that failed DAVE decryption was dispatched as `VOICE_AUDIO` anyway,
+  still encrypted, and never counted as a failure: the check for passthrough read the NIF's
+  `{:ok, false}` as true. Such frames are now dropped, and `[:eda, :voice, :dave,
+  :frame_decrypt_error]` fires for them as documented.
+- A DAVE session that stops decrypting now recovers by itself. After 36 frames in a row fail, the
+  last transition is reported to Discord as invalid and the session re-initialised, so the bot is
+  removed from the group and added again — measured at under a second in a live channel. It used
+  to stay broken until the bot left the channel. Failures while a transition is pending are
+  expected and not counted.
+- A received RTP packet carrying only padding — clients send them to probe bandwidth — was
+  dispatched as `VOICE_AUDIO` with empty `opus`. It is now ignored. Under DAVE, these packets
+  were every decryption failure seen in a live channel — 10 in 40 s of speech, against none among
+  the 920 frames of audio and silence.
 
 ## [0.5.0-beta.1] - 2026-09-21
 
