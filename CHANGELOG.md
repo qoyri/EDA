@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `SHARD_READY` and `ALL_SHARDS_READY` report the number of guilds loaded in `guild_count`, and
+  the startup log line with them. They always said 0: the count was read once every guild had
+  arrived, from the counter of guilds still pending. A shard that times out counts the guilds
+  that did arrive. When the bot is declared ready is unchanged — it already waited for every
+  guild.
+
 ## [0.5.0-beta.1] - 2026-09-21
 
 The first beta of 0.5: a large minor release. Voice needs neither Rust nor configuration any

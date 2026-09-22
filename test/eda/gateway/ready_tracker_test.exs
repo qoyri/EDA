@@ -279,6 +279,33 @@ defmodule EDA.Gateway.ReadyTrackerTest do
       assert ev.shard_count == 1
       assert ev.guild_count == 0
     end
+
+    test "the ready events count the guilds loaded, not the ones still pending" do
+      Process.register(self(), :ready_tracker_test)
+      Application.put_env(:eda, :consumer, __MODULE__.TestConsumer)
+      :persistent_term.put(:eda_total_shards, 2)
+
+      ReadyTracker.shard_ready(0, ["gc1", "gc2", "gc3"])
+      ReadyTracker.shard_ready(1, ["gc4"])
+      for gid <- ["gc1", "gc2", "gc3", "gc4"], do: ReadyTracker.guild_loaded(gid)
+
+      assert_receive {:event, {:SHARD_READY, %{shard_id: 0, guild_count: 3}}}, 1_000
+      assert_receive {:event, {:SHARD_READY, %{shard_id: 1, guild_count: 1}}}, 1_000
+      assert_receive {:event, {:ALL_SHARDS_READY, %{shard_count: 2, guild_count: 4}}}, 1_000
+    end
+
+    test "a shard that times out counts only the guilds that arrived" do
+      Process.register(self(), :ready_tracker_test)
+      Application.put_env(:eda, :consumer, __MODULE__.TestConsumer)
+      :persistent_term.put(:eda_total_shards, 1)
+
+      # timeout_ms is 500ms from setup
+      ReadyTracker.shard_ready(0, ["gt1", "gt2", "gt3"])
+      ReadyTracker.guild_loaded("gt1")
+
+      assert_receive {:event, {:SHARD_READY, %{guild_count: 1}}}, 1_500
+      assert_receive {:event, {:ALL_SHARDS_READY, %{guild_count: 1}}}, 1_000
+    end
   end
 
   # Casts are asynchronous; a synchronous call to the same process is processed after them.
