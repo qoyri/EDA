@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0-beta.2] - 2026-09-22
+
+The second beta of 0.5 fixes what live testing of the first found in voice. Received audio that
+failed DAVE decryption reached the consumer still encrypted, and a session that stopped
+decrypting never recovered; two processes on the same token took the voice connection from each
+other in a loop. Nothing breaks from beta.1.
+
+### Installation
+
+```elixir
+def deps do
+  [
+    {:eda, "~> 0.5.0-beta.2"}
+  ]
+end
+```
+
+A requirement of `"~> 0.5.0-beta.1"` already accepts this beta: `mix deps.update eda` fetches it.
+
 ### Added
 
 - `EDA.Permission.for_member/2` computes a member's guild permissions from an `EDA.Member` or a

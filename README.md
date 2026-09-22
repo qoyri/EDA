@@ -29,7 +29,7 @@ names one:
 ```elixir
 def deps do
   [
-    {:eda, "~> 0.5.0-beta.1"}
+    {:eda, "~> 0.5.0-beta.2"}
   ]
 end
 ```
