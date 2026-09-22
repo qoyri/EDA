@@ -16,7 +16,10 @@ defmodule EDA.Gateway.ReadyTracker do
 
   @ets_table :eda_pending_guilds
 
+  # `pending_counts` counts down to 0 as guilds arrive; `loaded_counts` counts them up, for
+  # the guild counts the ready events report.
   defstruct pending_counts: %{},
+            loaded_counts: %{},
             guild_to_shard: %{},
             ready_shards: MapSet.new(),
             down_shards: MapSet.new(),
@@ -231,6 +234,7 @@ defmodule EDA.Gateway.ReadyTracker do
     new_state = %{
       state
       | pending_counts: Map.put(state.pending_counts, shard_id, count),
+        loaded_counts: Map.put(state.loaded_counts, shard_id, 0),
         guild_to_shard: new_g2s,
         shard_start_times:
           Map.put(state.shard_start_times, shard_id, System.monotonic_time(:millisecond))
@@ -255,7 +259,12 @@ defmodule EDA.Gateway.ReadyTracker do
         new_count = Map.get(state.pending_counts, shard_id, 1) - 1
         new_pending = Map.put(state.pending_counts, shard_id, new_count)
 
-        new_state = %{state | guild_to_shard: new_g2s, pending_counts: new_pending}
+        new_state = %{
+          state
+          | guild_to_shard: new_g2s,
+            pending_counts: new_pending,
+            loaded_counts: Map.update(state.loaded_counts, shard_id, 1, &(&1 + 1))
+        }
 
         if new_count <= 0 do
           {:noreply, mark_shard_ready(shard_id, new_state)}
@@ -340,14 +349,14 @@ defmodule EDA.Gateway.ReadyTracker do
     shard_start = Map.get(state.shard_start_times, shard_id, state.start_time)
     shard_duration = System.monotonic_time(:millisecond) - shard_start
 
-    # Count guilds that were loaded for this shard
-    original_count = Map.get(state.pending_counts, shard_id, 0)
+    # Guilds that arrived — all of them, unless the shard timed out
+    loaded_count = Map.get(state.loaded_counts, shard_id, 0)
 
     # Dispatch SHARD_READY event
-    dispatch_shard_ready(shard_id, original_count, shard_duration)
+    dispatch_shard_ready(shard_id, loaded_count, shard_duration)
 
     Logger.info(
-      "[ReadyTracker] Shard #{shard_id} ready (#{original_count} guild(s) in #{shard_duration}ms)"
+      "[ReadyTracker] Shard #{shard_id} ready (#{loaded_count} guild(s) in #{shard_duration}ms)"
     )
 
     state = %{state | ready_shards: new_ready, shard_timers: new_timers}
@@ -368,7 +377,7 @@ defmodule EDA.Gateway.ReadyTracker do
     total_duration = System.monotonic_time(:millisecond) - state.start_time
 
     total_guilds =
-      state.pending_counts
+      state.loaded_counts
       |> Map.values()
       |> Enum.sum()
 
