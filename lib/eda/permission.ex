@@ -407,6 +407,42 @@ defmodule EDA.Permission do
   end
 
   @doc """
+  Computes effective guild-level permissions for a member already in hand: an `EDA.Member`, or a
+  raw member map such as the one an interaction carries.
+
+  Unlike `in_guild/2`, the member need not be cached — without the `GUILD_MEMBERS` intent, most
+  are not. Only the guild and its roles are read from the cache.
+
+  For the channel an interaction was used in, Discord already sends the member's permissions
+  there, overwrites included, as `member.permissions`.
+
+  Returns `{:ok, bitset}` or `{:error, reason}`.
+
+      {:ok, perms} = EDA.Permission.for_member(interaction.member, interaction.guild_id)
+      EDA.Permission.has?(perms, :ban_members)
+  """
+  @spec for_member(EDA.Member.t() | map(), String.t() | integer()) ::
+          {:ok, bitset()} | {:error, term()}
+  def for_member(member, guild_id) do
+    with {:member, member} when member != nil <- {:member, member_raw(member)},
+         {:guild, guild} when guild != nil <- {:guild, EDA.Cache.get_guild(to_string(guild_id))} do
+      {:ok, compute_guild_permissions(guild, member)}
+    else
+      {:member, nil} -> {:error, :member_without_user}
+      {:guild, nil} -> {:error, :guild_not_found}
+    end
+  end
+
+  # The raw shape compute_guild_permissions/2 reads: the struct's user is an EDA.User.
+  defp member_raw(%EDA.Member{user: %{id: id}, roles: roles}) when id != nil,
+    do: %{"user" => %{"id" => id}, "roles" => roles || []}
+
+  defp member_raw(%EDA.Member{}), do: nil
+  defp member_raw(%{"user" => %{"id" => _}} = raw), do: raw
+  defp member_raw(%{"user_id" => _} = raw), do: raw
+  defp member_raw(_), do: nil
+
+  @doc """
   Computes effective channel-level permissions for a member.
 
   Returns `{:ok, bitset}` or `{:error, reason}`.
