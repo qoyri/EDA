@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Less work per gateway event.** With a consumer, an event is parsed once and the caches take
+  the struct, where they used to parse the payload again: a `GUILD_CREATE` went from 1.24 ms to
+  0.7 ms on real guilds. `EDA.Collector` now receives an event only when a collector awaits its
+  type; every event used to be copied to the collector process whether or not one did.
+
 ## [0.5.0-beta.3] - 2026-09-23
 
 The third beta reworks EDA's model of Discord from end to end, and breaks a lot on purpose, before

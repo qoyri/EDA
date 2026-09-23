@@ -29,6 +29,9 @@ defmodule EDA.Collector do
 
   @default_timeout 30_000
 
+  # How many collectors await each event type, so notify/2 can skip the copy when none does.
+  @awaited :eda_collector_awaited
+
   defmodule Entry do
     @moduledoc false
     defstruct [:event_types, :filter, :caller, :max, :timeout_ref, collected: []]
@@ -77,12 +80,21 @@ defmodule EDA.Collector do
   @doc """
   Notifies the collector of a new event. Called by `EDA.Gateway.Events`.
 
-  This is a non-blocking cast. If the Collector GenServer is not running,
-  the notification is silently ignored.
+  This is a non-blocking cast, sent only when a collector awaits that event type: otherwise
+  the event is not copied to the collector process at all, which is the case for nearly every
+  event a bot receives. If the Collector GenServer is not running, the notification is silently
+  ignored.
   """
   @spec notify(atom(), term()) :: :ok
   def notify(event_type, event_struct) do
-    GenServer.cast(__MODULE__, {:event, event_type, event_struct})
+    if :ets.member(@awaited, event_type) do
+      GenServer.cast(__MODULE__, {:event, event_type, event_struct})
+    end
+
+    :ok
+  rescue
+    # The table is gone with the collector process.
+    ArgumentError -> :ok
   catch
     :exit, _ -> :ok
   end
@@ -91,6 +103,7 @@ defmodule EDA.Collector do
 
   @impl true
   def init(_) do
+    :ets.new(@awaited, [:named_table, :protected, :set, read_concurrency: true])
     {:ok, %{collectors: %{}}}
   end
 
@@ -107,6 +120,7 @@ defmodule EDA.Collector do
       timeout_ref: timeout_ref
     }
 
+    Enum.each(Enum.uniq(event_types), &:ets.update_counter(@awaited, &1, 1, {&1, 0}))
     {:noreply, put_in(state, [:collectors, ref], entry)}
   end
 
@@ -117,6 +131,7 @@ defmodule EDA.Collector do
         maybe_collect(ref, entry, event_type, event_struct, replied, acc)
       end)
 
+    Enum.each(replied, &release(Map.fetch!(state.collectors, &1)))
     collectors = Map.drop(collectors, replied)
     {:noreply, %{state | collectors: collectors}}
   end
@@ -128,12 +143,20 @@ defmodule EDA.Collector do
         {:noreply, state}
 
       {entry, collectors} ->
+        release(entry)
         GenServer.reply(entry.caller, {:error, :timeout})
         {:noreply, %{state | collectors: collectors}}
     end
   end
 
   # ── Private ─────────────────────────────────────────────────────────
+
+  # A collector is done: its event types are awaited by one fewer.
+  defp release(%Entry{event_types: types}) do
+    for type <- Enum.uniq(types) do
+      if :ets.update_counter(@awaited, type, -1) <= 0, do: :ets.delete(@awaited, type)
+    end
+  end
 
   defp maybe_collect(ref, entry, event_type, event_struct, replied, acc) do
     if event_type in entry.event_types and safe_filter(entry.filter, event_struct) do

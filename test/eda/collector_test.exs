@@ -167,4 +167,39 @@ defmodule EDA.CollectorTest do
       assert {:ok, %{custom_id: "btn_ok"}} = Task.await(task)
     end
   end
+
+  describe "what notify/2 sends" do
+    test "an event type nobody awaits is not sent to the collector process" do
+      refute :ets.member(:eda_collector_awaited, :NOBODY_AWAITS_THIS)
+      assert :ok = EDA.Collector.notify(:NOBODY_AWAITS_THIS, %{big: :payload})
+    end
+
+    test "the count of collectors awaiting a type goes back to none when they are done" do
+      task =
+        Task.async(fn ->
+          EDA.Collector.await([:COUNT_TEST, :COUNT_TEST], fn _ -> true end, timeout: 1_000)
+        end)
+
+      wait = fn f ->
+        if :ets.member(:eda_collector_awaited, :COUNT_TEST),
+          do: :ok,
+          else:
+            (
+              Process.sleep(5)
+              f.(f)
+            )
+      end
+
+      wait.(wait)
+
+      EDA.Collector.notify(:COUNT_TEST, :hit)
+      assert {:ok, :hit} = Task.await(task)
+      :sys.get_state(EDA.Collector)
+      refute :ets.member(:eda_collector_awaited, :COUNT_TEST)
+
+      assert {:error, :timeout} = EDA.Collector.await(:COUNT_TEST, fn _ -> true end, timeout: 20)
+      :sys.get_state(EDA.Collector)
+      refute :ets.member(:eda_collector_awaited, :COUNT_TEST)
+    end
+  end
 end
