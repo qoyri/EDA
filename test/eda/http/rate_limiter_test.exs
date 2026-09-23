@@ -122,12 +122,12 @@ defmodule EDA.HTTP.RateLimiterTest do
       shared_bucket = "/guilds/33333333333333333/test"
       shared_key = EDA.HTTP.Bucket.key(:get, shared_bucket)
 
-      # Long enough that the three requests are all queued before it resets, however loaded the
-      # suite is: with 0.2 s, the last one (urgent) sometimes arrived after the reset, found the
-      # low one already served, and the test failed about one full run in ten.
+      # Far longer than it takes to queue the three requests, however loaded the suite is — the
+      # bucket is freed explicitly below. With 0.2 s, the last one (urgent) sometimes arrived after
+      # the reset, found the low one already served, and the test failed one full run in ten.
       RateLimiter.report_headers(shared_key, [
         {"x-ratelimit-remaining", "0"},
-        {"x-ratelimit-reset-after", "1.0"},
+        {"x-ratelimit-reset-after", "5.0"},
         {"x-ratelimit-bucket", "priority-test-bucket"}
       ])
 
