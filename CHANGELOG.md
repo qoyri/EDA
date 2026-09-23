@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `EDA.Presence.platforms/1` says which platforms a user is connected from, off the
+  `client_status` EDA already received and never exposed, with `status_on/2`, `on?/2` and the
+  `desktop?/1`, `mobile?/1`, `web?/1` shorthands. They read a `PRESENCE_UPDATE` event, a cached
+  presence or the raw map. Discord documents `:desktop`, `:mobile`, `:web` and `:vr`; `:embedded`
+  is named too, since it is sent but not documented, and a platform added later comes back as its
+  string rather than being dropped. A user offline or invisible has no platform, and the two are
+  indistinguishable here.
+
 - The invite target user endpoints Discord added on 2026-09-18: `EDA.API.Invite`, and
   `EDA.Invite` for structs, gained `add_target_user/2`, `remove_target_user/2`,
   `add_target_users/2` and `remove_target_users/2` (up to 1000 at a time). They change a list in
