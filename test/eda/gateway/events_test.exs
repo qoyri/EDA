@@ -274,7 +274,7 @@ defmodule EDA.Gateway.EventsTest do
       })
 
       cached = EDA.Cache.Channel.get("vcs_cache_1")
-      assert cached["status"] == "movie night"
+      assert cached.voice.status == "movie night"
       assert cached["name"] == "vc"
     end
 

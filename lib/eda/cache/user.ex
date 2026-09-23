@@ -19,7 +19,7 @@ defmodule EDA.Cache.User do
   @doc """
   Gets a user from the cache.
   """
-  @spec get(String.t() | integer()) :: map() | nil
+  @spec get(String.t() | integer()) :: EDA.User.t() | nil
   def get(user_id) do
     case adapter().get(@table, to_string(user_id)) do
       nil ->
@@ -35,7 +35,7 @@ defmodule EDA.Cache.User do
   @doc """
   Gets all cached users.
   """
-  @spec all() :: [map()]
+  @spec all() :: [EDA.User.t()]
   def all do
     adapter().all(@table)
   end
@@ -43,9 +43,10 @@ defmodule EDA.Cache.User do
   @doc """
   Creates or replaces a user in the cache.
   """
-  @spec create(map()) :: map()
+  @spec create(map() | EDA.User.t()) :: EDA.User.t()
   def create(user) do
-    user_id = to_string(user["id"])
+    user = to_struct(user)
+    user_id = to_string(user.id)
 
     case EDA.Cache.Policy.check(EDA.Cache.Config.policy(@cache_name), :user, user_id, user) do
       :cache ->
@@ -63,7 +64,7 @@ defmodule EDA.Cache.User do
   @doc """
   Updates a user in the cache.
   """
-  @spec update(String.t() | integer(), map()) :: map() | nil
+  @spec update(String.t() | integer(), map()) :: EDA.User.t() | nil
   def update(user_id, updates) do
     user_id = to_string(user_id)
 
@@ -72,7 +73,7 @@ defmodule EDA.Cache.User do
         nil
 
       existing ->
-        updated = Map.merge(existing, updates)
+        updated = EDA.Entity.patch(existing, updates)
         adapter().put(@table, user_id, updated)
         updated
     end
@@ -106,4 +107,8 @@ defmodule EDA.Cache.User do
   end
 
   defp adapter, do: EDA.Cache.Adapter.current()
+
+  # The cache keeps a user without the partial member Discord attaches to a mention.
+  defp to_struct(%EDA.User{} = user), do: %{user | member: nil}
+  defp to_struct(raw) when is_map(raw), do: raw |> Map.delete("member") |> EDA.User.from_raw()
 end

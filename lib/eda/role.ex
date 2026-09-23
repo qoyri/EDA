@@ -311,7 +311,7 @@ defmodule EDA.Role do
   def fetch_role(guild_id, role_id) do
     case EDA.Cache.get_role(role_id) do
       nil -> fetch_from_rest(guild_id, role_id)
-      raw -> {:ok, from_raw(raw)}
+      role -> {:ok, role}
     end
     |> put_guild(guild_id)
   end

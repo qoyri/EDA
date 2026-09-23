@@ -393,7 +393,7 @@ defmodule EDA.Message do
 
   defp mention_name(%__MODULE__{guild_id: guild_id}, "@&", id) when is_binary(guild_id) do
     case EDA.Cache.Role.get(guild_id, id) do
-      %{"name" => name} -> "@" <> name
+      %EDA.Role{name: name} when is_binary(name) -> "@" <> name
       _ -> nil
     end
   end

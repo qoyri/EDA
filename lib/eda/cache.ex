@@ -5,6 +5,11 @@ defmodule EDA.Cache do
   This module provides a simple API for accessing cached Discord data.
   Data is automatically cached as events are received from the Gateway.
 
+  The caches hold structs — `EDA.Guild`, `EDA.User`, `EDA.Channel`, `EDA.Member`, `EDA.Role`,
+  `EDA.VoiceState` and `EDA.Event.PresenceUpdate` — parsed once when Discord sends them, so a
+  read costs a lookup and nothing more. Partial updates are applied with `EDA.Entity.patch/2`:
+  a field Discord sends is replaced, one it leaves out is kept.
+
   ## Examples
 
       # Get a guild
@@ -45,7 +50,7 @@ defmodule EDA.Cache do
   demonstrably exists look absent.
 
   Redaction **nulls** the sensitive fields rather than omitting them, which matters here:
-  `EDA.Cache.Channel.update/2` merges the incoming payload over the cached one, so a channel
+  `EDA.Cache.Channel.update/2` patches the cached channel with the fields the payload carries, so a channel
   that becomes obfuscated has its `name`, `topic`, `status` and `last_message_id` genuinely
   replaced — the previously cached values do not survive. Verified against a live guild on
   2026-09-19. Redaction is also **selective**: `position`, `parent_id`, `nsfw`, `bitrate` and
@@ -110,13 +115,13 @@ defmodule EDA.Cache do
   @doc """
   Gets a guild by ID.
   """
-  @spec get_guild(String.t() | integer()) :: map() | nil
+  @spec get_guild(String.t() | integer()) :: EDA.Guild.t() | nil
   defdelegate get_guild(guild_id), to: EDA.Cache.Guild, as: :get
 
   @doc """
   Gets all cached guilds.
   """
-  @spec guilds() :: [map()]
+  @spec guilds() :: [EDA.Guild.t()]
   defdelegate guilds(), to: EDA.Cache.Guild, as: :all
 
   @doc """
@@ -130,13 +135,13 @@ defmodule EDA.Cache do
   @doc """
   Gets a user by ID.
   """
-  @spec get_user(String.t() | integer()) :: map() | nil
+  @spec get_user(String.t() | integer()) :: EDA.User.t() | nil
   defdelegate get_user(user_id), to: EDA.Cache.User, as: :get
 
   @doc """
   Gets all cached users.
   """
-  @spec users() :: [map()]
+  @spec users() :: [EDA.User.t()]
   defdelegate users(), to: EDA.Cache.User, as: :all
 
   @doc """
@@ -150,7 +155,7 @@ defmodule EDA.Cache do
   @doc """
   Gets a channel by ID.
   """
-  @spec get_channel(String.t() | integer()) :: map() | nil
+  @spec get_channel(String.t() | integer()) :: EDA.Channel.t() | nil
   defdelegate get_channel(channel_id), to: EDA.Cache.Channel, as: :get
 
   @doc """
@@ -158,7 +163,7 @@ defmodule EDA.Cache do
 
   Includes channels Discord has obfuscated; see `channels_for_guild/1`.
   """
-  @spec channels() :: [map()]
+  @spec channels() :: [EDA.Channel.t()]
   defdelegate channels(), to: EDA.Cache.Channel, as: :all
 
   @doc """
@@ -174,7 +179,7 @@ defmodule EDA.Cache do
 
   See the "Obfuscated channels" section of `EDA.Cache` for why they are kept.
   """
-  @spec channels_for_guild(String.t() | integer()) :: [map()]
+  @spec channels_for_guild(String.t() | integer()) :: [EDA.Channel.t()]
   defdelegate channels_for_guild(guild_id), to: EDA.Cache.Channel, as: :for_guild
 
   @doc """
@@ -188,13 +193,13 @@ defmodule EDA.Cache do
   @doc """
   Gets a member in a guild.
   """
-  @spec get_member(String.t() | integer(), String.t() | integer()) :: map() | nil
+  @spec get_member(String.t() | integer(), String.t() | integer()) :: EDA.Member.t() | nil
   defdelegate get_member(guild_id, user_id), to: EDA.Cache.Member, as: :get
 
   @doc """
   Gets all members for a guild.
   """
-  @spec members(String.t() | integer()) :: [map()]
+  @spec members(String.t() | integer()) :: [EDA.Member.t()]
   defdelegate members(guild_id), to: EDA.Cache.Member, as: :for_guild
 
   @doc """
@@ -208,17 +213,17 @@ defmodule EDA.Cache do
   @doc """
   Gets a role by ID.
   """
-  @spec get_role(String.t() | integer()) :: map() | nil
+  @spec get_role(String.t() | integer()) :: EDA.Role.t() | nil
   defdelegate get_role(role_id), to: EDA.Cache.Role, as: :get
 
   @doc "Gets a role by guild and role ID, without going through the role-to-guild index."
-  @spec get_role(String.t() | integer(), String.t() | integer()) :: map() | nil
+  @spec get_role(String.t() | integer(), String.t() | integer()) :: EDA.Role.t() | nil
   defdelegate get_role(guild_id, role_id), to: EDA.Cache.Role, as: :get
 
   @doc """
   Gets all roles for a guild.
   """
-  @spec roles(String.t() | integer()) :: [map()]
+  @spec roles(String.t() | integer()) :: [EDA.Role.t()]
   defdelegate roles(guild_id), to: EDA.Cache.Role, as: :for_guild
 
   @doc """
@@ -232,19 +237,22 @@ defmodule EDA.Cache do
   @doc """
   Gets a user's voice state in a guild.
   """
-  @spec get_voice_state(String.t() | integer(), String.t() | integer()) :: map() | nil
+  @spec get_voice_state(String.t() | integer(), String.t() | integer()) ::
+          EDA.VoiceState.t() | nil
   defdelegate get_voice_state(guild_id, user_id), to: EDA.Cache.VoiceState, as: :get
 
   @doc """
   Gets all voice states for a guild.
   """
-  @spec voice_states(String.t() | integer()) :: [map()]
+  @spec voice_states(String.t() | integer()) :: [EDA.VoiceState.t()]
   defdelegate voice_states(guild_id), to: EDA.Cache.VoiceState, as: :for_guild
 
   @doc """
   Gets all voice states for a specific channel in a guild.
   """
-  @spec voice_channel_members(String.t() | integer(), String.t() | integer()) :: [map()]
+  @spec voice_channel_members(String.t() | integer(), String.t() | integer()) :: [
+          EDA.VoiceState.t()
+        ]
   defdelegate voice_channel_members(guild_id, channel_id),
     to: EDA.Cache.VoiceState,
     as: :for_channel
@@ -254,13 +262,14 @@ defmodule EDA.Cache do
   @doc """
   Gets a user's presence in a guild.
   """
-  @spec get_presence(String.t() | integer(), String.t() | integer()) :: map() | nil
+  @spec get_presence(String.t() | integer(), String.t() | integer()) ::
+          EDA.Event.PresenceUpdate.t() | nil
   defdelegate get_presence(guild_id, user_id), to: EDA.Cache.Presence, as: :get
 
   @doc """
   Gets all presences for a guild.
   """
-  @spec presences(String.t() | integer()) :: [map()]
+  @spec presences(String.t() | integer()) :: [EDA.Event.PresenceUpdate.t()]
   defdelegate presences(guild_id), to: EDA.Cache.Presence, as: :for_guild
 
   # Fetch — cache-first with REST fallback
@@ -268,7 +277,7 @@ defmodule EDA.Cache do
   @doc """
   Fetches a guild from cache, falling back to REST on miss.
   """
-  @spec fetch_guild(String.t() | integer()) :: {:ok, map()} | {:error, term()}
+  @spec fetch_guild(String.t() | integer()) :: {:ok, EDA.Guild.t()} | {:error, term()}
   def fetch_guild(guild_id) do
     case get_guild(guild_id) do
       nil -> rest_fallback(:guilds, fn -> EDA.API.Guild.get(guild_id) end)
@@ -279,7 +288,7 @@ defmodule EDA.Cache do
   @doc """
   Fetches a user from cache, falling back to REST on miss.
   """
-  @spec fetch_user(String.t() | integer()) :: {:ok, map()} | {:error, term()}
+  @spec fetch_user(String.t() | integer()) :: {:ok, EDA.User.t()} | {:error, term()}
   def fetch_user(user_id) do
     case get_user(user_id) do
       nil -> rest_fallback(:users, fn -> EDA.API.User.get(user_id) end)
@@ -290,7 +299,7 @@ defmodule EDA.Cache do
   @doc """
   Fetches a channel from cache, falling back to REST on miss.
   """
-  @spec fetch_channel(String.t() | integer()) :: {:ok, map()} | {:error, term()}
+  @spec fetch_channel(String.t() | integer()) :: {:ok, EDA.Channel.t()} | {:error, term()}
   def fetch_channel(channel_id) do
     case get_channel(channel_id) do
       nil -> rest_fallback(:channels, fn -> EDA.API.Channel.get(channel_id) end)
@@ -302,7 +311,7 @@ defmodule EDA.Cache do
   Fetches a member from cache, falling back to REST on miss.
   """
   @spec fetch_member(String.t() | integer(), String.t() | integer()) ::
-          {:ok, map()} | {:error, term()}
+          {:ok, EDA.Member.t()} | {:error, term()}
   def fetch_member(guild_id, user_id) do
     case get_member(guild_id, user_id) do
       nil ->
@@ -320,7 +329,7 @@ defmodule EDA.Cache do
   Note: the REST API returns all roles for the guild, so `guild_id` is required.
   """
   @spec fetch_role(String.t() | integer(), String.t() | integer()) ::
-          {:ok, map()} | {:error, term()}
+          {:ok, EDA.Role.t()} | {:error, term()}
   def fetch_role(guild_id, role_id) do
     case get_role(role_id) do
       nil -> fetch_role_from_rest(guild_id, role_id)
@@ -333,15 +342,12 @@ defmodule EDA.Cache do
 
     with {:ok, roles} <- EDA.API.Role.list(guild_id) do
       :telemetry.execute([:eda, :cache, :fallback], %{count: 1}, %{cache: :roles})
-      Enum.each(roles, &EDA.Cache.Role.create(guild_id, &1))
-      find_role(roles, role_id_str)
-    end
-  end
+      roles = Enum.map(roles, &EDA.Cache.Role.create(guild_id, &1))
 
-  defp find_role(roles, role_id_str) do
-    case Enum.find(roles, fn r -> to_string(r["id"]) == role_id_str end) do
-      nil -> {:error, :not_found}
-      role -> {:ok, role}
+      case Enum.find(roles, &(&1.id == role_id_str)) do
+        nil -> {:error, :not_found}
+        role -> {:ok, role}
+      end
     end
   end
 
@@ -351,15 +357,18 @@ defmodule EDA.Cache do
     case rest_fn.() do
       {:ok, data} ->
         :telemetry.execute([:eda, :cache, :fallback], %{count: 1}, %{cache: cache_name})
-        do_cache(target, data)
-        {:ok, data}
+        {:ok, do_cache(target, data)}
 
       {:error, _} = error ->
         error
     end
   end
 
-  defp do_cache(:guilds, data), do: EDA.Cache.Guild.create(data)
+  # The guild cache holds the guild object alone, as the gateway fills it: its roles and lists
+  # live in their own caches.
+  defp do_cache(:guilds, data),
+    do: EDA.Cache.Guild.create(Map.drop(data, ["roles" | EDA.Guild.gateway_lists()]))
+
   defp do_cache(:users, data), do: EDA.Cache.User.create(data)
   defp do_cache(:channels, data), do: EDA.Cache.Channel.create(data)
 

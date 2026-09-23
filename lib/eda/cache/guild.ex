@@ -17,12 +17,11 @@ defmodule EDA.Cache.Guild do
   end
 
   @doc """
-  Gets a guild from the cache as a raw map (string keys).
-
-  This is the low-level cache accessor. For a typed `%EDA.Guild{}` struct,
-  use `EDA.Guild.fetch/1` instead which parses the raw map automatically.
+  Gets a guild from the cache, as an `EDA.Guild` holding the guild object alone: its roles,
+  channels and members are in their own caches. `EDA.Guild.fetch/1` adds the roles, and asks
+  Discord when the guild is not cached.
   """
-  @spec get(String.t() | integer()) :: map() | nil
+  @spec get(String.t() | integer()) :: EDA.Guild.t() | nil
   def get(guild_id) do
     case adapter().get(@table, to_string(guild_id)) do
       nil ->
@@ -38,7 +37,7 @@ defmodule EDA.Cache.Guild do
   @doc """
   Gets all cached guilds.
   """
-  @spec all() :: [map()]
+  @spec all() :: [EDA.Guild.t()]
   def all do
     adapter().all(@table)
   end
@@ -46,9 +45,10 @@ defmodule EDA.Cache.Guild do
   @doc """
   Creates or replaces a guild in the cache.
   """
-  @spec create(map()) :: map()
+  @spec create(map() | EDA.Guild.t()) :: EDA.Guild.t()
   def create(guild) do
-    guild_id = to_string(guild["id"])
+    guild = to_struct(guild)
+    guild_id = to_string(guild.id)
 
     case EDA.Cache.Policy.check(EDA.Cache.Config.policy(@cache_name), :guild, guild_id, guild) do
       :cache ->
@@ -66,7 +66,7 @@ defmodule EDA.Cache.Guild do
   @doc """
   Updates a guild in the cache.
   """
-  @spec update(String.t() | integer(), map()) :: map() | nil
+  @spec update(String.t() | integer(), map()) :: EDA.Guild.t() | nil
   def update(guild_id, updates) do
     guild_id = to_string(guild_id)
 
@@ -75,7 +75,7 @@ defmodule EDA.Cache.Guild do
         nil
 
       existing ->
-        updated = Map.merge(existing, updates)
+        updated = EDA.Entity.patch(existing, updates)
         adapter().put(@table, guild_id, updated)
         updated
     end
@@ -109,4 +109,7 @@ defmodule EDA.Cache.Guild do
   end
 
   defp adapter, do: EDA.Cache.Adapter.current()
+
+  defp to_struct(%EDA.Guild{} = guild), do: guild
+  defp to_struct(raw) when is_map(raw), do: EDA.Guild.from_raw(raw)
 end

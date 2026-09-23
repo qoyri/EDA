@@ -178,10 +178,14 @@ config :eda, :cache,
   presences: [policy: :none],
   channels: [
     policy: fn _entity, _key, ch ->
-      if ch["type"] in [0, 2, 5], do: :cache, else: :skip
+      if ch.type in [:guild_text, :guild_voice, :guild_announcement], do: :cache, else: :skip
     end
   ]
 ```
+
+The caches hold structs — `EDA.Guild`, `EDA.Member`, `EDA.Channel` and the others — parsed once
+when Discord sends them: `EDA.Cache.get_member/2` returns an `EDA.Member`, and an admission
+policy receives the struct.
 
 Channels the bot cannot view are **kept in the cache**, with their metadata redacted by Discord
 (`name` becomes `"___hidden___"`). Reject them with `EDA.Channel.obfuscated?/1` before showing a

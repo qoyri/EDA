@@ -10,7 +10,7 @@ defmodule EDA.Cache.PresenceTest do
       })
 
       presence = EDA.Cache.Presence.get("pg1", "pu1")
-      assert presence["status"] == "online"
+      assert presence["status"] == :online
       assert presence["guild_id"] == "pg1"
     end
 
@@ -30,7 +30,7 @@ defmodule EDA.Cache.PresenceTest do
       })
 
       presence = EDA.Cache.Presence.get("pg2", "pu2")
-      assert presence["status"] == "idle"
+      assert presence["status"] == :idle
     end
   end
 
@@ -62,7 +62,7 @@ defmodule EDA.Cache.PresenceTest do
       })
 
       presence = EDA.Cache.get_presence("pf_g", "pf_u")
-      assert presence["status"] == "dnd"
+      assert presence["status"] == :dnd
     end
   end
 end

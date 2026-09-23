@@ -40,4 +40,38 @@ defmodule EDA.Entity do
       defp parse_response(:ok), do: :ok
     end
   end
+
+  @doc """
+  Applies a partial update from Discord to an entity: the fields whose key is in `raw` take the
+  parsed value, the others keep theirs. A key present with a `nil` value clears the field; a key
+  absent leaves it alone, which is how Discord's partial updates work.
+
+  The cache uses it to apply `GUILD_MEMBER_UPDATE`, `CHANNEL_UPDATE` and the other updates to
+  the structs it holds.
+
+      iex> member = %EDA.Member{nick: "Annie", roles: ["1"]}
+      iex> EDA.Entity.patch(member, %{"nick" => nil})
+      %EDA.Member{nick: nil, roles: ["1"]}
+  """
+  @spec patch(struct(), map()) :: struct()
+  def patch(%mod{} = entity, raw) when is_map(raw) do
+    if function_exported?(mod, :patch, 2),
+      do: mod.patch(entity, raw),
+      else: patch_fields(entity, raw)
+  end
+
+  @doc false
+  # The generic patch: a field takes the parsed value when its name is a key of `raw`.
+  def patch_fields(%mod{} = entity, raw) do
+    parsed = mod.from_raw(raw)
+
+    entity
+    |> Map.from_struct()
+    |> Map.keys()
+    |> Enum.reduce(entity, fn field, acc ->
+      if Map.has_key?(raw, Atom.to_string(field)),
+        do: Map.put(acc, field, Map.fetch!(parsed, field)),
+        else: acc
+    end)
+  end
 end

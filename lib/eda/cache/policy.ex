@@ -12,13 +12,17 @@ defmodule EDA.Cache.Policy do
   - `module` — a module implementing the `EDA.Cache.Policy` behaviour
   - `fn/3` — an anonymous function `fn entity, key, value -> :cache | :skip end`
 
+  `value` is the struct about to be cached: an `EDA.Channel`, an `EDA.Member`, and so on.
+
   ## Example
 
       config :eda,
         cache: [
           presences: [policy: :none],
           channels: [policy: fn _entity, _key, ch ->
-            if ch["type"] in [0, 2, 5], do: :cache, else: :skip
+            if ch.type in [:guild_text, :guild_voice, :guild_announcement],
+              do: :cache,
+              else: :skip
           end]
         ]
   """
@@ -27,7 +31,7 @@ defmodule EDA.Cache.Policy do
   @type decision :: :cache | :skip
 
   @doc "Decides whether the given entity should be cached."
-  @callback should_cache?(entity(), key :: term(), value :: map()) :: decision()
+  @callback should_cache?(entity(), key :: term(), value :: struct()) :: decision()
 
   @doc """
   Dispatches a policy check.

@@ -20,7 +20,7 @@ defmodule EDA.Cache.Role do
   @doc """
   Gets a role by ID.
   """
-  @spec get(String.t() | integer()) :: map() | nil
+  @spec get(String.t() | integer()) :: EDA.Role.t() | nil
   def get(role_id) do
     role_id = to_string(role_id)
 
@@ -46,7 +46,7 @@ defmodule EDA.Cache.Role do
   Gets a role by guild and role ID — one lookup on the composite key, and `nil` for a role that
   belongs to another guild.
   """
-  @spec get(String.t() | integer(), String.t() | integer()) :: map() | nil
+  @spec get(String.t() | integer(), String.t() | integer()) :: EDA.Role.t() | nil
   def get(guild_id, role_id) do
     case adapter().get(@table, {to_string(guild_id), to_string(role_id)}) do
       nil ->
@@ -62,7 +62,7 @@ defmodule EDA.Cache.Role do
   @doc """
   Gets all roles for a guild. O(guild_size) via match_object.
   """
-  @spec for_guild(String.t() | integer()) :: [map()]
+  @spec for_guild(String.t() | integer()) :: [EDA.Role.t()]
   def for_guild(guild_id) do
     guild_id = to_string(guild_id)
 
@@ -72,7 +72,7 @@ defmodule EDA.Cache.Role do
   @doc """
   Gets all cached roles.
   """
-  @spec all() :: [map()]
+  @spec all() :: [EDA.Role.t()]
   def all do
     adapter().all(@table)
   end
@@ -80,12 +80,12 @@ defmodule EDA.Cache.Role do
   @doc """
   Creates or replaces a role in the cache.
   """
-  @spec create(String.t(), map()) :: map()
+  @spec create(String.t(), map() | EDA.Role.t()) :: EDA.Role.t()
   def create(guild_id, role) do
     guild_id = to_string(guild_id)
-    role_id = to_string(role["id"])
+    role_with_guild = %{to_struct(role) | guild_id: guild_id}
+    role_id = to_string(role_with_guild.id)
     key = {guild_id, role_id}
-    role_with_guild = Map.put(role, "guild_id", guild_id)
 
     case EDA.Cache.Policy.check(
            EDA.Cache.Config.policy(@cache_name),
@@ -109,7 +109,7 @@ defmodule EDA.Cache.Role do
   @doc """
   Updates a role in the cache.
   """
-  @spec update(String.t(), map()) :: map() | nil
+  @spec update(String.t(), map()) :: EDA.Role.t() | nil
   def update(role_id, updates) do
     role_id = to_string(role_id)
 
@@ -118,9 +118,8 @@ defmodule EDA.Cache.Role do
         nil
 
       existing ->
-        updated = Map.merge(existing, updates)
-        guild_id = updated["guild_id"]
-        adapter().put(@table, {guild_id, role_id}, updated)
+        updated = EDA.Entity.patch(existing, updates)
+        adapter().put(@table, {updated.guild_id, role_id}, updated)
         updated
     end
   end
@@ -178,4 +177,7 @@ defmodule EDA.Cache.Role do
   end
 
   defp adapter, do: EDA.Cache.Adapter.current()
+
+  defp to_struct(%EDA.Role{} = role), do: role
+  defp to_struct(raw) when is_map(raw), do: EDA.Role.from_raw(raw)
 end

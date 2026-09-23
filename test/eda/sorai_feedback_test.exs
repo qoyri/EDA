@@ -92,9 +92,11 @@ defmodule EDA.SoraiFeedbackTest do
         )
       end)
 
-      assert {:ok, %{"user" => %{"id" => ^user_id}}} = EDA.Cache.fetch_member(guild_id, user_id)
+      assert {:ok, %EDA.Member{user: %EDA.User{id: ^user_id}}} =
+               EDA.Cache.fetch_member(guild_id, user_id)
+
       # The second call is served from the cache: Bypass would fail on an unexpected request.
-      assert {:ok, %{"guild_id" => ^guild_id}} = EDA.Cache.fetch_member(guild_id, user_id)
+      assert {:ok, %EDA.Member{guild_id: ^guild_id}} = EDA.Cache.fetch_member(guild_id, user_id)
     end
   end
 
@@ -118,7 +120,7 @@ defmodule EDA.SoraiFeedbackTest do
     end
 
     test "Cache.get_role/2 looks up by guild and role, and not across guilds", %{guild_id: g} do
-      assert %{"position" => 3} = EDA.Cache.get_role(g, "8800000000000000011")
+      assert %EDA.Role{position: 3} = EDA.Cache.get_role(g, "8800000000000000011")
       assert EDA.Cache.get_role("8800000000000000999", "8800000000000000011") == nil
     end
 
@@ -127,7 +129,7 @@ defmodule EDA.SoraiFeedbackTest do
         roles: ["8800000000000000011", "8800000000000000013", "8800000000000000012"]
       }
 
-      assert %{"id" => "8800000000000000012"} = EDA.Member.top_role(member, g)
+      assert %EDA.Role{id: "8800000000000000012"} = EDA.Member.top_role(member, g)
       assert EDA.Member.top_role_position(member, g) == 7
       assert EDA.Member.top_role_position(%{"roles" => []}, g) == 0
     end

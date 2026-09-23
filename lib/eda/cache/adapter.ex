@@ -50,7 +50,7 @@ defmodule EDA.Cache.Adapter do
   @typedoc "A flat id or a `{guild_id, id}` tuple."
   @type key :: term()
 
-  @typedoc "A cached entity, as a raw string-keyed map, or an index value."
+  @typedoc "A cached entity, as its struct, or an index value."
   @type value :: term()
 
   @doc "Prepares a table. Called once per table at startup."

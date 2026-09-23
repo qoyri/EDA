@@ -134,6 +134,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The caches hold structs.** `EDA.Cache.get_guild/1` returns an `EDA.Guild`,
+  `get_member/2` an `EDA.Member`, `get_channel/1` an `EDA.Channel`, and so on for users, roles,
+  voice states and presences (`EDA.Event.PresenceUpdate`). Discord's payloads are parsed once,
+  when they arrive, instead of on every read: `EDA.Member.fetch_member/2` on a cached member went
+  from 3.2 µs to 0.6 µs, and an entry takes 15 to 30 % less memory (measured on 1196 members,
+  roles and channels of real guilds). Partial updates go through the new
+  `EDA.Entity.patch/2`: a field Discord sends is replaced, `null` clears it, a field it leaves
+  out is kept. An admission policy receives the struct, and `EDA.Member.top_role/2` returns an
+  `EDA.Role`. `x["field"]` still reads a struct, but a value is now what the struct holds: an
+  atom for a channel type, a `DateTime` for a date. Fields Discord does not document (a guild's
+  `region`, `lazy`…) are no longer kept.
+
 - **`EDA.Interaction.edit_response/2` and `followup/2` return an `EDA.Message`** instead of the
   raw map, and `edit_followup/3` and `delete_followup/2` are new.
 

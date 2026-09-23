@@ -18,7 +18,7 @@ defmodule EDA.Cache.ChannelTest do
       Channel.create(channel)
 
       cached = Channel.get("dm1")
-      assert cached["type"] == 1
+      assert cached["type"] == :dm
       assert cached["guild_id"] == nil
     end
 
@@ -58,7 +58,7 @@ defmodule EDA.Cache.ChannelTest do
 
       cached = Channel.get("cu1")
       assert cached["name"] == "new"
-      assert cached["type"] == 0
+      assert cached["type"] == :guild_text
     end
 
     test "returns nil for unknown channel" do
