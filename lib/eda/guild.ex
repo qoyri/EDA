@@ -157,7 +157,8 @@ defmodule EDA.Guild do
       premium_subscription_count: raw["premium_subscription_count"],
       premium_progress_bar_enabled: raw["premium_progress_bar_enabled"],
       vanity_url_code: raw["vanity_url_code"],
-      preferred_locale: raw["preferred_locale"],
+      # The partial guild of an interaction names it `locale`.
+      preferred_locale: raw["preferred_locale"] || raw["locale"],
       verification_level: raw["verification_level"],
       default_message_notifications: raw["default_message_notifications"],
       explicit_content_filter: raw["explicit_content_filter"],

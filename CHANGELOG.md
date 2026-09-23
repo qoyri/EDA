@@ -105,6 +105,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `INTERACTION_CREATE` dropped what a user-installed command needs to know where it runs and who
+  installed it. It now keeps `context` (`:guild`, `:bot_dm`, `:private_channel`),
+  `authorizing_integration_owners` (`%{guild_install: _, user_install: _}`),
+  `attachment_size_limit`, `version`, and the partial `guild` and `channel` Discord attaches, as
+  `EDA.Guild` and `EDA.Channel` — the only channel data such a command gets in a guild the bot is
+  not in. `entitlements` are `EDA.Entitlement` structs. The partial guild's `locale` lands in
+  `preferred_locale`.
+
 - More fields Discord documents were dropped: a role's `flags` (selectable in an onboarding
   prompt); a reaction's `count_details` (`%{burst: _, normal: _}`), `me_burst` and
   `burst_colors`, without which a super reaction looked like a normal one; a clip attachment's
