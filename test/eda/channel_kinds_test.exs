@@ -57,7 +57,7 @@ defmodule EDA.ChannelKindsTest do
         assert %Channel.Voice{bitrate: 64_000, user_limit: 5, rtc_region: "rotterdam"} =
                  channel.voice
 
-        assert channel.voice.video_quality_mode == 2
+        assert channel.voice.video_quality_mode == :full
         assert channel.voice.status == "raid"
         assert channel.thread == nil
       end
@@ -74,7 +74,7 @@ defmodule EDA.ChannelKindsTest do
           })
 
         assert %Channel.Forum{available_tags: [%EDA.ForumTag{name: "Bug"}]} = channel.forum
-        assert channel.forum.default_sort_order == 1
+        assert channel.forum.default_sort_order == :creation_date
       end
     end
 

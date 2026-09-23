@@ -305,9 +305,9 @@ defmodule EDA.Permission do
   @doc """
   Returns `true` if the permission applies to the given channel.
 
-  The second argument is a channel kind (`:text`, `:voice`, `:stage`), a raw Discord
-  channel type integer, or a channel struct or map. Categories accept every kind, since
-  their overwrites cascade to children of any type.
+  The second argument is a channel kind (`:text`, `:voice`, `:stage`), a channel type as an
+  atom (`:guild_voice`) or Discord's integer, or a channel struct or map. Categories accept
+  every kind, since their overwrites cascade to children of any type.
 
   ## Examples
 
@@ -325,7 +325,11 @@ defmodule EDA.Permission do
     do: kind in channel_types(flag)
 
   def applies_to?(flag, %{"type" => type}), do: applies_to?(flag, type)
-  def applies_to?(flag, %{type: type}) when is_integer(type), do: applies_to?(flag, type)
+  def applies_to?(flag, %{type: type}) when not is_nil(type), do: applies_to?(flag, type)
+
+  # A channel type atom (`:guild_voice`), as `EDA.Channel.type` holds it.
+  def applies_to?(flag, type) when is_atom(type) and not is_nil(type),
+    do: applies_to?(flag, EDA.Channel.type_value(type))
 
   def applies_to?(flag, type) when is_integer(type) do
     case channel_kind(type) do

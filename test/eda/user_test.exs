@@ -128,7 +128,7 @@ defmodule EDA.UserTest do
         json(conn, %{"id" => "dm1", "type" => 1})
       end)
 
-      assert {:ok, %EDA.Channel{id: "dm1", type: 1}} = User.create_dm("123")
+      assert {:ok, %EDA.Channel{id: "dm1", type: :dm}} = User.create_dm("123")
     end
   end
 end

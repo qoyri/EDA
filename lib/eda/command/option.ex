@@ -66,21 +66,6 @@ defmodule EDA.Command.Option do
 
   @option_name_regex ~r/^[-_\p{L}\p{N}]{1,32}$/u
 
-  @channel_type_map %{
-    guild_text: 0,
-    dm: 1,
-    guild_voice: 2,
-    group_dm: 3,
-    guild_category: 4,
-    guild_announcement: 5,
-    announcement_thread: 10,
-    public_thread: 11,
-    private_thread: 12,
-    guild_stage_voice: 13,
-    guild_forum: 15,
-    guild_media: 16
-  }
-
   # ── Type Constructors ───────────────────────────────────────────────
 
   @doc "Creates a SUB_COMMAND option (type 1) with nested options."
@@ -348,15 +333,7 @@ defmodule EDA.Command.Option do
   end
 
   defp apply_opt({:channel_types, types}, opt) when is_list(types) do
-    values =
-      Enum.map(types, fn ct ->
-        case Map.fetch(@channel_type_map, ct) do
-          {:ok, v} -> v
-          :error -> raise ArgumentError, "unknown channel type #{inspect(ct)}"
-        end
-      end)
-
-    %{opt | channel_types: values}
+    %{opt | channel_types: Enum.map(types, &EDA.Channel.type_value/1)}
   end
 
   defp validate_name!(name) do

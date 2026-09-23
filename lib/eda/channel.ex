@@ -4,20 +4,27 @@ defmodule EDA.Channel do
 
   ## Channel types
 
-  | Constant                  | Value | Description                    |
-  |---------------------------|-------|--------------------------------|
-  | `type_guild_text/0`       | 0     | Text channel in a guild        |
-  | `type_dm/0`               | 1     | Direct message                 |
-  | `type_guild_voice/0`      | 2     | Voice channel in a guild       |
-  | `type_group_dm/0`         | 3     | Group DM                       |
-  | `type_guild_category/0`   | 4     | Category                       |
-  | `type_guild_news/0`       | 5     | News / announcement channel    |
-  | `type_guild_news_thread/0`  | 10  | Thread in a news channel       |
-  | `type_guild_public_thread/0`| 11  | Public thread                  |
-  | `type_guild_private_thread/0`| 12 | Private thread                 |
-  | `type_guild_stage_voice/0`| 13    | Stage voice channel            |
-  | `type_guild_forum/0`      | 15    | Forum channel                  |
-  | `type_guild_media/0`      | 16    | Media channel                  |
+  `type` is an atom, Discord's name for it in lowercase; a type Discord adds before EDA knows it
+  stays the integer. Every call that takes a channel type accepts the atom or the integer, and
+  `type_value/1` converts.
+
+  | `type`                   | Value | Description                          |
+  |--------------------------|-------|--------------------------------------|
+  | `:guild_text`            | 0     | Text channel in a guild              |
+  | `:dm`                    | 1     | Direct message                       |
+  | `:guild_voice`           | 2     | Voice channel in a guild             |
+  | `:group_dm`              | 3     | Group DM                             |
+  | `:guild_category`        | 4     | Category                             |
+  | `:guild_announcement`    | 5     | Announcement channel                 |
+  | `:announcement_thread`   | 10    | Thread in an announcement channel    |
+  | `:public_thread`         | 11    | Public thread                        |
+  | `:private_thread`        | 12    | Private thread                       |
+  | `:guild_stage_voice`     | 13    | Stage channel                        |
+  | `:guild_directory`       | 14    | Student hub directory                |
+  | `:guild_forum`           | 15    | Forum channel                        |
+  | `:guild_media`           | 16    | Media channel                        |
+
+  The `type_*/0` functions return the integers, for code written against them.
 
   ## Forum layout types
 
@@ -53,6 +60,38 @@ defmodule EDA.Channel do
   @type_guild_stage_voice 13
   @type_guild_forum 15
   @type_guild_media 16
+
+  @types %{
+    0 => :guild_text,
+    1 => :dm,
+    2 => :guild_voice,
+    3 => :group_dm,
+    4 => :guild_category,
+    5 => :guild_announcement,
+    10 => :announcement_thread,
+    11 => :public_thread,
+    12 => :private_thread,
+    13 => :guild_stage_voice,
+    14 => :guild_directory,
+    15 => :guild_forum,
+    16 => :guild_media
+  }
+
+  @type channel_type ::
+          :guild_text
+          | :dm
+          | :guild_voice
+          | :group_dm
+          | :guild_category
+          | :guild_announcement
+          | :announcement_thread
+          | :public_thread
+          | :private_thread
+          | :guild_stage_voice
+          | :guild_directory
+          | :guild_forum
+          | :guild_media
+          | integer()
 
   @thread_types [@type_guild_news_thread, @type_guild_public_thread, @type_guild_private_thread]
   @forum_types [@type_guild_forum, @type_guild_media]
@@ -97,7 +136,7 @@ defmodule EDA.Channel do
 
   @type t :: %__MODULE__{
           id: String.t() | nil,
-          type: integer() | nil,
+          type: channel_type() | nil,
           guild_id: String.t() | nil,
           position: integer() | nil,
           permission_overwrites: [EDA.PermissionOverwrite.t()] | nil,
@@ -324,56 +363,71 @@ defmodule EDA.Channel do
   # ── Type helpers ──
 
   @doc """
-  Returns `true` if the channel is a forum channel (type 15).
+  Returns `true` if the channel is a forum channel.
 
   ## Examples
 
-      iex> EDA.Channel.forum?(%EDA.Channel{type: 15})
+      iex> EDA.Channel.forum?(%EDA.Channel{type: :guild_forum})
       true
 
-      iex> EDA.Channel.forum?(%EDA.Channel{type: 0})
+      iex> EDA.Channel.forum?(%EDA.Channel{type: :guild_text})
       false
   """
   @spec forum?(t()) :: boolean()
-  def forum?(%__MODULE__{type: @type_guild_forum}), do: true
-  def forum?(%__MODULE__{}), do: false
+  def forum?(%__MODULE__{type: type}), do: type == :guild_forum
 
   @doc """
-  Returns `true` if the channel is a media channel (type 16).
+  Returns `true` if the channel is a media channel.
 
   ## Examples
 
-      iex> EDA.Channel.media?(%EDA.Channel{type: 16})
+      iex> EDA.Channel.media?(%EDA.Channel{type: :guild_media})
       true
 
-      iex> EDA.Channel.media?(%EDA.Channel{type: 0})
+      iex> EDA.Channel.media?(%EDA.Channel{type: :guild_text})
       false
   """
   @spec media?(t()) :: boolean()
-  def media?(%__MODULE__{type: @type_guild_media}), do: true
-  def media?(%__MODULE__{}), do: false
+  def media?(%__MODULE__{type: type}), do: type == :guild_media
 
   @doc """
-  Returns `true` if the channel is a thread (types 10, 11, 12).
+  Returns `true` if the channel is a thread.
 
   ## Examples
 
-      iex> EDA.Channel.thread?(%EDA.Channel{type: 11})
+      iex> EDA.Channel.thread?(%EDA.Channel{type: :public_thread})
       true
 
-      iex> EDA.Channel.thread?(%EDA.Channel{type: 0})
+      iex> EDA.Channel.thread?(%EDA.Channel{type: :guild_text})
       false
   """
   @spec thread?(t()) :: boolean()
-  def thread?(%__MODULE__{type: type})
-      when type in [
-             @type_guild_news_thread,
-             @type_guild_public_thread,
-             @type_guild_private_thread
-           ],
-      do: true
+  def thread?(%__MODULE__{type: type}),
+    do: type in [:announcement_thread, :public_thread, :private_thread]
 
-  def thread?(%__MODULE__{}), do: false
+  @doc """
+  The integer Discord uses for a channel type, from its atom or the integer itself.
+
+      iex> EDA.Channel.type_value(:guild_forum)
+      15
+
+      iex> EDA.Channel.type_value(15)
+      15
+  """
+  @spec type_value(channel_type()) :: integer()
+  def type_value(type), do: EDA.Enum.value!(@types, type, "channel type")
+
+  @doc """
+  The atom for a channel type's integer; one EDA does not know stays the integer.
+
+      iex> EDA.Channel.type_name(5)
+      :guild_announcement
+
+      iex> EDA.Channel.type_name(99)
+      99
+  """
+  @spec type_name(integer() | nil) :: channel_type() | nil
+  def type_name(value), do: EDA.Enum.name(@types, value)
 
   # ── Parsing ──
 
@@ -381,7 +435,7 @@ defmodule EDA.Channel do
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
       id: raw["id"],
-      type: raw["type"],
+      type: EDA.Enum.name(@types, raw["type"]),
       guild_id: raw["guild_id"],
       position: raw["position"],
       permission_overwrites: parse_overwrites(raw["permission_overwrites"]),

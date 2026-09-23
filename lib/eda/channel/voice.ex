@@ -6,7 +6,7 @@ defmodule EDA.Channel.Voice do
   - `bitrate` — in bits per second; the ceiling depends on the guild's boost level
   - `user_limit` — 0 means no limit
   - `rtc_region` — the voice region id, `nil` for automatic
-  - `video_quality_mode` — 1 for automatic, 2 for 720p
+  - `video_quality_mode` — `:auto` (Discord picks) or `:full` (720p)
   - `status` — the voice channel status text, set with `EDA.Channel.set_voice_status/3`
   """
 
@@ -18,7 +18,7 @@ defmodule EDA.Channel.Voice do
           bitrate: pos_integer() | nil,
           user_limit: non_neg_integer() | nil,
           rtc_region: String.t() | nil,
-          video_quality_mode: pos_integer() | nil,
+          video_quality_mode: :auto | :full | integer() | nil,
           status: String.t() | nil
         }
 
@@ -32,7 +32,7 @@ defmodule EDA.Channel.Voice do
       bitrate: raw["bitrate"],
       user_limit: raw["user_limit"],
       rtc_region: raw["rtc_region"],
-      video_quality_mode: raw["video_quality_mode"],
+      video_quality_mode: EDA.Enum.name(%{1 => :auto, 2 => :full}, raw["video_quality_mode"]),
       status: raw["status"]
     }
   end

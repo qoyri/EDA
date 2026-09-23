@@ -45,6 +45,17 @@ defmodule EDA.PermissionClassificationTest do
   end
 
   describe "applies_to?/2" do
+    test "an EDA.Channel, whose type is an atom, and a channel type atom" do
+      # The type became an atom; the struct used to fall through to `false` for everything.
+      voice = EDA.Channel.from_raw(%{"id" => "1", "type" => 2})
+
+      assert voice.type == :guild_voice
+      assert Permission.applies_to?(:speak, voice)
+      refute Permission.applies_to?(:speak, EDA.Channel.from_raw(%{"id" => "2", "type" => 0}))
+      assert Permission.applies_to?(:request_to_speak, :guild_stage_voice)
+      assert Permission.inapplicable(Permission.to_bitset([:speak]), :guild_text) == [:speak]
+    end
+
     test "a stage-only permission" do
       assert Permission.applies_to?(:request_to_speak, :stage)
       refute Permission.applies_to?(:request_to_speak, :text)

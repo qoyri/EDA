@@ -39,7 +39,7 @@ defmodule EDA.InteractionFieldsTest do
     event = EDA.Event.from_raw("INTERACTION_CREATE", @payload)
 
     assert %EDA.Guild{preferred_locale: "fr", features: ["COMMUNITY"]} = event.guild
-    assert %EDA.Channel{type: 1} = event.channel
+    assert %EDA.Channel{type: :dm} = event.channel
     assert [%EDA.Entitlement{id: "6"}] = event.entitlements
   end
 

@@ -216,7 +216,7 @@ defmodule EDA.InteractionPermissionsTest do
       assert %EDA.Channel{} = channel
       assert channel.id == "c_allowed"
       assert channel.name == "general"
-      assert channel.type == 0
+      assert channel.type == :guild_text
       assert channel.app_permissions == to_string(@send_messages)
       assert channel.permissions == to_string(@send_messages ||| @manage_messages)
     end

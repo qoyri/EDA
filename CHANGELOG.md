@@ -49,6 +49,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A channel's `type` is an atom**, Discord's name in lowercase: `:guild_text`, `:dm`,
+  `:guild_voice`, `:group_dm`, `:guild_category`, `:guild_announcement`, `:announcement_thread`,
+  `:public_thread`, `:private_thread`, `:guild_stage_voice`, `:guild_directory` (newly known),
+  `:guild_forum`, `:guild_media`. A type Discord adds later stays the integer.
+  `EDA.Channel.type_value/1` and `type_name/1` convert; the `type_*/0` functions still return the
+  integers. So do a voice channel's `video_quality_mode` (`:auto`, `:full`) and a forum's
+  `default_sort_order` (`:latest_activity`, `:creation_date`) and `default_forum_layout`
+  (`:not_set`, `:list_view`, `:gallery_view`).
+
 - **Every date is a `DateTime`**, where most were the string Discord sent and a few an integer:
   `EDA.Message` `timestamp` and `edited_timestamp`; `EDA.Member` `joined_at`, `premium_since` and
   `communication_disabled_until`; `EDA.Guild.joined_at`; `EDA.Channel.last_pin_timestamp`;

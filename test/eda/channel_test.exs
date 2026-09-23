@@ -58,14 +58,14 @@ defmodule EDA.ChannelTest do
       }
 
       channel = Channel.from_raw(raw)
-      assert channel.type == 15
+      assert channel.type == :guild_forum
       assert channel.last_message_id == "msg1"
       assert channel.default_auto_archive_duration == 1440
       assert channel.flags == 0
       assert channel.forum.default_reaction_emoji == %{"emoji_id" => nil, "emoji_name" => "👍"}
       assert channel.default_thread_rate_limit_per_user == 60
-      assert channel.forum.default_sort_order == 0
-      assert channel.forum.default_forum_layout == 1
+      assert channel.forum.default_sort_order == :latest_activity
+      assert channel.forum.default_forum_layout == :list_view
 
       assert [%EDA.ForumTag{id: "t1", name: "Bug"}, %EDA.ForumTag{id: "t2", name: "Feature"}] =
                channel.forum.available_tags
@@ -117,21 +117,21 @@ defmodule EDA.ChannelTest do
 
   describe "type helpers" do
     test "forum?/1 returns true for type 15" do
-      assert Channel.forum?(%Channel{type: 15})
-      refute Channel.forum?(%Channel{type: 0})
+      assert Channel.forum?(%Channel{type: :guild_forum})
+      refute Channel.forum?(%Channel{type: :guild_text})
     end
 
     test "media?/1 returns true for type 16" do
-      assert Channel.media?(%Channel{type: 16})
-      refute Channel.media?(%Channel{type: 0})
+      assert Channel.media?(%Channel{type: :guild_media})
+      refute Channel.media?(%Channel{type: :guild_text})
     end
 
     test "thread?/1 returns true for thread types" do
-      assert Channel.thread?(%Channel{type: 10})
-      assert Channel.thread?(%Channel{type: 11})
-      assert Channel.thread?(%Channel{type: 12})
-      refute Channel.thread?(%Channel{type: 0})
-      refute Channel.thread?(%Channel{type: 15})
+      assert Channel.thread?(%Channel{type: :announcement_thread})
+      assert Channel.thread?(%Channel{type: :public_thread})
+      assert Channel.thread?(%Channel{type: :private_thread})
+      refute Channel.thread?(%Channel{type: :guild_text})
+      refute Channel.thread?(%Channel{type: :guild_forum})
     end
   end
 

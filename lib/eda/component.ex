@@ -535,21 +535,6 @@ defmodule EDA.Component do
   def channel_select(custom_id, opts \\ []) when is_binary(custom_id) do
     validate_custom_id!(custom_id)
 
-    channel_type_map = %{
-      guild_text: 0,
-      dm: 1,
-      guild_voice: 2,
-      group_dm: 3,
-      guild_category: 4,
-      guild_announcement: 5,
-      announcement_thread: 10,
-      public_thread: 11,
-      private_thread: 12,
-      guild_stage_voice: 13,
-      guild_forum: 15,
-      guild_media: 16
-    }
-
     map = %{type: @channel_select, custom_id: custom_id}
     map = put_if(map, :placeholder, opts[:placeholder])
     map = put_if(map, :min_values, opts[:min_values])
@@ -564,10 +549,7 @@ defmodule EDA.Component do
 
       types when is_list(types) ->
         resolved =
-          Enum.map(types, fn t ->
-            channel_type_map[t] ||
-              raise ArgumentError, "unknown channel type #{inspect(t)}"
-          end)
+          Enum.map(types, &EDA.Channel.type_value/1)
 
         Map.put(map, :channel_types, resolved)
     end
