@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Reading a message: `EDA.Message.url/1` and `parse_link/1` (any of Discord's domains, `@me`
+  for a DM), `mentions?/2` (a user, member, role or `:everyone`), `invites/1` (the invite codes
+  it links to), `webhook?/1`, `system?/1`, `deletable?/1` (six system types cannot be deleted,
+  per Discord's table) and `clean_content/1` (mentions written as names).
+
 - How a member shows, and what the bot may do to them: `EDA.Member.display_name/1` (nickname,
   display name, username), `boosting?/1`, `roles/2` (their roles as structs, highest first) and
   `color/2`; `owner?/2`, `can_interact?/3` (Discord's hierarchy: the owner above all, then the
@@ -350,6 +355,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with string keys keeps working, as on every other nested object.
 
 ### Fixed
+
+- A message activity of type 6, `STREAM_REQUEST`, was left as the integer; it is
+  `:stream_request`.
 
 - `EDA.User.avatar_url/1` returned `.png` for every avatar, animated ones included, and neither
   it, `EDA.Guild.icon_url/1` nor `EDA.Emoji.image_url/1` took a size. All three now take options:
