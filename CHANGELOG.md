@@ -59,6 +59,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A message's embeds are `EDA.Embed` structs**, down to their parts: `EDA.Embed.Footer`,
+  `Author`, `Field`, `Media` (image, thumbnail and video, with the size, content type and
+  placeholder Discord adds) and `Provider`. `EDA.Embed` gained `type` (`:rich`, `:video`,
+  `:link`…), `video`, `provider` and `flags`, and `from_raw/1`. The builder builds the same
+  structs, so `embed.footer.text` reads either; `timestamp` is a `DateTime` in both. A received
+  embed can be sent again: `to_map/1` leaves out what only Discord sets.
+
 - **The enumerations that had a helper are atoms in the struct too**, the helper taking the atom
   as well: `EDA.Invite` `type` and `target_type`, `EDA.Subscription.status`,
   `EDA.User.premium_type`, the `type` of `INTERACTION_CREATE` (with the names

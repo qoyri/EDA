@@ -115,7 +115,7 @@ defmodule EDA.Message do
           mentions: [EDA.User.t()] | nil,
           mention_roles: [String.t()] | nil,
           attachments: [EDA.Attachment.t()] | nil,
-          embeds: [map()] | nil,
+          embeds: [EDA.Embed.t()] | nil,
           reactions: [EDA.Reaction.t()] | nil,
           pinned: boolean() | nil,
           type: atom() | integer() | nil,
@@ -158,7 +158,7 @@ defmodule EDA.Message do
       mentions: parse_users(raw["mentions"]),
       mention_roles: raw["mention_roles"],
       attachments: parse_attachments(raw["attachments"]),
-      embeds: raw["embeds"],
+      embeds: parse_list(raw["embeds"], &EDA.Embed.from_raw/1),
       reactions: parse_reactions(raw["reactions"]),
       pinned: raw["pinned"],
       type: EDA.Enum.name(@types, raw["type"]),
@@ -186,6 +186,9 @@ defmodule EDA.Message do
       channel_type: raw["channel_type"]
     }
   end
+
+  defp parse_list(nil, _parse), do: nil
+  defp parse_list(list, parse) when is_list(list), do: Enum.map(list, parse)
 
   defp parse_user(nil), do: nil
   defp parse_user(raw) when is_map(raw), do: EDA.User.from_raw(raw)

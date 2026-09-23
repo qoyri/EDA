@@ -24,11 +24,27 @@ defmodule EDA.Embed do
         |> field("Inline Field", "Value", inline: true)
 
       EDA.API.Message.create(channel_id, embed: embed)
+
+  ## Received embeds
+
+  An embed on a received message is the same struct, down to its parts: `EDA.Embed.Footer`,
+  `EDA.Embed.Author`, `EDA.Embed.Field`, `EDA.Embed.Media` for the image, thumbnail and video,
+  and `EDA.Embed.Provider` for the site a link embed comes from. `timestamp` is a `DateTime`,
+  and `type` is `:rich` for an embed a bot built, or `:image`, `:video`, `:gifv`, `:article`,
+  `:link` or `:poll_result` for one Discord made; a type added later stays its string.
+
+  A received embed can be sent again as is: `to_map/1` leaves out what only Discord sets (the
+  type, the proxied URLs, the sizes, the video and the provider).
   """
+
+  use EDA.Event.Access
+
+  alias EDA.Embed.{Author, Field, Footer, Media, Provider}
 
   @enforce_keys []
   defstruct [
     :title,
+    :type,
     :description,
     :url,
     :timestamp,
@@ -36,22 +52,33 @@ defmodule EDA.Embed do
     :footer,
     :image,
     :thumbnail,
+    :video,
+    :provider,
     :author,
+    :flags,
     fields: []
   ]
 
+  @type type :: :rich | :image | :video | :gifv | :article | :link | :poll_result | String.t()
+
   @type t :: %__MODULE__{
           title: String.t() | nil,
+          type: type() | nil,
           description: String.t() | nil,
           url: String.t() | nil,
-          timestamp: String.t() | nil,
+          timestamp: DateTime.t() | nil,
           color: non_neg_integer() | nil,
-          footer: map() | nil,
-          image: map() | nil,
-          thumbnail: map() | nil,
-          author: map() | nil,
-          fields: [map()]
+          footer: Footer.t() | nil,
+          image: Media.t() | nil,
+          thumbnail: Media.t() | nil,
+          video: Media.t() | nil,
+          provider: Provider.t() | nil,
+          author: Author.t() | nil,
+          flags: non_neg_integer() | nil,
+          fields: [Field.t()]
         }
+
+  @types Map.new(~w(rich image video gifv article link poll_result)a, &{Atom.to_string(&1), &1})
 
   @colors %{
     blurple: 0x5865F2,
@@ -114,6 +141,33 @@ defmodule EDA.Embed do
     new() |> color(:green) |> description(text)
   end
 
+  @doc """
+  An embed as Discord sends it, down to its parts.
+
+      iex> embed = EDA.Embed.from_raw(%{"type" => "rich", "title" => "Hi", "footer" => %{"text" => "bye"}})
+      iex> {embed.type, embed.title, embed.footer.text}
+      {:rich, "Hi", "bye"}
+  """
+  @spec from_raw(map()) :: t()
+  def from_raw(raw) when is_map(raw) do
+    %__MODULE__{
+      title: raw["title"],
+      type: Map.get(@types, raw["type"], raw["type"]),
+      description: raw["description"],
+      url: raw["url"],
+      timestamp: EDA.Timestamp.parse(raw["timestamp"]),
+      color: raw["color"],
+      footer: Footer.from_raw(raw["footer"]),
+      image: Media.from_raw(raw["image"]),
+      thumbnail: Media.from_raw(raw["thumbnail"]),
+      video: Media.from_raw(raw["video"]),
+      provider: Provider.from_raw(raw["provider"]),
+      author: Author.from_raw(raw["author"]),
+      flags: raw["flags"],
+      fields: Enum.map(raw["fields"] || [], &Field.from_raw/1)
+    }
+  end
+
   # ── Setters ─────────────────────────────────────────────────────────
 
   @doc "Sets the embed title (max 256 characters)."
@@ -139,19 +193,23 @@ defmodule EDA.Embed do
   @doc """
   Sets the embed timestamp.
 
-  Accepts a `DateTime`, `NaiveDateTime`, or an ISO 8601 string.
+  Accepts a `DateTime`, a `NaiveDateTime` (taken as UTC), or an ISO 8601 string, and stores a
+  `DateTime`.
   """
   @spec timestamp(t(), DateTime.t() | NaiveDateTime.t() | String.t()) :: t()
   def timestamp(%__MODULE__{} = embed, %DateTime{} = dt) do
-    %{embed | timestamp: DateTime.to_iso8601(dt)}
+    %{embed | timestamp: dt}
   end
 
   def timestamp(%__MODULE__{} = embed, %NaiveDateTime{} = ndt) do
-    %{embed | timestamp: NaiveDateTime.to_iso8601(ndt) <> "Z"}
+    %{embed | timestamp: DateTime.from_naive!(ndt, "Etc/UTC")}
   end
 
   def timestamp(%__MODULE__{} = embed, ts) when is_binary(ts) do
-    %{embed | timestamp: ts}
+    case EDA.Timestamp.parse(ts) do
+      %DateTime{} = dt -> %{embed | timestamp: dt}
+      nil -> raise ArgumentError, "invalid ISO 8601 timestamp: #{inspect(ts)}"
+    end
   end
 
   @doc """
@@ -199,11 +257,7 @@ defmodule EDA.Embed do
   def footer(%__MODULE__{} = embed, text, opts \\ []) when is_binary(text) do
     validate_length!(text, 2048, "footer text")
 
-    footer =
-      %{text: text}
-      |> put_opt(:icon_url, opts[:icon_url])
-
-    %{embed | footer: footer}
+    %{embed | footer: %Footer{text: text, icon_url: opts[:icon_url]}}
   end
 
   @doc """
@@ -218,24 +272,19 @@ defmodule EDA.Embed do
   def author(%__MODULE__{} = embed, name, opts \\ []) when is_binary(name) do
     validate_length!(name, 256, "author name")
 
-    author =
-      %{name: name}
-      |> put_opt(:url, opts[:url])
-      |> put_opt(:icon_url, opts[:icon_url])
-
-    %{embed | author: author}
+    %{embed | author: %Author{name: name, url: opts[:url], icon_url: opts[:icon_url]}}
   end
 
   @doc "Sets the embed thumbnail URL."
   @spec thumbnail(t(), String.t()) :: t()
   def thumbnail(%__MODULE__{} = embed, url) when is_binary(url) do
-    %{embed | thumbnail: %{url: url}}
+    %{embed | thumbnail: %Media{url: url}}
   end
 
   @doc "Sets the embed image URL."
   @spec image(t(), String.t()) :: t()
   def image(%__MODULE__{} = embed, url) when is_binary(url) do
-    %{embed | image: %{url: url}}
+    %{embed | image: %Media{url: url}}
   end
 
   @doc """
@@ -255,7 +304,7 @@ defmodule EDA.Embed do
     validate_length!(name, 256, "field name")
     validate_length!(value, 1024, "field value")
 
-    f = %{name: name, value: value, inline: Keyword.get(opts, :inline, false)}
+    f = %Field{name: name, value: value, inline: Keyword.get(opts, :inline, false)}
     %{embed | fields: embed.fields ++ [f]}
   end
 
@@ -298,19 +347,29 @@ defmodule EDA.Embed do
   # ── Serialization ───────────────────────────────────────────────────
 
   @doc """
-  Converts the embed struct to a plain map, stripping nil values.
+  Converts the embed struct to the map Discord takes, leaving out empty values and what only
+  Discord sets.
   """
   @spec to_map(t()) :: map()
   def to_map(%__MODULE__{} = embed) do
-    embed
-    |> Map.from_struct()
+    %{
+      title: embed.title,
+      description: embed.description,
+      url: embed.url,
+      timestamp: embed.timestamp && DateTime.to_iso8601(embed.timestamp),
+      color: embed.color,
+      footer: embed.footer && %{text: embed.footer.text, icon_url: embed.footer.icon_url},
+      image: embed.image && %{url: embed.image.url},
+      thumbnail: embed.thumbnail && %{url: embed.thumbnail.url},
+      author:
+        embed.author &&
+          %{name: embed.author.name, url: embed.author.url, icon_url: embed.author.icon_url},
+      fields:
+        if(embed.fields != [],
+          do: Enum.map(embed.fields, &%{name: &1.name, value: &1.value, inline: &1.inline})
+        )
+    }
     |> strip_nils()
-    |> then(fn map ->
-      case map[:fields] do
-        [] -> Map.delete(map, :fields)
-        _ -> map
-      end
-    end)
   end
 
   # ── Private ─────────────────────────────────────────────────────────
@@ -349,9 +408,6 @@ defmodule EDA.Embed do
         raise ArgumentError, "invalid hex color #{inspect("#" <> hex)}"
     end
   end
-
-  defp put_opt(map, _key, nil), do: map
-  defp put_opt(map, key, value), do: Map.put(map, key, value)
 
   defp strip_nils(map) when is_map(map) do
     map
