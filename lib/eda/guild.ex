@@ -22,6 +22,18 @@ defmodule EDA.Guild do
   """
   use EDA.Event.Access
 
+  @premium_tiers %{0 => :none, 1 => :tier_1, 2 => :tier_2, 3 => :tier_3}
+
+  @nsfw_levels %{0 => :default, 1 => :explicit, 2 => :safe, 3 => :age_restricted}
+
+  @mfa_levels %{0 => :none, 1 => :elevated}
+
+  @content_filters %{0 => :disabled, 1 => :members_without_roles, 2 => :all_members}
+
+  @notification_levels %{0 => :all_messages, 1 => :only_mentions}
+
+  @verification_levels %{0 => :none, 1 => :low, 2 => :medium, 3 => :high, 4 => :very_high}
+
   # There is one guild struct per guild, so a map past its compact form costs nothing held in
   # bulk; its fields stay flat, as Discord sends them. The limit matters for what the cache holds by the
   # thousand; see test/eda/cached_struct_size_test.exs.
@@ -97,16 +109,17 @@ defmodule EDA.Guild do
           owner_id: String.t() | nil,
           permissions: String.t() | nil,
           features: [String.t()] | nil,
-          premium_tier: non_neg_integer() | nil,
+          premium_tier: :none | :tier_1 | :tier_2 | :tier_3 | integer() | nil,
           premium_subscription_count: non_neg_integer() | nil,
           premium_progress_bar_enabled: boolean() | nil,
           vanity_url_code: String.t() | nil,
           preferred_locale: String.t() | nil,
-          verification_level: non_neg_integer() | nil,
-          default_message_notifications: non_neg_integer() | nil,
-          explicit_content_filter: non_neg_integer() | nil,
-          mfa_level: non_neg_integer() | nil,
-          nsfw_level: non_neg_integer() | nil,
+          verification_level: :none | :low | :medium | :high | :very_high | integer() | nil,
+          default_message_notifications: :all_messages | :only_mentions | integer() | nil,
+          explicit_content_filter:
+            :disabled | :members_without_roles | :all_members | integer() | nil,
+          mfa_level: :none | :elevated | integer() | nil,
+          nsfw_level: :default | :explicit | :safe | :age_restricted | integer() | nil,
           afk_channel_id: String.t() | nil,
           afk_timeout: non_neg_integer() | nil,
           widget_enabled: boolean() | nil,
@@ -157,17 +170,18 @@ defmodule EDA.Guild do
       owner_id: raw["owner_id"],
       permissions: raw["permissions"],
       features: raw["features"],
-      premium_tier: raw["premium_tier"],
+      premium_tier: EDA.Enum.name(@premium_tiers, raw["premium_tier"]),
       premium_subscription_count: raw["premium_subscription_count"],
       premium_progress_bar_enabled: raw["premium_progress_bar_enabled"],
       vanity_url_code: raw["vanity_url_code"],
       # The partial guild of an interaction names it `locale`.
       preferred_locale: raw["preferred_locale"] || raw["locale"],
-      verification_level: raw["verification_level"],
-      default_message_notifications: raw["default_message_notifications"],
-      explicit_content_filter: raw["explicit_content_filter"],
-      mfa_level: raw["mfa_level"],
-      nsfw_level: raw["nsfw_level"],
+      verification_level: EDA.Enum.name(@verification_levels, raw["verification_level"]),
+      default_message_notifications:
+        EDA.Enum.name(@notification_levels, raw["default_message_notifications"]),
+      explicit_content_filter: EDA.Enum.name(@content_filters, raw["explicit_content_filter"]),
+      mfa_level: EDA.Enum.name(@mfa_levels, raw["mfa_level"]),
+      nsfw_level: EDA.Enum.name(@nsfw_levels, raw["nsfw_level"]),
       afk_channel_id: raw["afk_channel_id"],
       afk_timeout: raw["afk_timeout"],
       widget_enabled: raw["widget_enabled"],
@@ -343,4 +357,31 @@ defmodule EDA.Guild do
 
   def icon_url(%__MODULE__{id: id, icon: icon}, opts),
     do: EDA.CDN.url("icons/#{id}/#{icon}", EDA.CDN.animated_hash?(icon), opts)
+
+  @doc """
+  The integer Discord uses for a verification level, from its atom or the integer itself.
+  """
+  @spec verification_level_value(atom() | integer()) :: integer()
+  def verification_level_value(value),
+    do: EDA.Enum.value!(@verification_levels, value, "verification level")
+
+  @doc """
+  The integer Discord uses for a notification level, from its atom or the integer itself.
+  """
+  @spec default_message_notifications_value(atom() | integer()) :: integer()
+  def default_message_notifications_value(value),
+    do: EDA.Enum.value!(@notification_levels, value, "notification level")
+
+  @doc """
+  The integer Discord uses for a explicit content filter, from its atom or the integer itself.
+  """
+  @spec explicit_content_filter_value(atom() | integer()) :: integer()
+  def explicit_content_filter_value(value),
+    do: EDA.Enum.value!(@content_filters, value, "explicit content filter")
+
+  @doc """
+  The integer Discord uses for a MFA level, from its atom or the integer itself.
+  """
+  @spec mfa_level_value(atom() | integer()) :: integer()
+  def mfa_level_value(value), do: EDA.Enum.value!(@mfa_levels, value, "MFA level")
 end

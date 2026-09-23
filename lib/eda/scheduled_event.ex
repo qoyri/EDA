@@ -15,6 +15,12 @@ defmodule EDA.ScheduledEvent do
 
   use EDA.Event.Access
 
+  @entity_types %{1 => :stage_instance, 2 => :voice, 3 => :external}
+
+  @statuses %{1 => :scheduled, 2 => :active, 3 => :completed, 4 => :canceled}
+
+  @privacy_levels %{2 => :guild_only}
+
   defstruct [
     :id,
     :guild_id,
@@ -44,9 +50,9 @@ defmodule EDA.ScheduledEvent do
           description: String.t() | nil,
           scheduled_start_time: DateTime.t() | nil,
           scheduled_end_time: DateTime.t() | nil,
-          privacy_level: integer() | nil,
-          status: integer() | nil,
-          entity_type: integer() | nil,
+          privacy_level: :guild_only | integer() | nil,
+          status: :scheduled | :active | :completed | :canceled | integer() | nil,
+          entity_type: :stage_instance | :voice | :external | integer() | nil,
           entity_id: String.t() | nil,
           entity_metadata: map() | nil,
           creator: EDA.User.t() | nil,
@@ -67,9 +73,9 @@ defmodule EDA.ScheduledEvent do
       description: raw["description"],
       scheduled_start_time: EDA.Timestamp.parse(raw["scheduled_start_time"]),
       scheduled_end_time: EDA.Timestamp.parse(raw["scheduled_end_time"]),
-      privacy_level: raw["privacy_level"],
-      status: raw["status"],
-      entity_type: raw["entity_type"],
+      privacy_level: EDA.Enum.name(@privacy_levels, raw["privacy_level"]),
+      status: EDA.Enum.name(@statuses, raw["status"]),
+      entity_type: EDA.Enum.name(@entity_types, raw["entity_type"]),
       entity_id: raw["entity_id"],
       entity_metadata: raw["entity_metadata"],
       creator: parse_user(raw["creator"]),
@@ -81,4 +87,23 @@ defmodule EDA.ScheduledEvent do
 
   defp parse_user(nil), do: nil
   defp parse_user(raw) when is_map(raw), do: EDA.User.from_raw(raw)
+
+  @doc """
+  The integer Discord uses for a privacy level, from its atom or the integer itself.
+  """
+  @spec privacy_level_value(atom() | integer()) :: integer()
+  def privacy_level_value(value), do: EDA.Enum.value!(@privacy_levels, value, "privacy level")
+
+  @doc """
+  The integer Discord uses for a scheduled event status, from its atom or the integer itself.
+  """
+  @spec status_value(atom() | integer()) :: integer()
+  def status_value(value), do: EDA.Enum.value!(@statuses, value, "scheduled event status")
+
+  @doc """
+  The integer Discord uses for a scheduled event entity type, from its atom or the integer itself.
+  """
+  @spec entity_type_value(atom() | integer()) :: integer()
+  def entity_type_value(value),
+    do: EDA.Enum.value!(@entity_types, value, "scheduled event entity type")
 end

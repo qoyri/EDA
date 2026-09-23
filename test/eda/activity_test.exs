@@ -20,7 +20,7 @@ defmodule EDA.ActivityTest do
       activity = Activity.from_raw(raw)
       assert %Activity{} = activity
       assert activity.name == "Playing"
-      assert activity.type == 0
+      assert activity.type == :playing
       assert activity.created_at == ~U[1970-01-01 00:20:34.567Z]
       assert %EDA.Emoji{id: "e1", name: "game"} = activity.emoji
     end

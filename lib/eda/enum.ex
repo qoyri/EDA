@@ -20,10 +20,32 @@ defmodule EDA.Enum do
   @spec value!(%{integer() => atom()}, atom() | integer(), String.t()) :: integer()
   def value!(_table, value, _what) when is_integer(value), do: value
 
-  def value!(table, name, what) when is_atom(name) do
+  def value!(table, name, what) when is_atom(name) and not is_nil(name) do
     Enum.find_value(table, fn {int, atom} -> if atom == name, do: int end) ||
       raise ArgumentError,
             "unknown #{what} #{inspect(name)}; known: " <>
               (table |> Enum.sort() |> Enum.map_join(", ", fn {_i, a} -> inspect(a) end))
+  end
+
+  @doc false
+  # Converts the atoms of an outgoing payload to Discord's integers, for the keys given; a key may
+  # be an atom or a string, and a value that is already an integer, or nil, is left alone.
+  @spec encode(map(), [{atom(), (atom() | integer() -> integer())}]) :: map()
+  def encode(payload, conversions) when is_map(payload) do
+    Enum.reduce(conversions, payload, fn {key, convert}, acc ->
+      acc
+      |> convert_at(key, convert)
+      |> convert_at(Atom.to_string(key), convert)
+    end)
+  end
+
+  defp convert_at(payload, key, convert) do
+    case payload do
+      %{^key => value} when is_atom(value) and not is_nil(value) ->
+        Map.put(payload, key, convert.(value))
+
+      _ ->
+        payload
+    end
   end
 end

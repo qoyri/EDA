@@ -148,6 +148,7 @@ defmodule EDA.MixProject do
           EDA.Role.Colors,
           EDA.ScheduledEvent,
           EDA.SoundboardSound,
+          EDA.StageInstance,
           EDA.Sticker,
           EDA.Sticker.Pack,
           EDA.User,

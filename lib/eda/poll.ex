@@ -29,6 +29,8 @@ defmodule EDA.Poll do
 
   use EDA.Event.Access
 
+  @layout_types %{1 => :default}
+
   alias EDA.Poll.{Answer, AnswerCount}
 
   defstruct [
@@ -47,7 +49,7 @@ defmodule EDA.Poll do
           expiry: DateTime.t() | nil,
           duration: integer() | nil,
           allow_multiselect: boolean(),
-          layout_type: integer() | nil,
+          layout_type: :default | integer() | nil,
           results: {boolean(), [AnswerCount.t()]} | nil
         }
 
@@ -117,7 +119,7 @@ defmodule EDA.Poll do
       expiry: EDA.Timestamp.parse(raw["expiry"]),
       duration: raw["duration"],
       allow_multiselect: raw["allow_multiselect"] || false,
-      layout_type: raw["layout_type"],
+      layout_type: EDA.Enum.name(@layout_types, raw["layout_type"]),
       results: parse_results(raw["results"])
     }
   end
@@ -127,7 +129,7 @@ defmodule EDA.Poll do
 
   ## Examples
 
-      iex> poll = %EDA.Poll{question: "Yes?", answers: [%EDA.Poll.Answer{text: "Yes"}], duration: 24, allow_multiselect: false, layout_type: 1}
+      iex> poll = %EDA.Poll{question: "Yes?", answers: [%EDA.Poll.Answer{text: "Yes"}], duration: 24, allow_multiselect: false, layout_type: :default}
       iex> raw = EDA.Poll.to_raw(poll)
       iex> raw["question"]
       %{"text" => "Yes?"}
@@ -141,7 +143,12 @@ defmodule EDA.Poll do
     }
 
     raw = if poll.duration, do: Map.put(raw, "duration", poll.duration), else: raw
-    raw = if poll.layout_type, do: Map.put(raw, "layout_type", poll.layout_type), else: raw
+
+    raw =
+      if poll.layout_type,
+        do: Map.put(raw, "layout_type", layout_type_value(poll.layout_type)),
+        else: raw
+
     raw
   end
 
@@ -182,7 +189,7 @@ defmodule EDA.Poll do
       answers: [],
       duration: duration,
       allow_multiselect: Keyword.get(opts, :multiselect, false),
-      layout_type: Keyword.get(opts, :layout, @layout_default)
+      layout_type: EDA.Enum.name(@layout_types, Keyword.get(opts, :layout, @layout_default))
     }
   end
 
@@ -340,6 +347,12 @@ defmodule EDA.Poll do
             "duration must be between #{@min_duration} and #{@max_duration} hours, got #{duration}"
     end
   end
+
+  @doc """
+  The integer Discord uses for a poll layout, from its atom or the integer itself.
+  """
+  @spec layout_type_value(atom() | integer()) :: integer()
+  def layout_type_value(value), do: EDA.Enum.value!(@layout_types, value, "poll layout")
 end
 
 defimpl Jason.Encoder, for: EDA.Poll do

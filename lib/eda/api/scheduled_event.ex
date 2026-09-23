@@ -37,14 +37,28 @@ defmodule EDA.API.ScheduledEvent do
   @doc "Creates a scheduled event in a guild."
   @spec create(String.t() | integer(), map()) :: {:ok, map()} | {:error, term()}
   def create(guild_id, params) do
-    post("/guilds/#{guild_id}/scheduled-events", params)
+    post(
+      "/guilds/#{guild_id}/scheduled-events",
+      EDA.Enum.encode(Map.new(params),
+        privacy_level: &EDA.ScheduledEvent.privacy_level_value/1,
+        status: &EDA.ScheduledEvent.status_value/1,
+        entity_type: &EDA.ScheduledEvent.entity_type_value/1
+      )
+    )
   end
 
   @doc "Modifies a scheduled event."
   @spec modify(String.t() | integer(), String.t() | integer(), map()) ::
           {:ok, map()} | {:error, term()}
   def modify(guild_id, event_id, params) do
-    patch("/guilds/#{guild_id}/scheduled-events/#{event_id}", params)
+    patch(
+      "/guilds/#{guild_id}/scheduled-events/#{event_id}",
+      EDA.Enum.encode(Map.new(params),
+        privacy_level: &EDA.ScheduledEvent.privacy_level_value/1,
+        status: &EDA.ScheduledEvent.status_value/1,
+        entity_type: &EDA.ScheduledEvent.entity_type_value/1
+      )
+    )
   end
 
   @doc "Deletes a scheduled event."

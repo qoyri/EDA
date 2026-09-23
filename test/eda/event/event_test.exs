@@ -30,7 +30,7 @@ defmodule EDA.EventTest do
       assert result.channel_id == "ch1"
       assert result.guild_id == "g1"
       assert result.tts == false
-      assert result.type == 0
+      assert result.type == :default
     end
 
     test "MessageCreate nested maps remain string-keyed" do

@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `EDA.StageInstance`, a live stage as a struct, which `STAGE_INSTANCE_CREATE`, `_UPDATE` and
+  `_DELETE` now deliver instead of structs of their own.
+
 - `EDA.Timestamp`, which reads Discord's timestamps into `DateTime` structs: `parse/1` for the
   ISO 8601 dates, `from_unix/1` and `from_unix_ms/1` for the Unix times a few payloads carry. It
   reads the two shapes Discord uses by matching bytes, 3 to 4 times faster than
@@ -48,6 +51,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or strings, and are integers in `EDA.User.DisplayNameStyles`.
 
 ### Changed
+
+- **More enumerations are atoms**, Discord's names in lowercase, an unknown value staying the
+  integer: `EDA.Message.type` (`:default`, `:reply`, `:chat_input_command`, `:thread_created`…),
+  `EDA.Webhook.type` (`:incoming`, `:channel_follower`, `:application`), `EDA.Activity` `type`
+  (`:playing`, `:streaming`, `:listening`, `:watching`, `:custom`, `:competing`) and
+  `status_display_type`, `EDA.PermissionOverwrite.type` (`:role`, `:member`),
+  `EDA.Poll.layout_type` (`:default`), `EDA.ScheduledEvent` `privacy_level`, `status` and
+  `entity_type`, `EDA.StageInstance.privacy_level`, and on `EDA.Guild` `verification_level`,
+  `default_message_notifications`, `explicit_content_filter`, `mfa_level`, `nsfw_level` and
+  `premium_tier` (`:none`, `:tier_1`…). The calls that send them — creating a channel or a thread,
+  editing a permission overwrite, modifying a guild, creating or modifying a scheduled event,
+  building a poll — take the atom or the integer, and refuse an atom Discord does not have, naming
+  the ones it does.
 
 - **A channel's `type` is an atom**, Discord's name in lowercase: `:guild_text`, `:dm`,
   `:guild_voice`, `:group_dm`, `:guild_category`, `:guild_announcement`, `:announcement_thread`,

@@ -1,38 +1,12 @@
 defmodule EDA.Event.StageInstanceCreate do
-  @moduledoc "Dispatched when a stage instance is created."
-  use EDA.Event.Access
+  @moduledoc """
+  Sent when a stage goes live. Delivers an `EDA.StageInstance`, not a struct of its own.
 
-  defstruct [
-    :id,
-    :guild_id,
-    :channel_id,
-    :topic,
-    :privacy_level,
-    :discoverable_disabled,
-    :guild_scheduled_event_id
-  ]
+  The consumer receives `{:STAGE_INSTANCE_CREATE, %EDA.StageInstance{}}`. This module only parses the
+  payload.
+  """
 
-  @type t :: %__MODULE__{
-          id: String.t() | nil,
-          guild_id: String.t() | nil,
-          channel_id: String.t() | nil,
-          topic: String.t() | nil,
-          privacy_level: integer() | nil,
-          discoverable_disabled: boolean() | nil,
-          guild_scheduled_event_id: String.t() | nil
-        }
-
-  @doc "Converts a raw Discord payload into this event struct."
-  @spec from_raw(map()) :: t()
-  def from_raw(raw) when is_map(raw) do
-    %__MODULE__{
-      id: raw["id"],
-      guild_id: raw["guild_id"],
-      channel_id: raw["channel_id"],
-      topic: raw["topic"],
-      privacy_level: raw["privacy_level"],
-      discoverable_disabled: raw["discoverable_disabled"],
-      guild_scheduled_event_id: raw["guild_scheduled_event_id"]
-    }
-  end
+  @doc "Parses the `STAGE_INSTANCE_CREATE` payload into an `EDA.StageInstance`."
+  @spec from_raw(map()) :: EDA.StageInstance.t()
+  def from_raw(raw) when is_map(raw), do: EDA.StageInstance.from_raw(raw)
 end

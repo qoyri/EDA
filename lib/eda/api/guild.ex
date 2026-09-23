@@ -16,6 +16,13 @@ defmodule EDA.API.Guild do
   @doc "Modifies a guild."
   @spec modify(String.t() | integer(), map(), keyword()) :: {:ok, map()} | {:error, term()}
   def modify(guild_id, payload, opts \\ []) do
+    payload =
+      EDA.Enum.encode(Map.new(payload),
+        verification_level: &EDA.Guild.verification_level_value/1,
+        default_message_notifications: &EDA.Guild.default_message_notifications_value/1,
+        explicit_content_filter: &EDA.Guild.explicit_content_filter_value/1
+      )
+
     patch("/guilds/#{guild_id}", payload, opts)
   end
 

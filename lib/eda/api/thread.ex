@@ -32,7 +32,11 @@ defmodule EDA.API.Thread do
   def start(channel_id, opts) do
     body = Map.new(opts)
     check_options!(body, @thread_keys, "EDA.API.Thread.start/2")
-    post("/channels/#{channel_id}/threads", body)
+
+    post(
+      "/channels/#{channel_id}/threads",
+      EDA.Enum.encode(body, type: &EDA.Channel.type_value/1)
+    )
   end
 
   @doc """

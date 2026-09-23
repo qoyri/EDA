@@ -51,7 +51,7 @@ defmodule EDA.KeptFieldsTest do
         "state_url" => "https://example.com/artist"
       })
 
-    assert activity.status_display_type == 1
+    assert activity.status_display_type == :state
     assert activity.details_url == "https://example.com/track"
     assert activity.state_url == "https://example.com/artist"
   end
