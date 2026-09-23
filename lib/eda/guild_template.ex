@@ -51,8 +51,8 @@ defmodule EDA.GuildTemplate do
           usage_count: integer() | nil,
           creator_id: String.t() | nil,
           creator: EDA.User.t() | nil,
-          created_at: String.t() | nil,
-          updated_at: String.t() | nil,
+          created_at: DateTime.t() | nil,
+          updated_at: DateTime.t() | nil,
           source_guild_id: String.t() | nil,
           serialized_source_guild: EDA.GuildTemplate.SourceGuild.t() | nil,
           is_dirty: boolean() | nil
@@ -85,8 +85,8 @@ defmodule EDA.GuildTemplate do
       usage_count: raw["usage_count"],
       creator_id: raw["creator_id"],
       creator: parse_creator(raw["creator"]),
-      created_at: raw["created_at"],
-      updated_at: raw["updated_at"],
+      created_at: EDA.Timestamp.parse(raw["created_at"]),
+      updated_at: EDA.Timestamp.parse(raw["updated_at"]),
       source_guild_id: raw["source_guild_id"],
       serialized_source_guild: parse_source_guild(raw["serialized_source_guild"]),
       is_dirty: raw["is_dirty"]

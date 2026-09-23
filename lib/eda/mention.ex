@@ -95,9 +95,17 @@ defmodule EDA.Mention do
       EDA.Mention.timestamp(1_700_000_000)       #=> "<t:1700000000>"
       EDA.Mention.timestamp(1_700_000_000, :R)   #=> "<t:1700000000:R>"
       EDA.Mention.timestamp(1_700_000_000, :f)   #=> "<t:1700000000:f>"
+
+  A `DateTime` works too, so a date EDA parsed can be shown as is:
+
+      iex> EDA.Mention.timestamp(~U[2023-11-14 22:13:20Z], :R)
+      "<t:1700000000:R>"
   """
-  @spec timestamp(integer(), atom()) :: String.t()
+  @spec timestamp(integer() | DateTime.t(), atom()) :: String.t()
   def timestamp(unix, style \\ nil)
+
+  def timestamp(%DateTime{} = datetime, style),
+    do: timestamp(DateTime.to_unix(datetime), style)
 
   def timestamp(unix, nil) when is_integer(unix), do: "<t:#{unix}>"
 

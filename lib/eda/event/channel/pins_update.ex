@@ -6,7 +6,7 @@ defmodule EDA.Event.ChannelPinsUpdate do
   @type t :: %__MODULE__{
           guild_id: String.t() | nil,
           channel_id: String.t() | nil,
-          last_pin_timestamp: String.t() | nil
+          last_pin_timestamp: DateTime.t() | nil
         }
   @doc "Converts a raw Discord payload into this event struct."
   @spec from_raw(map()) :: t()
@@ -14,7 +14,7 @@ defmodule EDA.Event.ChannelPinsUpdate do
     %__MODULE__{
       guild_id: raw["guild_id"],
       channel_id: raw["channel_id"],
-      last_pin_timestamp: raw["last_pin_timestamp"]
+      last_pin_timestamp: EDA.Timestamp.parse(raw["last_pin_timestamp"])
     }
   end
 end

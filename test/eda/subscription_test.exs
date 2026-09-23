@@ -34,7 +34,7 @@ defmodule EDA.SubscriptionTest do
       assert sub.sku_ids == ["sku1"]
       assert sub.entitlement_ids == ["e1"]
       assert sub.renewal_sku_ids == ["sku2"]
-      assert sub.current_period_end == "2026-10-01T00:00:00Z"
+      assert sub.current_period_end == ~U[2026-10-01 00:00:00Z]
       assert sub.status == 2
       assert sub.country == "FR"
     end

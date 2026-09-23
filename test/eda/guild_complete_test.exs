@@ -77,7 +77,7 @@ defmodule EDA.GuildCompleteTest do
     test "GUILD_CREATE is an EDA.Guild, with the lists that only it carries, typed" do
       guild = EDA.Event.from_raw("GUILD_CREATE", @guild_create)
 
-      assert %EDA.Guild{joined_at: "2026-09-23T10:00:00.000000+00:00"} = guild
+      assert %EDA.Guild{joined_at: ~U[2026-09-23 10:00:00.000000Z]} = guild
       assert [%EDA.Channel{name: "general"}] = guild.channels
       assert [%EDA.Channel{thread: %EDA.Channel.Thread{archived: false}}] = guild.threads
       assert [%EDA.Member{}] = guild.members

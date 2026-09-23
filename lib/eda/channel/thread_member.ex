@@ -17,7 +17,7 @@ defmodule EDA.Channel.ThreadMember do
   @type t :: %__MODULE__{
           id: String.t() | nil,
           user_id: String.t() | nil,
-          join_timestamp: String.t() | nil,
+          join_timestamp: DateTime.t() | nil,
           flags: non_neg_integer() | nil,
           member: EDA.Member.t() | nil
         }
@@ -30,7 +30,7 @@ defmodule EDA.Channel.ThreadMember do
     %__MODULE__{
       id: raw["id"],
       user_id: raw["user_id"],
-      join_timestamp: raw["join_timestamp"],
+      join_timestamp: EDA.Timestamp.parse(raw["join_timestamp"]),
       flags: raw["flags"],
       member: parse_member(raw["member"])
     }

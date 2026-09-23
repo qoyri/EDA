@@ -7,7 +7,7 @@ defmodule EDA.Event.ThreadMemberUpdate do
           id: String.t() | nil,
           guild_id: String.t() | nil,
           user_id: String.t() | nil,
-          join_timestamp: String.t() | nil,
+          join_timestamp: DateTime.t() | nil,
           flags: integer() | nil
         }
   @doc "Converts a raw Discord payload into this event struct."
@@ -17,7 +17,7 @@ defmodule EDA.Event.ThreadMemberUpdate do
       id: raw["id"],
       guild_id: raw["guild_id"],
       user_id: raw["user_id"],
-      join_timestamp: raw["join_timestamp"],
+      join_timestamp: EDA.Timestamp.parse(raw["join_timestamp"]),
       flags: raw["flags"]
     }
   end

@@ -44,7 +44,7 @@ defmodule EDA.Poll do
   @type t :: %__MODULE__{
           question: String.t() | nil,
           answers: [Answer.t()],
-          expiry: String.t() | nil,
+          expiry: DateTime.t() | nil,
           duration: integer() | nil,
           allow_multiselect: boolean(),
           layout_type: integer() | nil,
@@ -114,7 +114,7 @@ defmodule EDA.Poll do
     %__MODULE__{
       question: get_in(raw, ["question", "text"]),
       answers: parse_answers(raw["answers"]),
-      expiry: raw["expiry"],
+      expiry: EDA.Timestamp.parse(raw["expiry"]),
       duration: raw["duration"],
       allow_multiselect: raw["allow_multiselect"] || false,
       layout_type: raw["layout_type"],
@@ -227,7 +227,7 @@ defmodule EDA.Poll do
 
   ## Examples
 
-      iex> EDA.Poll.expired?(%EDA.Poll{expiry: "2020-01-01T00:00:00+00:00"})
+      iex> EDA.Poll.expired?(%EDA.Poll{expiry: ~U[2020-01-01 00:00:00Z]})
       true
 
       iex> EDA.Poll.expired?(%EDA.Poll{expiry: nil})
@@ -237,9 +237,9 @@ defmodule EDA.Poll do
   def expired?(%__MODULE__{expiry: nil}), do: false
 
   def expired?(%__MODULE__{expiry: expiry}) do
-    case DateTime.from_iso8601(expiry) do
-      {:ok, dt, _offset} -> DateTime.compare(dt, DateTime.utc_now()) == :lt
-      _ -> false
+    case EDA.Timestamp.parse(expiry) do
+      nil -> false
+      dt -> DateTime.compare(dt, DateTime.utc_now()) == :lt
     end
   end
 

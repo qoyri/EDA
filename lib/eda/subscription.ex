@@ -39,10 +39,10 @@ defmodule EDA.Subscription do
           sku_ids: [String.t()] | nil,
           entitlement_ids: [String.t()] | nil,
           renewal_sku_ids: [String.t()] | nil,
-          current_period_start: String.t() | nil,
-          current_period_end: String.t() | nil,
+          current_period_start: DateTime.t() | nil,
+          current_period_end: DateTime.t() | nil,
           status: integer() | nil,
-          canceled_at: String.t() | nil,
+          canceled_at: DateTime.t() | nil,
           country: String.t() | nil
         }
 
@@ -54,10 +54,10 @@ defmodule EDA.Subscription do
       sku_ids: raw["sku_ids"],
       entitlement_ids: raw["entitlement_ids"],
       renewal_sku_ids: raw["renewal_sku_ids"],
-      current_period_start: raw["current_period_start"],
-      current_period_end: raw["current_period_end"],
+      current_period_start: EDA.Timestamp.parse(raw["current_period_start"]),
+      current_period_end: EDA.Timestamp.parse(raw["current_period_end"]),
       status: raw["status"],
-      canceled_at: raw["canceled_at"],
+      canceled_at: EDA.Timestamp.parse(raw["canceled_at"]),
       country: raw["country"]
     }
   end

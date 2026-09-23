@@ -29,8 +29,8 @@ defmodule EDA.InviteCreateEventTest do
     invite = EDA.Event.from_raw("INVITE_CREATE", @payload)
 
     assert %EDA.Invite{code: "abc123", guild_id: "2", channel_id: "1"} = invite
-    assert invite.expires_at == "2026-09-24T10:00:00.000000+00:00"
-    assert invite.created_at == "2026-09-23T10:00:00.000000+00:00"
+    assert invite.expires_at == ~U[2026-09-24 10:00:00.000000Z]
+    assert invite.created_at == ~U[2026-09-23 10:00:00.000000Z]
     assert EDA.Invite.target_type(invite) == :stream
     assert %EDA.User{username: "streamer"} = invite.target_user
     assert invite.role_ids == ["5", "6"]

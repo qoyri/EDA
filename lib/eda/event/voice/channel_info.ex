@@ -33,15 +33,5 @@ defmodule EDA.Event.ChannelInfo do
   @doc false
   # The voice session start, in Unix seconds. The reference types it as an integer, but the live
   # gateway sends it as a string ("1790002356"), so both are read.
-  def unix_time(nil), do: nil
-  def unix_time(seconds) when is_integer(seconds), do: DateTime.from_unix!(seconds)
-
-  def unix_time(seconds) when is_binary(seconds) do
-    case Integer.parse(seconds) do
-      {n, ""} -> DateTime.from_unix!(n)
-      _ -> nil
-    end
-  end
-
-  def unix_time(_other), do: nil
+  def unix_time(seconds), do: EDA.Timestamp.from_unix(seconds)
 end

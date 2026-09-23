@@ -31,7 +31,7 @@ defmodule EDA.Event.VoiceStateUpdate do
           self_stream: boolean() | nil,
           self_video: boolean() | nil,
           suppress: boolean() | nil,
-          request_to_speak_timestamp: String.t() | nil
+          request_to_speak_timestamp: DateTime.t() | nil
         }
 
   @doc "Converts a raw Discord payload into this event struct."
@@ -50,7 +50,7 @@ defmodule EDA.Event.VoiceStateUpdate do
       self_stream: raw["self_stream"],
       self_video: raw["self_video"],
       suppress: raw["suppress"],
-      request_to_speak_timestamp: raw["request_to_speak_timestamp"]
+      request_to_speak_timestamp: EDA.Timestamp.parse(raw["request_to_speak_timestamp"])
     }
   end
 

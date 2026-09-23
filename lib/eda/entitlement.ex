@@ -94,15 +94,5 @@ defmodule EDA.Entitlement do
       (is_nil(entitlement.ends_at) or DateTime.compare(entitlement.ends_at, now) == :gt)
   end
 
-  defp parse_time(nil), do: nil
-
-  defp parse_time(iso) when is_binary(iso) do
-    case DateTime.from_iso8601(iso) do
-      {:ok, dt, _offset} -> dt
-      _ -> nil
-    end
-  end
-
-  defp parse_time(%DateTime{} = dt), do: dt
-  defp parse_time(_other), do: nil
+  defp parse_time(value), do: EDA.Timestamp.parse(value)
 end

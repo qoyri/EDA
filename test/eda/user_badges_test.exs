@@ -179,8 +179,8 @@ defmodule EDA.UserBadgesTest do
         })
 
       assert event.flags == 1
-      assert event.premium_since == "2026-01-01T00:00:00+00:00"
-      assert event.communication_disabled_until == "2026-02-01T00:00:00+00:00"
+      assert event.premium_since == ~U[2026-01-01 00:00:00Z]
+      assert event.communication_disabled_until == ~U[2026-02-01 00:00:00Z]
       assert event.banner == "b_hash"
 
       # The event is the member itself, with its guild.
@@ -219,7 +219,7 @@ defmodule EDA.UserBadgesTest do
         })
 
       assert event.flags == 4
-      assert event.communication_disabled_until == "2026-02-01T00:00:00+00:00"
+      assert event.communication_disabled_until == ~U[2026-02-01 00:00:00Z]
       assert event.banner == "b_hash"
       assert event.mute == true
     end

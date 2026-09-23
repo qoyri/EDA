@@ -30,13 +30,13 @@ defmodule EDA.Member do
           banner: String.t() | nil,
           bio: String.t() | nil,
           roles: [String.t()] | nil,
-          joined_at: String.t() | nil,
-          premium_since: String.t() | nil,
+          joined_at: DateTime.t() | nil,
+          premium_since: DateTime.t() | nil,
           deaf: boolean() | nil,
           mute: boolean() | nil,
           pending: boolean() | nil,
           permissions: String.t() | nil,
-          communication_disabled_until: String.t() | nil,
+          communication_disabled_until: DateTime.t() | nil,
           flags: integer() | nil,
           avatar_decoration_data: EDA.User.AvatarDecoration.t() | nil,
           collectibles: EDA.User.Collectibles.t() | nil,
@@ -53,13 +53,13 @@ defmodule EDA.Member do
       banner: raw["banner"],
       bio: raw["bio"],
       roles: raw["roles"],
-      joined_at: raw["joined_at"],
-      premium_since: raw["premium_since"],
+      joined_at: EDA.Timestamp.parse(raw["joined_at"]),
+      premium_since: EDA.Timestamp.parse(raw["premium_since"]),
       deaf: raw["deaf"],
       mute: raw["mute"],
       pending: raw["pending"],
       permissions: raw["permissions"],
-      communication_disabled_until: raw["communication_disabled_until"],
+      communication_disabled_until: EDA.Timestamp.parse(raw["communication_disabled_until"]),
       flags: raw["flags"],
       avatar_decoration_data: EDA.User.AvatarDecoration.from_raw(raw["avatar_decoration_data"]),
       collectibles: EDA.User.Collectibles.from_raw(raw["collectibles"]),
@@ -142,10 +142,10 @@ defmodule EDA.Member do
 
   ## Examples
 
-      iex> EDA.Member.timed_out?(%EDA.Member{communication_disabled_until: "2099-01-01T00:00:00Z"})
+      iex> EDA.Member.timed_out?(%EDA.Member{communication_disabled_until: ~U[2099-01-01 00:00:00Z]})
       true
 
-      iex> EDA.Member.timed_out?(%EDA.Member{communication_disabled_until: "2020-01-01T00:00:00Z"})
+      iex> EDA.Member.timed_out?(%EDA.Member{communication_disabled_until: ~U[2020-01-01 00:00:00Z]})
       false
 
       iex> EDA.Member.timed_out?(%EDA.Member{})
@@ -159,17 +159,8 @@ defmodule EDA.Member do
     end
   end
 
-  defp parse_timestamp(nil), do: nil
-
-  defp parse_timestamp(value) when is_binary(value) do
-    case DateTime.from_iso8601(value) do
-      {:ok, dt, _offset} -> dt
-      {:error, _reason} -> nil
-    end
-  end
-
-  defp parse_timestamp(%DateTime{} = value), do: value
-  defp parse_timestamp(_value), do: nil
+  # A struct holds a DateTime; a raw member map from the cache holds Discord's string.
+  defp parse_timestamp(value), do: EDA.Timestamp.parse(value)
 
   @doc """
   The member's highest role in a guild, as the cached role map, or `nil` when they have none

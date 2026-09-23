@@ -21,7 +21,7 @@ defmodule EDA.ActivityTest do
       assert %Activity{} = activity
       assert activity.name == "Playing"
       assert activity.type == 0
-      assert activity.created_at == 1_234_567
+      assert activity.created_at == ~U[1970-01-01 00:20:34.567Z]
       assert %EDA.Emoji{id: "e1", name: "game"} = activity.emoji
     end
 

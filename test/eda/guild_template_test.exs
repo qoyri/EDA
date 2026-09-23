@@ -50,8 +50,8 @@ defmodule EDA.GuildTemplateTest do
       assert template.usage_count == 12
       assert template.creator_id == "123456789"
       assert %EDA.User{id: "123456789", username: "creator"} = template.creator
-      assert template.created_at == "2020-01-01T00:00:00+00:00"
-      assert template.updated_at == "2020-06-01T12:00:00+00:00"
+      assert template.created_at == ~U[2020-01-01 00:00:00Z]
+      assert template.updated_at == ~U[2020-06-01 12:00:00Z]
       assert template.source_guild_id == "987654321"
       assert template.is_dirty == false
     end
