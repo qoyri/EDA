@@ -40,6 +40,12 @@ to about 13 µs instead of 19, a presence to 6.9 instead of 12, a role update to
 
 ### Fixed
 
+- **Cached entities no longer keep whole JSON payloads alive.** JSON was decoded with strings
+  that only referenced the body they came from, and a cache entry holding one of them, over 64
+  bytes, kept the whole body in memory. With the JSON gateway encoding, the channels of eight
+  real guilds kept 614 KB of their 786 KB `GUILD_CREATE` frames alive; REST responses did the
+  same on a smaller scale. Strings are now copied out of the body: 2 µs more per JSON event,
+  0.6 ms more on a 743 KB REST page. The default ETF encoding was not affected.
 - **Colours, flags and limits are integers on ETF, as on JSON.** The default ETF encoding turned
   every integer from 2^22 into a string, taking it for a snowflake: a role colour above `#400000`
   (half the roles of real guilds), an `accent_color`, flags with bit 22 set, a guild's

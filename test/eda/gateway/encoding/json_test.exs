@@ -14,6 +14,14 @@ defmodule EDA.Gateway.Encoding.JSONTest do
       assert %{"id" => "123456789012345678"} = JSON.decode(json)
     end
 
+    test "a long string does not keep the whole frame alive" do
+      topic = String.duplicate("t", 200)
+      frame = Jason.encode!(%{"topic" => topic, "padding" => String.duplicate("p", 50_000)})
+
+      assert %{"topic" => ^topic} = decoded = JSON.decode(frame)
+      assert :binary.referenced_byte_size(decoded["topic"]) == 200
+    end
+
     test "raises on invalid JSON" do
       assert_raise Jason.DecodeError, fn ->
         JSON.decode("not json")
