@@ -3,6 +3,9 @@ defmodule EDA.Cache.Presence do
   ETS-based cache for Discord presences.
 
   Tracks user status (online/idle/dnd/offline) and activities per guild.
+
+  What Discord leaves out of a presence is cached as it arrives, so a missing custom status
+  means what it means on `EDA.Event.PresenceUpdate`: the user's profile may simply be private.
   Keyed by `{guild_id, user_id}`.
 
   Requires the `guild_presences` privileged intent.
