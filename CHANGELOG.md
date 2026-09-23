@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **zstd-stream transport compression, on by default.** The gateway now asks Discord for
+  `compress=zstd-stream` and decompresses in EDA's precompiled NIF: on the frames Discord sent to
+  a real bot, 74 % less time than zlib-stream for a `GUILD_CREATE`, 46 % less for a small event
+  (1.1 µs instead of 2.0). A bot without the NIF falls back to zlib-stream, and
+  `config :eda, gateway_compression: :zlib` chooses it. Decompression errors emit
+  `[:eda, :gateway, :zstd, :error]`, as zlib's emit `[:eda, :gateway, :zlib, :error]`.
+
 ### Changed
 
 - **Less work per gateway event.** With a consumer, an event is parsed once and the caches take

@@ -289,4 +289,96 @@ fn max_protocol_version() -> u16 {
     DAVE_PROTOCOL_VERSION
 }
 
+// ── Gateway transport compression ────────────────────────────────────────────
+//
+// zstd-stream: one decompression context per gateway connection, fed each WebSocket message as
+// Discord flushes it. It lives in this NIF because EDA already ships it precompiled; the gateway
+// reaches it through EDA.Gateway.Zstd.
+
+// The output buffer is kept between messages, so decompressing one allocates nothing but the
+// binary it returns.
+struct ZstdState {
+    dctx: zstd::zstd_safe::DCtx<'static>,
+    out: Vec<u8>,
+}
+
+struct ZstdResource(Mutex<ZstdState>);
+
+#[rustler::resource_impl]
+impl rustler::Resource for ZstdResource {}
+
+#[rustler::nif]
+fn zstd_new() -> Result<ResourceArc<ZstdResource>, Atom> {
+    let dctx = zstd::zstd_safe::DCtx::try_create().ok_or(atoms::error())?;
+    let state = ZstdState {
+        dctx,
+        out: Vec::with_capacity(64 * 1024),
+    };
+    Ok(ResourceArc::new(ZstdResource(Mutex::new(state))))
+}
+
+fn zstd_run<'a>(
+    env: Env<'a>,
+    resource: &ResourceArc<ZstdResource>,
+    input: &Binary,
+) -> Result<Binary<'a>, Atom> {
+    let mut guard = resource.0.lock().map_err(|_| atoms::error())?;
+    let ZstdState { dctx, out } = &mut *guard;
+    out.clear();
+    let mut in_buf = zstd::zstd_safe::InBuffer::around(input.as_slice());
+
+    loop {
+        if out.capacity() - out.len() < 1024 {
+            out.reserve(out.capacity());
+        }
+        let pos = out.len();
+        let mut out_buf = zstd::zstd_safe::OutBuffer::around_pos(out, pos);
+        dctx.decompress_stream(&mut out_buf, &mut in_buf)
+            .map_err(|_| atoms::error())?;
+        let full = out_buf.pos() == out_buf.capacity();
+        // Done once the input is consumed and the output was not the limit.
+        if in_buf.pos() == input.len() && !full {
+            break;
+        }
+    }
+
+    let result = to_binary(env, out);
+    // A huge READY must not keep its buffer for the life of the connection.
+    if out.capacity() > 1024 * 1024 {
+        *out = Vec::with_capacity(64 * 1024);
+    }
+    Ok(result)
+}
+
+// Most messages decompress in microseconds, well within a normal scheduler's budget; a large
+// GUILD_CREATE or READY goes to the dirty one, chosen by input size on the Elixir side.
+#[rustler::nif]
+fn zstd_decompress<'a>(
+    env: Env<'a>,
+    resource: ResourceArc<ZstdResource>,
+    input: Binary,
+) -> Result<Binary<'a>, Atom> {
+    zstd_run(env, &resource, &input)
+}
+
+#[rustler::nif(schedule = "DirtyCpu")]
+fn zstd_decompress_dirty<'a>(
+    env: Env<'a>,
+    resource: ResourceArc<ZstdResource>,
+    input: Binary,
+) -> Result<Binary<'a>, Atom> {
+    zstd_run(env, &resource, &input)
+}
+
+#[rustler::nif]
+fn zstd_reset(resource: ResourceArc<ZstdResource>) -> Atom {
+    match resource.0.lock() {
+        Ok(mut state) => match state.dctx.reset(zstd::zstd_safe::ResetDirective::SessionOnly) {
+            Ok(_) => atoms::ok(),
+            Err(_) => atoms::error(),
+        },
+        Err(_) => atoms::error(),
+    }
+}
+
 rustler::init!("Elixir.EDA.Voice.Dave.Native");

@@ -16,7 +16,7 @@ defmodule EDA.Gateway.Connection do
 
   require Logger
 
-  alias EDA.Gateway.{CloseCode, Encoding, Events, Heartbeat, ShardManager, Zlib}
+  alias EDA.Gateway.{CloseCode, Compression, Encoding, Events, Heartbeat, ShardManager}
 
   defstruct [
     :token,
@@ -27,7 +27,8 @@ defmodule EDA.Gateway.Connection do
     :seq,
     :heartbeat_ack,
     :shard,
-    :zlib,
+    :compression,
+    :decompressor,
     :encoding,
     :heartbeat_send_time,
     :heartbeat_latency,
@@ -44,7 +45,8 @@ defmodule EDA.Gateway.Connection do
           seq: integer() | nil,
           heartbeat_ack: boolean(),
           shard: {integer(), integer()},
-          zlib: Zlib.t() | nil,
+          compression: module(),
+          decompressor: EDA.Gateway.Zlib.t() | EDA.Gateway.Zstd.t() | nil,
           encoding: module() | nil,
           heartbeat_send_time: integer() | nil,
           heartbeat_latency: integer() | nil,
@@ -62,6 +64,8 @@ defmodule EDA.Gateway.Connection do
   - `:token` — bot token (required)
   - `:shard` — `{shard_id, total_shards}` tuple (required)
   - `:gateway_url` — WebSocket URL from `/gateway/bot` (required)
+  - `:compression` — decompressor module matching the URL's `compress` parameter (defaults to
+    `EDA.Gateway.Compression.module/0`)
   """
   def start_link(opts) do
     token = Keyword.fetch!(opts, :token)
@@ -74,7 +78,8 @@ defmodule EDA.Gateway.Connection do
       seq: nil,
       heartbeat_ack: true,
       shard: shard,
-      zlib: nil,
+      compression: Keyword.get_lazy(opts, :compression, &Compression.module/0),
+      decompressor: nil,
       encoding: Encoding.module()
     }
 
@@ -134,16 +139,16 @@ defmodule EDA.Gateway.Connection do
   def handle_connect(_conn, state) do
     Logger.info("#{shard_label(state)} Connected to Discord Gateway")
 
-    # Init zlib on first connect (must happen in the WebSockex process),
-    # reset on subsequent reconnects.
-    zlib =
-      case state.zlib do
+    # Init the decompressor on first connect (a zlib context must be created in the WebSockex
+    # process), reset it on subsequent reconnects.
+    decompressor =
+      case state.decompressor do
         nil ->
-          {:ok, z} = Zlib.init()
-          z
+          {:ok, d} = state.compression.init()
+          d
 
         existing ->
-          Zlib.reset(existing)
+          state.compression.reset(existing)
       end
 
     hello_timer = Process.send_after(self(), :hello_timeout, 20_000)
@@ -151,7 +156,7 @@ defmodule EDA.Gateway.Connection do
     {:ok,
      %{
        state
-       | zlib: zlib,
+       | decompressor: decompressor,
          connected_at: System.monotonic_time(:millisecond),
          hello_timer: hello_timer
      }}
@@ -273,30 +278,30 @@ defmodule EDA.Gateway.Connection do
 
   @impl true
   def terminate(reason, state) do
-    if state.zlib, do: Zlib.close(state.zlib)
+    if state.decompressor, do: state.compression.close(state.decompressor)
     Logger.debug("#{shard_label(state)} Terminated: #{inspect(reason)}")
     :ok
   end
 
   @impl true
   def handle_frame({:binary, compressed}, state) do
-    case Zlib.push(state.zlib, compressed) do
-      {:ok, decompressed, zlib} ->
+    case state.compression.push(state.decompressor, compressed) do
+      {:ok, decompressed, decompressor} ->
         case safe_decode(state.encoding, decompressed) do
           {:ok, payload} ->
-            handle_payload(payload, %{state | zlib: zlib})
+            handle_payload(payload, %{state | decompressor: decompressor})
 
           {:error, reason} ->
             Logger.error("#{shard_label(state)} Decode error: #{inspect(reason)}")
-            {:ok, %{state | zlib: zlib}}
+            {:ok, %{state | decompressor: decompressor}}
         end
 
-      {:incomplete, zlib} ->
-        {:ok, %{state | zlib: zlib}}
+      {:incomplete, decompressor} ->
+        {:ok, %{state | decompressor: decompressor}}
 
-      {:error, reason, zlib} ->
-        Logger.error("#{shard_label(state)} Zlib decompression failed: #{inspect(reason)}")
-        {:close, %{state | zlib: zlib}}
+      {:error, reason, decompressor} ->
+        Logger.error("#{shard_label(state)} Decompression failed: #{inspect(reason)}")
+        {:close, %{state | decompressor: decompressor}}
     end
   end
 

@@ -3,7 +3,8 @@ defmodule EDA.Voice.Dave.Native do
   NIF bindings for the DAVE (Discord Audio Video E2EE) MLS session.
 
   Wraps the `davey` Rust crate which implements the MLS (RFC 9420) key
-  exchange protocol used by Discord's DAVE protocol.
+  exchange protocol used by Discord's DAVE protocol. The same NIF also carries the gateway's
+  zstd-stream decompression, used through `EDA.Gateway.Zstd`.
 
   The NIF is downloaded precompiled when EDA compiles, from the GitHub release of EDA's version,
   and verified against the checksums shipped in the package. Binaries exist for Linux (x86-64,
@@ -183,4 +184,25 @@ defmodule EDA.Voice.Dave.Native do
   rescue
     _ -> false
   end
+
+  # ── Gateway transport compression ──
+  #
+  # zstd-stream decompression for the gateway, in this NIF because it is the one EDA already
+  # ships precompiled. Used through EDA.Gateway.Zstd.
+
+  @doc false
+  @spec zstd_new() :: {:ok, reference()} | {:error, atom()}
+  def zstd_new, do: :erlang.nif_error(:nif_not_loaded)
+
+  @doc false
+  @spec zstd_decompress(reference(), binary()) :: {:ok, binary()} | {:error, atom()}
+  def zstd_decompress(_ref, _input), do: :erlang.nif_error(:nif_not_loaded)
+
+  @doc false
+  @spec zstd_decompress_dirty(reference(), binary()) :: {:ok, binary()} | {:error, atom()}
+  def zstd_decompress_dirty(_ref, _input), do: :erlang.nif_error(:nif_not_loaded)
+
+  @doc false
+  @spec zstd_reset(reference()) :: :ok | :error
+  def zstd_reset(_ref), do: :erlang.nif_error(:nif_not_loaded)
 end
