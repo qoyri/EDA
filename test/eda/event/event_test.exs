@@ -115,8 +115,7 @@ defmodule EDA.EventTest do
       result = Event.from_raw("SUPER_NEW_EVENT", data)
       assert %Event.Raw{} = result
       assert result.event_type == "SUPER_NEW_EVENT"
-      assert result.data.foo == "bar"
-      assert result.data.baz == 42
+      assert result.data == %{"foo" => "bar", "baz" => 42}
     end
 
     test "GUILD_CREATE extracts all fields" do

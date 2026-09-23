@@ -27,6 +27,8 @@ defmodule EDA.AutoMod do
 
   alias EDA.AutoMod.{Action, TriggerMetadata}
 
+  use EDA.Event.Access
+
   defstruct [
     :id,
     :guild_id,

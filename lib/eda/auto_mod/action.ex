@@ -22,6 +22,8 @@ defmodule EDA.AutoMod.Action do
 
   alias EDA.AutoMod.ActionMetadata
 
+  use EDA.Event.Access
+
   defstruct [:type, :metadata]
 
   @type t :: %__MODULE__{

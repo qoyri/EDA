@@ -34,6 +34,9 @@ defmodule EDA.Gateway.Events do
 
       consumer ->
         struct = EDA.Event.from_raw(effective_type, data)
+        # An atom even for an event EDA does not know, so a bot can match a new one by name
+        # before EDA types it. Discord's event names are a small fixed set, so this does not
+        # grow the atom table without bound, unlike converting payload keys would.
         event_type_atom = String.to_atom(effective_type)
         event = {event_type_atom, struct}
 

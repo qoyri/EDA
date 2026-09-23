@@ -6,6 +6,8 @@ defmodule EDA.Sticker do
   Formats: `:png`, `:apng`, `:lottie`, `:gif`.
   """
 
+  use EDA.Event.Access
+
   defstruct [
     :id,
     :pack_id,

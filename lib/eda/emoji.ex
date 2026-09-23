@@ -9,6 +9,8 @@ defmodule EDA.Emoji do
   into a message string and get the correct mention format.
   """
 
+  use EDA.Event.Access
+
   defstruct [:id, :name, :animated, :roles, :user, :require_colons, :managed, :available]
 
   @type t :: %__MODULE__{

@@ -1,6 +1,8 @@
 defmodule EDA.Sticker.Pack do
   @moduledoc "Represents a Discord sticker pack (collection of standard Nitro stickers)."
 
+  use EDA.Event.Access
+
   defstruct [:id, :stickers, :name, :sku_id, :cover_sticker_id, :description, :banner_asset_id]
 
   @type t :: %__MODULE__{

@@ -38,6 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `EDA.Event.Raw`, the fallback for a gateway event EDA does not type yet, keeps its `data` as
+  Discord sent it, with string keys, instead of converting the top-level keys to atoms: read
+  `raw.data["guild_id"]` rather than `raw.data.guild_id`. Converting created an atom for every key
+  of every unknown payload, and atoms are never freed. The event still reaches the consumer under
+  its own name, so a new event can be matched before EDA types it.
+
 - `EDA.API.Invite.create/2` sends up to 1000 `target_users` as the JSON array Discord now
   accepts, so the list is in force when the call returns, instead of uploading a CSV and leaving
   the caller to poll. A longer list, or a CSV binary, still uploads. Two findings from that
@@ -48,6 +54,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `EDA.User.Collectibles` (holding an `EDA.User.Nameplate`) instead of raw maps. The
   decoration carries `expires_at`, which Discord sends but does not document. Code that read them
   with string keys keeps working, as on every other nested object.
+
+### Fixed
+
+- `EDA.Emoji`, `EDA.Sticker`, `EDA.Sticker.Pack`, `EDA.AutoMod` and its action and metadata
+  structs, `EDA.GuildTemplate` and its source guild did not implement the access every other
+  struct offers, so `reaction.emoji["name"]` or `get_in(event, ["emoji", "name"])` raised
+  `UndefinedFunctionError` — on the emoji of every reaction event. A test now walks every struct
+  built from Discord data, so one added without it fails.
+- Reading a struct field by string key (`msg["content"]`) no longer converts the key to an atom
+  on every read: it is matched against the struct's own fields, about 2.5 times faster, now
+  quicker than a lookup in a raw map. Writing through that access (`put_in/2`, `pop_in/1`) can no
+  longer add a key the struct does not have or remove one it has: an unknown key raises
+  `KeyError`, and popping a field resets it to `nil`.
 
 ## [0.5.0-beta.2] - 2026-09-22
 

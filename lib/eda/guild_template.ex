@@ -28,6 +28,8 @@ defmodule EDA.GuildTemplate do
       EDA.GuildTemplate.max_description_length()  # => 120
   """
 
+  use EDA.Event.Access
+
   defstruct [
     :code,
     :name,
@@ -107,6 +109,8 @@ defmodule EDA.GuildTemplate.SourceGuild do
   Roles and channels are kept as plain maps since their IDs are placeholders
   and they contain only a subset of normal guild role/channel fields.
   """
+
+  use EDA.Event.Access
 
   defstruct [
     :name,

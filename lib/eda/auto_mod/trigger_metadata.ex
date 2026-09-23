@@ -8,6 +8,8 @@ defmodule EDA.AutoMod.TriggerMetadata do
   - `mention_spam` → `:mention_total_limit`, `:mention_raid_protection_enabled`
   """
 
+  use EDA.Event.Access
+
   defstruct [
     :keyword_filter,
     :regex_patterns,

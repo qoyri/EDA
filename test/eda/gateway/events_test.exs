@@ -147,7 +147,7 @@ defmodule EDA.Gateway.EventsTest do
 
       assert_receive {:event, {:UNKNOWN_NEW_EVENT, %EDA.Event.Raw{} = raw}}, 1000
       assert raw.event_type == "UNKNOWN_NEW_EVENT"
-      assert raw.data.foo == "bar"
+      assert raw.data == %{"foo" => "bar"}
 
       Application.delete_env(:eda, :consumer)
     end

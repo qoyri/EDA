@@ -8,6 +8,8 @@ defmodule EDA.AutoMod.ActionMetadata do
   - `timeout` → `:duration_seconds`
   """
 
+  use EDA.Event.Access
+
   defstruct [:channel_id, :duration_seconds, :custom_message]
 
   @type t :: %__MODULE__{
