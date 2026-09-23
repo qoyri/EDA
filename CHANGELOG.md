@@ -38,6 +38,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`GUILD_CREATE`, `GUILD_AVAILABLE` and `GUILD_UPDATE` deliver an `EDA.Guild`**, instead of
+  structs of their own. The lists only `GUILD_CREATE` carries — `channels`, `threads`, `members`,
+  `voice_states`, `presences`, `stage_instances`, `guild_scheduled_events`,
+  `soundboard_sounds` — are typed (`EDA.Channel`, `EDA.Member`, `EDA.VoiceState`,
+  `EDA.SoundboardSound`) and describe that moment only: they are `nil` on a guild from
+  `EDA.Guild.fetch/1` or the REST API. Read the current state from `EDA.Cache.members/1`,
+  `EDA.Cache.channels_for_guild/1` and the like.
+- **The guild cache holds the guild object alone**, without those lists and without the roles,
+  which each have a cache of their own. `EDA.Guild.fetch/1` fills `roles` from the role cache.
+
 - **`INVITE_CREATE` delivers an `EDA.Invite`**, instead of a struct of its own. `EDA.Invite` gains
   `role_ids`, filled from the event's `role_ids` or from the partial roles the REST routes send.
 
@@ -88,6 +98,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with string keys keeps working, as on every other nested object.
 
 ### Fixed
+
+- `EDA.Guild` kept 12 of the guild object's fields. It now keeps all of them: `features`,
+  `premium_tier`, `premium_subscription_count`, `premium_progress_bar_enabled`, `banner`,
+  `splash`, `discovery_splash`, `icon_hash`, `description`, `vanity_url_code`,
+  `preferred_locale`, the verification, notification, content filter, MFA and NSFW levels, the
+  AFK channel and timeout, the widget settings, the system, rules, public updates and safety
+  alerts channels with the system channel's flags, `application_id`, the member, presence and
+  video limits, the approximate counts, `welcome_screen`, `incidents_data`, `owner`,
+  `permissions`, `emojis` and `stickers`.
+- `EDA.Guild.fetch/1` returned channels, members and roles frozen when the bot joined the guild:
+  the cache stored the whole `GUILD_CREATE` and nothing updated the copy. Every member was also
+  held twice, the second copy outside the member cache's `max_size`.
+- The active threads `GUILD_CREATE` carries were thrown away; they now go to the channel cache.
+  `GUILD_EMOJIS_UPDATE` and `GUILD_STICKERS_UPDATE` now update the guild's emojis and stickers
+  in the cache.
 
 - `INVITE_CREATE` dropped `expires_at`, `created_at`, `target_type`, `target_user`,
   `target_application` and the roles the invite grants, all of which a bot tracking its invites

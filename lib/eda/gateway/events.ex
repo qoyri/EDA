@@ -132,8 +132,9 @@ defmodule EDA.Gateway.Events do
 
   defp update_cache("GUILD_CREATE", data) do
     guild_id = data["id"]
-    EDA.Cache.Guild.create(data)
+    EDA.Cache.Guild.create(guild_entry(data))
     cache_guild_channels(guild_id, data["channels"])
+    cache_guild_channels(guild_id, data["threads"])
     cache_guild_members(guild_id, data["members"])
     cache_guild_roles(guild_id, data["roles"])
     cache_guild_voice_states(guild_id, data["voice_states"])
@@ -142,7 +143,15 @@ defmodule EDA.Gateway.Events do
   end
 
   defp update_cache("GUILD_UPDATE", data) do
-    EDA.Cache.Guild.update(data["id"], data)
+    EDA.Cache.Guild.update(data["id"], guild_entry(data))
+  end
+
+  defp update_cache("GUILD_EMOJIS_UPDATE", data) do
+    EDA.Cache.Guild.update(data["guild_id"], %{"emojis" => data["emojis"]})
+  end
+
+  defp update_cache("GUILD_STICKERS_UPDATE", data) do
+    EDA.Cache.Guild.update(data["guild_id"], %{"stickers" => data["stickers"]})
   end
 
   defp update_cache("GUILD_DELETE", data) do
@@ -357,6 +366,11 @@ defmodule EDA.Gateway.Events do
   end
 
   # ── GUILD_CREATE helpers ───────────────────────────────────────────
+
+  # The guild entry holds the guild object alone. The lists GUILD_CREATE adds, and the roles,
+  # each have a cache of their own that events keep current; a copy here went stale at once and
+  # held every member twice, outside the member cache's max_size.
+  defp guild_entry(data), do: Map.drop(data, ["roles" | EDA.Guild.gateway_lists()])
 
   defp cache_guild_channels(_guild_id, nil), do: :ok
 

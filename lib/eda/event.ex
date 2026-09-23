@@ -95,8 +95,7 @@ defmodule EDA.Event do
 
   @type event() ::
           EDA.Event.Ready.t()
-          | EDA.Event.GuildCreate.t()
-          | EDA.Event.GuildUpdate.t()
+          | EDA.Guild.t()
           | EDA.Event.GuildDelete.t()
           | EDA.Channel.t()
           | EDA.Event.GuildMemberAdd.t()

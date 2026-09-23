@@ -209,7 +209,7 @@ defmodule EDA.Gateway.EventsTest do
         "members" => []
       })
 
-      assert_receive {:event, {:GUILD_AVAILABLE, %EDA.Event.GuildCreate{} = evt}}, 1000
+      assert_receive {:event, {:GUILD_AVAILABLE, %EDA.Guild{} = evt}}, 1000
       assert evt.id == "recovery_g1"
 
       # Should be removed from unavailable set

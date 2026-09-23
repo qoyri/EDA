@@ -57,8 +57,8 @@ defmodule EDA.Consumer do
   - `{:MESSAGE_CREATE, %EDA.Message{}}` - A message was created
   - `{:MESSAGE_UPDATE, %EDA.Message{}}` - A message was edited
   - `{:MESSAGE_DELETE, %EDA.Event.MessageDelete{}}` - A message was deleted
-  - `{:GUILD_CREATE, %EDA.Event.GuildCreate{}}` - Bot joined a new guild at runtime
-  - `{:GUILD_AVAILABLE, %EDA.Event.GuildCreate{}}` - A guild finished loading during startup
+  - `{:GUILD_CREATE, %EDA.Guild{}}` - Bot joined a new guild at runtime
+  - `{:GUILD_AVAILABLE, %EDA.Guild{}}` - A guild finished loading during startup
   - `{:GUILD_DELETE, %EDA.Event.GuildDelete{}}` - Bot was removed from a guild
   - `{:GUILD_UNAVAILABLE, %EDA.Event.GuildDelete{}}` - A guild went offline (Discord outage)
   - `{:SHARD_READY, %EDA.Event.ShardReady{}}` - A shard finished loading all its guilds

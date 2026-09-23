@@ -130,7 +130,7 @@ defmodule EDA.EventTest do
       }
 
       result = Event.from_raw("GUILD_CREATE", data)
-      assert %Event.GuildCreate{} = result
+      assert %EDA.Guild{} = result
       assert result.name == "Test Guild"
       assert length(result.channels) == 1
       assert result.member_count == 42
