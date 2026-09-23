@@ -529,7 +529,8 @@ defmodule EDA.Interaction do
       edit_response(interaction, "Done!")
       edit_response(interaction, content: "Updated!", embeds: [embed])
   """
-  @spec edit_response(interaction(), String.t() | keyword()) :: {:ok, map()} | {:error, term()}
+  @spec edit_response(interaction(), String.t() | keyword()) ::
+          {:ok, EDA.Message.t()} | {:error, term()}
   def edit_response(interaction, content) when is_binary(content) do
     edit_response(interaction, content: content)
   end
@@ -540,6 +541,7 @@ defmodule EDA.Interaction do
     data = build_message_data(opts)
 
     EDA.API.Interaction.edit_response(app_id, interaction["token"], data, files)
+    |> parse_message()
   end
 
   @doc """
@@ -550,7 +552,8 @@ defmodule EDA.Interaction do
       followup(interaction, "Another message!")
       followup(interaction, content: "Followup", ephemeral: true)
   """
-  @spec followup(interaction(), String.t() | keyword()) :: {:ok, map()} | {:error, term()}
+  @spec followup(interaction(), String.t() | keyword()) ::
+          {:ok, EDA.Message.t()} | {:error, term()}
   def followup(interaction, content) when is_binary(content) do
     followup(interaction, content: content)
   end
@@ -569,8 +572,46 @@ defmodule EDA.Interaction do
       EDA.AutoDelete.schedule(to_string(channel_id), msg_id, delete_after)
     end
 
-    result
+    parse_message(result)
   end
+
+  @doc """
+  Edits a followup message sent with `followup/2`. Takes the message or its id, and the options
+  of `followup/2`.
+  """
+  @spec edit_followup(interaction(), EDA.Message.t() | String.t(), String.t() | keyword()) ::
+          {:ok, EDA.Message.t()} | {:error, term()}
+  def edit_followup(interaction, %EDA.Message{id: id}, opts),
+    do: edit_followup(interaction, id, opts)
+
+  def edit_followup(interaction, message_id, content) when is_binary(content),
+    do: edit_followup(interaction, message_id, content: content)
+
+  def edit_followup(interaction, message_id, opts) when is_list(opts) do
+    app_id = interaction["application_id"] || app_id()
+    {files, opts} = Keyword.pop(opts, :files, [])
+
+    app_id
+    |> EDA.API.Interaction.edit_followup(
+      interaction["token"],
+      message_id,
+      build_message_data(opts),
+      files
+    )
+    |> parse_message()
+  end
+
+  @doc "Deletes a followup message. Takes the message or its id."
+  @spec delete_followup(interaction(), EDA.Message.t() | String.t()) :: :ok | {:error, term()}
+  def delete_followup(interaction, %EDA.Message{id: id}), do: delete_followup(interaction, id)
+
+  def delete_followup(interaction, message_id) do
+    app_id = interaction["application_id"] || app_id()
+    EDA.API.Interaction.delete_followup(app_id, interaction["token"], message_id)
+  end
+
+  defp parse_message({:ok, raw}) when is_map(raw), do: {:ok, EDA.Message.from_raw(raw)}
+  defp parse_message(other), do: other
 
   @doc "Deletes the original interaction response."
   @spec delete_response(interaction()) :: :ok | {:error, term()}

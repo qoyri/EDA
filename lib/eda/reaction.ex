@@ -33,4 +33,22 @@ defmodule EDA.Reaction do
     do: %{burst: burst, normal: normal}
 
   defp parse_count_details(_), do: nil
+
+  @doc """
+  The users who reacted to a message with an emoji, as `EDA.User` structs. Takes the options
+  of `EDA.API.Reaction.list/4`: `:type` (`0` normal, `1` super reactions), `:after`, `:limit`.
+  """
+  @spec users(EDA.Message.t(), String.t() | EDA.Emoji.t(), keyword()) ::
+          {:ok, [EDA.User.t()]} | {:error, term()}
+  def users(%EDA.Message{channel_id: cid, id: mid}, emoji, opts \\ []) do
+    case EDA.API.Reaction.list(cid, mid, emoji, opts) do
+      {:ok, users} when is_list(users) -> {:ok, Enum.map(users, &EDA.User.from_raw/1)}
+      {:error, _} = err -> err
+    end
+  end
+
+  @doc "A lazy stream of every user who reacted with an emoji. Takes `:per_page` and `:after`."
+  @spec stream_users(EDA.Message.t(), String.t() | EDA.Emoji.t(), keyword()) :: Enumerable.t()
+  def stream_users(%EDA.Message{channel_id: cid, id: mid}, emoji, opts \\ []),
+    do: cid |> EDA.API.Reaction.stream(mid, emoji, opts) |> Stream.map(&EDA.User.from_raw/1)
 end

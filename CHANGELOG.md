@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Typed message calls: `EDA.Message.list/2`, `history/3`, `stream/2`, `pinned/2`, `pins/2`
+  (each pin with its `pinned_at` as a `DateTime`) and `forward/2`; `EDA.Poll.expire/1` and
+  `voters/3`; `EDA.Reaction.users/3` and `stream_users/3`. They return `EDA.Message` and
+  `EDA.User` structs where the `EDA.API` calls return Discord's maps.
+
 - `EDA.User` has a `member` field, set on the users a guild message mentions: Discord attaches
   their partial member to each, which EDA used to drop. It is an `EDA.Member` with the
   message's `guild_id`, and `nil` on any other user.
@@ -65,6 +70,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   struct, so a bit Discord adds later is not lost.
 
 ### Changed
+
+- **`EDA.Interaction.edit_response/2` and `followup/2` return an `EDA.Message`** instead of the
+  raw map, and `edit_followup/3` and `delete_followup/2` are new.
 
 - **A presence's `status` is an atom** (`:online`, `:idle`, `:dnd`, `:offline`), like the
   statuses `EDA.Presence` sends, and `client_status` names its platforms and statuses:
