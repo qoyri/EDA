@@ -31,15 +31,17 @@ defmodule EDA.Activity.Assets do
   @spec from_raw(map() | nil) :: t() | nil
   def from_raw(nil), do: nil
 
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      large_image: raw["large_image"],
-      large_text: raw["large_text"],
-      large_url: raw["large_url"],
-      small_image: raw["small_image"],
-      small_text: raw["small_text"],
-      small_url: raw["small_url"],
-      invite_cover_image: raw["invite_cover_image"]
+      large_image: :maps.get("large_image", raw, nil),
+      large_text: :maps.get("large_text", raw, nil),
+      large_url: :maps.get("large_url", raw, nil),
+      small_image: :maps.get("small_image", raw, nil),
+      small_text: :maps.get("small_text", raw, nil),
+      small_url: :maps.get("small_url", raw, nil),
+      invite_cover_image: :maps.get("invite_cover_image", raw, nil)
     }
   end
 end

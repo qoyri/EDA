@@ -77,27 +77,30 @@ defmodule EDA.Attachment do
   @max_description_length 1024
 
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      filename: raw["filename"],
-      title: raw["title"],
-      description: raw["description"],
-      content_type: raw["content_type"],
-      size: raw["size"],
-      url: raw["url"],
-      proxy_url: raw["proxy_url"],
-      height: raw["height"],
-      width: raw["width"],
-      placeholder: raw["placeholder"],
-      placeholder_version: raw["placeholder_version"],
-      ephemeral: raw["ephemeral"],
-      duration_secs: raw["duration_secs"],
-      waveform: raw["waveform"],
-      flags: raw["flags"],
-      clip_participants: parse_users(raw["clip_participants"]),
-      clip_created_at: EDA.Timestamp.parse(raw["clip_created_at"]),
-      application: raw["application"] && EDA.App.from_raw(raw["application"])
+      id: :maps.get("id", raw, nil),
+      filename: :maps.get("filename", raw, nil),
+      title: :maps.get("title", raw, nil),
+      description: :maps.get("description", raw, nil),
+      content_type: :maps.get("content_type", raw, nil),
+      size: :maps.get("size", raw, nil),
+      url: :maps.get("url", raw, nil),
+      proxy_url: :maps.get("proxy_url", raw, nil),
+      height: :maps.get("height", raw, nil),
+      width: :maps.get("width", raw, nil),
+      placeholder: :maps.get("placeholder", raw, nil),
+      placeholder_version: :maps.get("placeholder_version", raw, nil),
+      ephemeral: :maps.get("ephemeral", raw, nil),
+      duration_secs: :maps.get("duration_secs", raw, nil),
+      waveform: :maps.get("waveform", raw, nil),
+      flags: :maps.get("flags", raw, nil),
+      clip_participants: parse_users(:maps.get("clip_participants", raw, nil)),
+      clip_created_at: EDA.Timestamp.parse(:maps.get("clip_created_at", raw, nil)),
+      application:
+        :maps.get("application", raw, nil) && EDA.App.from_raw(:maps.get("application", raw, nil))
     }
   end
 

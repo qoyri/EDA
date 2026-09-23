@@ -52,19 +52,21 @@ defmodule EDA.Sticker do
       %EDA.Sticker{id: "1", name: "wave", type: :guild, format_type: :png}
   """
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      pack_id: raw["pack_id"],
-      name: raw["name"],
-      description: raw["description"],
-      tags: raw["tags"],
-      type: resolve_type(raw["type"]),
-      format_type: resolve_format(raw["format_type"]),
-      available: raw["available"],
-      guild_id: raw["guild_id"],
-      user: parse_user(raw["user"]),
-      sort_value: raw["sort_value"]
+      id: :maps.get("id", raw, nil),
+      pack_id: :maps.get("pack_id", raw, nil),
+      name: :maps.get("name", raw, nil),
+      description: :maps.get("description", raw, nil),
+      tags: :maps.get("tags", raw, nil),
+      type: resolve_type(:maps.get("type", raw, nil)),
+      format_type: resolve_format(:maps.get("format_type", raw, nil)),
+      available: :maps.get("available", raw, nil),
+      guild_id: :maps.get("guild_id", raw, nil),
+      user: parse_user(:maps.get("user", raw, nil)),
+      sort_value: :maps.get("sort_value", raw, nil)
     }
   end
 

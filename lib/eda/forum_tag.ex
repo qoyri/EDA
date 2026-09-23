@@ -51,13 +51,15 @@ defmodule EDA.ForumTag do
       %EDA.ForumTag{id: "1", name: "Bug", moderated: false, emoji_id: nil, emoji_name: "🐛"}
   """
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      name: raw["name"],
-      moderated: raw["moderated"] || false,
-      emoji_id: raw["emoji_id"],
-      emoji_name: raw["emoji_name"]
+      id: :maps.get("id", raw, nil),
+      name: :maps.get("name", raw, nil),
+      moderated: :maps.get("moderated", raw, nil) || false,
+      emoji_id: :maps.get("emoji_id", raw, nil),
+      emoji_name: :maps.get("emoji_name", raw, nil)
     }
   end
 

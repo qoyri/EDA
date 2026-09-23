@@ -489,26 +489,29 @@ defmodule EDA.Channel do
   # ── Parsing ──
 
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      type: EDA.Enum.name(@types, raw["type"]),
-      guild_id: raw["guild_id"],
-      position: raw["position"],
-      permission_overwrites: parse_overwrites(raw["permission_overwrites"]),
-      name: raw["name"],
-      topic: raw["topic"],
-      nsfw: raw["nsfw"],
-      rate_limit_per_user: raw["rate_limit_per_user"],
-      parent_id: raw["parent_id"],
-      last_message_id: raw["last_message_id"],
-      last_pin_timestamp: EDA.Timestamp.parse(raw["last_pin_timestamp"]),
-      permissions: raw["permissions"],
-      app_permissions: raw["app_permissions"],
-      default_auto_archive_duration: raw["default_auto_archive_duration"],
-      default_thread_rate_limit_per_user: raw["default_thread_rate_limit_per_user"],
-      flags: raw["flags"],
-      owner_id: raw["owner_id"],
+      id: :maps.get("id", raw, nil),
+      type: EDA.Enum.name(@types, :maps.get("type", raw, nil)),
+      guild_id: :maps.get("guild_id", raw, nil),
+      position: :maps.get("position", raw, nil),
+      permission_overwrites: parse_overwrites(:maps.get("permission_overwrites", raw, nil)),
+      name: :maps.get("name", raw, nil),
+      topic: :maps.get("topic", raw, nil),
+      nsfw: :maps.get("nsfw", raw, nil),
+      rate_limit_per_user: :maps.get("rate_limit_per_user", raw, nil),
+      parent_id: :maps.get("parent_id", raw, nil),
+      last_message_id: :maps.get("last_message_id", raw, nil),
+      last_pin_timestamp: EDA.Timestamp.parse(:maps.get("last_pin_timestamp", raw, nil)),
+      permissions: :maps.get("permissions", raw, nil),
+      app_permissions: :maps.get("app_permissions", raw, nil),
+      default_auto_archive_duration: :maps.get("default_auto_archive_duration", raw, nil),
+      default_thread_rate_limit_per_user:
+        :maps.get("default_thread_rate_limit_per_user", raw, nil),
+      flags: :maps.get("flags", raw, nil),
+      owner_id: :maps.get("owner_id", raw, nil),
       thread: kind(raw, @thread_types, EDA.Channel.Thread),
       forum: kind(raw, @forum_types, EDA.Channel.Forum),
       voice: kind(raw, @voice_types, EDA.Channel.Voice),

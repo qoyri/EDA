@@ -72,28 +72,31 @@ defmodule EDA.Event.InteractionCreate do
         }
   @doc "Converts a raw Discord payload into this event struct."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      application_id: raw["application_id"],
-      type: EDA.Enum.name(@types, raw["type"]),
-      data: parse_data(raw["type"], raw["data"]),
-      guild_id: raw["guild_id"],
-      channel_id: raw["channel_id"],
-      member: parse_member(raw["member"]),
-      user: parse_user(raw["user"]),
-      token: raw["token"],
-      message: parse_message(raw["message"]),
-      app_permissions: raw["app_permissions"],
-      locale: raw["locale"],
-      guild_locale: raw["guild_locale"],
-      entitlements: parse_list(raw["entitlements"], &EDA.Entitlement.from_raw/1),
-      guild: parse_one(raw["guild"], &EDA.Guild.from_raw/1),
-      channel: parse_one(raw["channel"], &EDA.Channel.from_raw/1),
-      context: parse_context(raw["context"]),
-      authorizing_integration_owners: parse_owners(raw["authorizing_integration_owners"]),
-      attachment_size_limit: raw["attachment_size_limit"],
-      version: raw["version"]
+      id: :maps.get("id", raw, nil),
+      application_id: :maps.get("application_id", raw, nil),
+      type: EDA.Enum.name(@types, :maps.get("type", raw, nil)),
+      data: parse_data(:maps.get("type", raw, nil), :maps.get("data", raw, nil)),
+      guild_id: :maps.get("guild_id", raw, nil),
+      channel_id: :maps.get("channel_id", raw, nil),
+      member: parse_member(:maps.get("member", raw, nil)),
+      user: parse_user(:maps.get("user", raw, nil)),
+      token: :maps.get("token", raw, nil),
+      message: parse_message(:maps.get("message", raw, nil)),
+      app_permissions: :maps.get("app_permissions", raw, nil),
+      locale: :maps.get("locale", raw, nil),
+      guild_locale: :maps.get("guild_locale", raw, nil),
+      entitlements: parse_list(:maps.get("entitlements", raw, nil), &EDA.Entitlement.from_raw/1),
+      guild: parse_one(:maps.get("guild", raw, nil), &EDA.Guild.from_raw/1),
+      channel: parse_one(:maps.get("channel", raw, nil), &EDA.Channel.from_raw/1),
+      context: parse_context(:maps.get("context", raw, nil)),
+      authorizing_integration_owners:
+        parse_owners(:maps.get("authorizing_integration_owners", raw, nil)),
+      attachment_size_limit: :maps.get("attachment_size_limit", raw, nil),
+      version: :maps.get("version", raw, nil)
     }
   end
 

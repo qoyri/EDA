@@ -54,8 +54,10 @@ defmodule EDA.Channel.Thread do
 
   @doc "Takes the thread fields out of a raw channel object."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
-    metadata = raw["thread_metadata"] || %{}
+    metadata = :maps.get("thread_metadata", raw, nil) || %{}
 
     %__MODULE__{
       archived: metadata["archived"],
@@ -64,12 +66,12 @@ defmodule EDA.Channel.Thread do
       locked: metadata["locked"],
       invitable: metadata["invitable"],
       create_timestamp: EDA.Timestamp.parse(metadata["create_timestamp"]),
-      member: EDA.Channel.ThreadMember.from_raw(raw["member"]),
-      newly_created: raw["newly_created"],
-      message_count: raw["message_count"],
-      member_count: raw["member_count"],
-      total_message_sent: raw["total_message_sent"],
-      applied_tags: raw["applied_tags"]
+      member: EDA.Channel.ThreadMember.from_raw(:maps.get("member", raw, nil)),
+      newly_created: :maps.get("newly_created", raw, nil),
+      message_count: :maps.get("message_count", raw, nil),
+      member_count: :maps.get("member_count", raw, nil),
+      total_message_sent: :maps.get("total_message_sent", raw, nil),
+      applied_tags: :maps.get("applied_tags", raw, nil)
     }
   end
 end

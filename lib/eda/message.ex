@@ -149,48 +149,56 @@ defmodule EDA.Message do
         }
 
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      channel_id: raw["channel_id"],
-      guild_id: raw["guild_id"],
-      author: parse_user(raw["author"]),
-      content: raw["content"],
-      timestamp: EDA.Timestamp.parse(raw["timestamp"]),
-      edited_timestamp: EDA.Timestamp.parse(raw["edited_timestamp"]),
-      tts: raw["tts"],
-      mention_everyone: raw["mention_everyone"],
-      mentions: parse_mentions(raw["mentions"], raw["guild_id"]),
-      mention_roles: raw["mention_roles"],
-      attachments: parse_attachments(raw["attachments"]),
-      embeds: parse_list(raw["embeds"], &EDA.Embed.from_raw/1),
-      reactions: parse_reactions(raw["reactions"]),
-      pinned: raw["pinned"],
-      type: EDA.Enum.name(@types, raw["type"]),
-      member: parse_member(raw["member"]),
-      referenced_message: parse_message(raw["referenced_message"]),
-      message_reference: EDA.Message.Reference.from_raw(raw["message_reference"]),
-      components: parse_list(raw["components"], &EDA.Component.from_raw/1),
-      sticker_items: parse_list(raw["sticker_items"], &EDA.Sticker.Item.from_raw/1),
-      poll: parse_poll(raw["poll"]),
-      webhook_id: raw["webhook_id"],
-      application_id: raw["application_id"],
-      flags: raw["flags"],
-      interaction_metadata: EDA.Message.InteractionMetadata.from_raw(raw["interaction_metadata"]),
-      message_snapshots: parse_list(raw["message_snapshots"], &parse_snapshot/1),
-      thread: parse_thread(raw["thread"]),
+      id: :maps.get("id", raw, nil),
+      channel_id: :maps.get("channel_id", raw, nil),
+      guild_id: :maps.get("guild_id", raw, nil),
+      author: parse_user(:maps.get("author", raw, nil)),
+      content: :maps.get("content", raw, nil),
+      timestamp: EDA.Timestamp.parse(:maps.get("timestamp", raw, nil)),
+      edited_timestamp: EDA.Timestamp.parse(:maps.get("edited_timestamp", raw, nil)),
+      tts: :maps.get("tts", raw, nil),
+      mention_everyone: :maps.get("mention_everyone", raw, nil),
+      mentions: parse_mentions(:maps.get("mentions", raw, nil), :maps.get("guild_id", raw, nil)),
+      mention_roles: :maps.get("mention_roles", raw, nil),
+      attachments: parse_attachments(:maps.get("attachments", raw, nil)),
+      embeds: parse_list(:maps.get("embeds", raw, nil), &EDA.Embed.from_raw/1),
+      reactions: parse_reactions(:maps.get("reactions", raw, nil)),
+      pinned: :maps.get("pinned", raw, nil),
+      type: EDA.Enum.name(@types, :maps.get("type", raw, nil)),
+      member: parse_member(:maps.get("member", raw, nil)),
+      referenced_message: parse_message(:maps.get("referenced_message", raw, nil)),
+      message_reference: EDA.Message.Reference.from_raw(:maps.get("message_reference", raw, nil)),
+      components: parse_list(:maps.get("components", raw, nil), &EDA.Component.from_raw/1),
+      sticker_items:
+        parse_list(:maps.get("sticker_items", raw, nil), &EDA.Sticker.Item.from_raw/1),
+      poll: parse_poll(:maps.get("poll", raw, nil)),
+      webhook_id: :maps.get("webhook_id", raw, nil),
+      application_id: :maps.get("application_id", raw, nil),
+      flags: :maps.get("flags", raw, nil),
+      interaction_metadata:
+        EDA.Message.InteractionMetadata.from_raw(:maps.get("interaction_metadata", raw, nil)),
+      message_snapshots: parse_list(:maps.get("message_snapshots", raw, nil), &parse_snapshot/1),
+      thread: parse_thread(:maps.get("thread", raw, nil)),
       mention_channels:
-        parse_list(raw["mention_channels"], &EDA.Message.ChannelMention.from_raw/1),
-      nonce: raw["nonce"],
-      position: raw["position"],
-      activity: EDA.Message.Activity.from_raw(raw["activity"]),
-      application: parse_application(raw["application"]),
-      call: EDA.Message.Call.from_raw(raw["call"]),
+        parse_list(
+          :maps.get("mention_channels", raw, nil),
+          &EDA.Message.ChannelMention.from_raw/1
+        ),
+      nonce: :maps.get("nonce", raw, nil),
+      position: :maps.get("position", raw, nil),
+      activity: EDA.Message.Activity.from_raw(:maps.get("activity", raw, nil)),
+      application: parse_application(:maps.get("application", raw, nil)),
+      call: EDA.Message.Call.from_raw(:maps.get("call", raw, nil)),
       role_subscription_data:
-        EDA.Message.RoleSubscriptionData.from_raw(raw["role_subscription_data"]),
-      resolved: EDA.Resolved.from_raw(raw["resolved"]),
-      shared_client_theme: EDA.Message.SharedClientTheme.from_raw(raw["shared_client_theme"]),
-      channel_type: EDA.Channel.type_name(raw["channel_type"])
+        EDA.Message.RoleSubscriptionData.from_raw(:maps.get("role_subscription_data", raw, nil)),
+      resolved: EDA.Resolved.from_raw(:maps.get("resolved", raw, nil)),
+      shared_client_theme:
+        EDA.Message.SharedClientTheme.from_raw(:maps.get("shared_client_theme", raw, nil)),
+      channel_type: EDA.Channel.type_name(:maps.get("channel_type", raw, nil))
     }
   end
 

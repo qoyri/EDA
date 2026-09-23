@@ -19,6 +19,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   seconds for the handlers still running, as the supervisor did. Measured through the whole path on real events: a message dispatched in about
   14 µs instead of 19, a presence in 7.5 instead of 12, a `GUILD_CREATE` in 0.63 ms instead of
   1.24.
+- **Faster parsing.** The `from_raw/1` of the entities on the gateway path read the payload with
+  a direct map lookup instead of going through `Access`: measured on real payloads, a message
+  parses in 5.5 µs instead of 6.2, a member in 1.75 instead of 2.1, a role in 0.67 instead of
+  0.9, and the parse of a `GUILD_CREATE` takes 0.27 ms instead of 0.30.
+
+### Fixed
+
+- **`from_raw/1` on a struct it already returned now gives it back unchanged.** It parsed the
+  struct again and lost what it held in nested structs: a message's author, a member's user,
+  a channel's voice and forum settings. Helpers that read the struct cache, such as
+  `EDA.Channel.children/1`, went through that path.
 
 ## [0.5.0-beta.3] - 2026-09-23
 

@@ -58,29 +58,33 @@ defmodule EDA.User do
         }
 
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      username: raw["username"],
-      avatar: raw["avatar"],
-      discriminator: raw["discriminator"],
-      public_flags: raw["public_flags"],
-      flags: raw["flags"],
-      accent_color: raw["accent_color"],
-      bot: raw["bot"],
-      system: raw["system"],
-      banner: raw["banner"],
-      global_name: raw["global_name"],
-      primary_guild: EDA.User.PrimaryGuild.from_raw(raw["primary_guild"]),
-      premium_type: EDA.Enum.name(@premium_types, raw["premium_type"]),
-      mfa_enabled: raw["mfa_enabled"],
-      locale: raw["locale"],
-      verified: raw["verified"],
-      email: raw["email"],
-      avatar_decoration_data: EDA.User.AvatarDecoration.from_raw(raw["avatar_decoration_data"]),
-      collectibles: EDA.User.Collectibles.from_raw(raw["collectibles"]),
-      display_name_styles: EDA.User.DisplayNameStyles.from_raw(raw["display_name_styles"]),
-      member: raw["member"] && EDA.Member.from_raw(raw["member"])
+      id: :maps.get("id", raw, nil),
+      username: :maps.get("username", raw, nil),
+      avatar: :maps.get("avatar", raw, nil),
+      discriminator: :maps.get("discriminator", raw, nil),
+      public_flags: :maps.get("public_flags", raw, nil),
+      flags: :maps.get("flags", raw, nil),
+      accent_color: :maps.get("accent_color", raw, nil),
+      bot: :maps.get("bot", raw, nil),
+      system: :maps.get("system", raw, nil),
+      banner: :maps.get("banner", raw, nil),
+      global_name: :maps.get("global_name", raw, nil),
+      primary_guild: EDA.User.PrimaryGuild.from_raw(:maps.get("primary_guild", raw, nil)),
+      premium_type: EDA.Enum.name(@premium_types, :maps.get("premium_type", raw, nil)),
+      mfa_enabled: :maps.get("mfa_enabled", raw, nil),
+      locale: :maps.get("locale", raw, nil),
+      verified: :maps.get("verified", raw, nil),
+      email: :maps.get("email", raw, nil),
+      avatar_decoration_data:
+        EDA.User.AvatarDecoration.from_raw(:maps.get("avatar_decoration_data", raw, nil)),
+      collectibles: EDA.User.Collectibles.from_raw(:maps.get("collectibles", raw, nil)),
+      display_name_styles:
+        EDA.User.DisplayNameStyles.from_raw(:maps.get("display_name_styles", raw, nil)),
+      member: :maps.get("member", raw, nil) && EDA.Member.from_raw(:maps.get("member", raw, nil))
     }
   end
 
