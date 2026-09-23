@@ -3,9 +3,11 @@ defmodule EDA.Event.PresenceUpdate do
   Dispatched when a user's presence is updated. Needs the `:guild_presences` intent.
 
   A user's custom status (the activity of type 4) is **omitted** from `activities` when their
-  profile privacy setting is *Friends Only*, or *Friends & Small Servers Only* in a guild of more
-  than 200 members. Its absence therefore does not mean the user has no custom status. The other
-  activity types are not affected by that setting, though Activity Sharing can hide them.
+  profile is private: the *Friends Only* setting, *Friends & Small Servers Only* in a guild of
+  more than 200 members, or the Private Profile that age assurance applies to a teen account
+  (announced 2026-09-22, and not something an app opts into). Its absence therefore does not mean
+  the user has no custom status, and expect to see it more often as those protections roll out.
+  The other activity types are not affected, though Activity Sharing can hide them.
   """
   use EDA.Event.Access
 
