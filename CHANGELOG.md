@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   supervisor the queue of every shard. The handler still gets `$callers` and `$ancestors`, and
   when the application stops, EDA still waits up to five seconds for the handlers still running,
   as the supervisor did.
+- **Faster ETF decoding.** Normalizing a payload returns the field names EDA knows as literals
+  instead of allocating a new string for every key of every event: 10 to 20 % faster on every
+  event type, a `GUILD_CREATE` normalized in 0.32 ms instead of 0.39.
 - **Faster parsing.** Every entity's `from_raw/1`, nested ones included, reads the payload with a
   direct map lookup instead of going through `Access`: a message parses in 5.5 µs instead of 6.2,
   a member in 1.75 instead of 2.1, a role in 0.67 instead of 0.9.
@@ -28,6 +31,12 @@ to about 13 µs instead of 19, a presence to 6.9 instead of 12, a role update to
 
 ### Fixed
 
+- **Colours, flags and limits are integers on ETF, as on JSON.** The default ETF encoding turned
+  every integer from 2^22 into a string, taking it for a snowflake: a role colour above `#400000`
+  (half the roles of real guilds), an `accent_color`, flags with bit 22 set, a guild's
+  `max_members`, and more, arrived as `"13566001"` where JSON gave `13566001`. Only snowflakes,
+  from 2^48, and permission bitfields become strings now; on real payloads ETF and JSON decode to
+  the same maps.
 - **`from_raw/1` on a struct it already returned now gives it back unchanged.** It parsed the
   struct again and lost what it held in nested structs: a message's author, a member's user,
   a channel's voice and forum settings. Helpers that read the struct cache, such as

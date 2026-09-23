@@ -111,12 +111,36 @@ defmodule EDA.Gateway.Encoding.ETFTest do
       assert ETF.normalize([]) == []
     end
 
-    test "converts integer at threshold 4_194_304 to string" do
-      assert ETF.normalize(4_194_304) == "4194304"
+    test "converts integers from 2^48, the snowflakes, to strings" do
+      assert ETF.normalize(281_474_976_710_656) == "281474976710656"
+      assert ETF.normalize(159_985_870_458_322_944) == "159985870458322944"
     end
 
-    test "preserves integer at 4_194_303" do
-      assert ETF.normalize(4_194_303) == 4_194_303
+    test "keeps every other integer an integer, as JSON does" do
+      # Seen on real payloads: a role colour, channel flags, a member limit, a millisecond version.
+      term = %{
+        color: 16_777_215,
+        flags: 11_051_008,
+        max_members: 25_000_000,
+        version: 1_790_183_039_714
+      }
+
+      assert ETF.normalize(term) == %{
+               "color" => 16_777_215,
+               "flags" => 11_051_008,
+               "max_members" => 25_000_000,
+               "version" => 1_790_183_039_714
+             }
+
+      assert ETF.normalize(281_474_976_710_655) == 281_474_976_710_655
+    end
+
+    test "turns a permission bitfield into a string whatever its value" do
+      assert ETF.normalize(%{allow: 1024, deny: 0}) == %{"allow" => "1024", "deny" => "0"}
+    end
+
+    test "gives the same result for a key EDA does not know" do
+      assert ETF.normalize(%{eda_unknown_field_xyz: 1}) == %{"eda_unknown_field_xyz" => 1}
     end
 
     test "preserves negative integers" do
