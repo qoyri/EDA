@@ -24,7 +24,7 @@ defmodule EDA.EventTest do
       }
 
       result = Event.from_raw("MESSAGE_CREATE", data)
-      assert %Event.MessageCreate{} = result
+      assert %EDA.Message{} = result
       assert result.id == "msg1"
       assert result.content == "hello"
       assert result.channel_id == "ch1"

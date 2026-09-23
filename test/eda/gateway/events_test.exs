@@ -130,7 +130,7 @@ defmodule EDA.Gateway.EventsTest do
         "content" => "hello"
       })
 
-      assert_receive {:event, {:MESSAGE_CREATE, %EDA.Event.MessageCreate{} = msg}}, 1000
+      assert_receive {:event, {:MESSAGE_CREATE, %EDA.Message{} = msg}}, 1000
       assert msg.id == "msg1"
       assert msg.content == "hello"
       assert msg["channel_id"] == "ch1"

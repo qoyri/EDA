@@ -38,6 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`MESSAGE_CREATE` and `MESSAGE_UPDATE` deliver an `EDA.Message`**, instead of a struct of their
+  own that copied part of it: match `{:MESSAGE_CREATE, %EDA.Message{} = msg}`. The message received
+  can now be passed straight to `EDA.Message.reply/2`, `edit/2`, `react/2` and `delete/2`, which
+  used to refuse it with a `FunctionClauseError`. `EDA.Event.MessageCreate` and `MessageUpdate`
+  remain as the parsers.
+
 - `EDA.Event.Raw`, the fallback for a gateway event EDA does not type yet, keeps its `data` as
   Discord sent it, with string keys, instead of converting the top-level keys to atoms: read
   `raw.data["guild_id"]` rather than `raw.data.guild_id`. Converting created an atom for every key
@@ -56,6 +62,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with string keys keeps working, as on every other nested object.
 
 ### Fixed
+
+- A message received through the gateway lost its poll and its reactions — a poll arrived without
+  its poll. It now carries every field Discord documents: `webhook_id` (present on 23 % of the
+  messages sampled on a real bot; the one way to tell a webhook's message apart), `flags`,
+  `application_id`, `interaction_metadata` (who ran the command a reply answers),
+  `message_snapshots` (the content of a forward), `thread` (as an `EDA.Channel`),
+  `mention_channels`, `nonce`, `position`, `activity`, `application`, `call`,
+  `role_subscription_data`, `resolved`, `shared_client_theme` and `channel_type`. Only the
+  deprecated `interaction` is left out.
 
 - `EDA.Emoji`, `EDA.Sticker`, `EDA.Sticker.Pack`, `EDA.AutoMod` and its action and metadata
   structs, `EDA.GuildTemplate` and its source guild did not implement the access every other
