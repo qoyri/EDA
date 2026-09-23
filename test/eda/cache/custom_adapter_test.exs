@@ -167,13 +167,13 @@ defmodule EDA.Cache.CustomAdapterTest do
     test "a DM channel has no guild_id and still round-trips" do
       EDA.Cache.Channel.create(%{"id" => "ca_dm1", "type" => 1})
 
-      assert EDA.Cache.get_channel("ca_dm1")["type"] == 1
+      assert EDA.Cache.get_channel("ca_dm1")["type"] == :dm
     end
 
     test "presences and voice states" do
       EDA.Cache.Presence.upsert("ca_g5", %{"user" => %{"id" => "ca_u5"}, "status" => "online"})
 
-      assert EDA.Cache.get_presence("ca_g5", "ca_u5")["status"] == "online"
+      assert EDA.Cache.get_presence("ca_g5", "ca_u5")["status"] == :online
 
       EDA.Cache.VoiceState.upsert("ca_g5", %{
         "user_id" => "ca_u5",

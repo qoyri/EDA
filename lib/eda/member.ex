@@ -218,19 +218,18 @@ defmodule EDA.Member do
   def banner_url(%__MODULE__{}, _opts), do: nil
 
   @doc """
-  The member's highest role in a guild, as the cached role map, or `nil` when they have none
+  The member's highest role in a guild, as an `EDA.Role`, or `nil` when they have none
   beyond `@everyone` (or their roles are not cached).
 
   "Highest" is the role with the greatest `position`, ties broken by the lower id, which is how
   Discord orders roles in the member list and in permission hierarchy checks.
   """
-  @spec top_role(t() | map(), String.t() | integer()) :: map() | nil
+  @spec top_role(t() | map(), String.t() | integer()) :: EDA.Role.t() | nil
   def top_role(member, guild_id) do
-    member
-    |> role_ids()
-    |> Enum.map(&EDA.Cache.Role.get(guild_id, &1))
-    |> Enum.reject(&is_nil/1)
-    |> Enum.max_by(&{&1["position"] || 0, -String.to_integer(&1["id"])}, fn -> nil end)
+    case roles(member, guild_id) do
+      [top | _] -> top
+      [] -> nil
+    end
   end
 
   @doc """
@@ -242,7 +241,7 @@ defmodule EDA.Member do
   def top_role_position(member, guild_id) do
     case top_role(member, guild_id) do
       nil -> 0
-      role -> role["position"] || 0
+      role -> role.position || 0
     end
   end
 
@@ -278,7 +277,6 @@ defmodule EDA.Member do
     |> role_ids()
     |> Enum.map(&EDA.Cache.Role.get(guild_id, &1))
     |> Enum.reject(&is_nil/1)
-    |> Enum.map(&%{EDA.Role.from_raw(&1) | guild_id: guild_id})
     |> Enum.sort_by(&EDA.Role.rank/1, :desc)
   end
 
@@ -304,8 +302,8 @@ defmodule EDA.Member do
 
   def owner?(member, guild_id) do
     case EDA.Cache.get_guild(guild_id) do
-      %{"owner_id" => owner_id} -> user_id(member) == owner_id
-      _ -> false
+      %EDA.Guild{owner_id: owner_id} -> user_id(member) == owner_id
+      nil -> false
     end
   end
 
@@ -374,8 +372,8 @@ defmodule EDA.Member do
   # The bot's own member in a guild, from the cache.
   def bot_member(guild_id) do
     with %EDA.User{id: id} <- EDA.Cache.me(),
-         raw when is_map(raw) <- EDA.Cache.get_member(guild_id, id) do
-      %{from_raw(raw) | guild_id: to_string(guild_id)}
+         %__MODULE__{} = member <- EDA.Cache.get_member(guild_id, id) do
+      member
     else
       _ -> nil
     end
@@ -419,7 +417,7 @@ defmodule EDA.Member do
   def fetch_member(guild_id, user_id) do
     case EDA.Cache.get_member(guild_id, user_id) do
       nil -> EDA.API.Member.get(guild_id, user_id) |> parse_response() |> put_guild(guild_id)
-      raw -> {:ok, from_raw(raw) |> Map.put(:guild_id, to_string(guild_id))}
+      member -> {:ok, member}
     end
   end
 

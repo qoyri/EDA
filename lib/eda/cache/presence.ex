@@ -24,7 +24,7 @@ defmodule EDA.Cache.Presence do
   @doc """
   Gets a user's presence in a guild.
   """
-  @spec get(String.t() | integer(), String.t() | integer()) :: map() | nil
+  @spec get(String.t() | integer(), String.t() | integer()) :: EDA.Event.PresenceUpdate.t() | nil
   def get(guild_id, user_id) do
     key = {to_string(guild_id), to_string(user_id)}
 
@@ -42,7 +42,7 @@ defmodule EDA.Cache.Presence do
   @doc """
   Gets all presences for a guild.
   """
-  @spec for_guild(String.t() | integer()) :: [map()]
+  @spec for_guild(String.t() | integer()) :: [EDA.Event.PresenceUpdate.t()]
   def for_guild(guild_id) do
     guild_id = to_string(guild_id)
 
@@ -56,14 +56,9 @@ defmodule EDA.Cache.Presence do
   def upsert(guild_id, data) do
     guild_id = to_string(guild_id)
 
-    user_id =
-      case data["user"] do
-        %{"id" => id} -> to_string(id)
-        _ -> to_string(data["user_id"])
-      end
-
+    presence = %{to_struct(data) | guild_id: guild_id}
+    user_id = to_string(presence.user && presence.user.id)
     key = {guild_id, user_id}
-    presence = Map.put(data, "guild_id", guild_id)
 
     case EDA.Cache.Policy.check(
            EDA.Cache.Config.policy(@cache_name),
@@ -108,4 +103,7 @@ defmodule EDA.Cache.Presence do
   end
 
   defp adapter, do: EDA.Cache.Adapter.current()
+
+  defp to_struct(%EDA.Event.PresenceUpdate{} = presence), do: presence
+  defp to_struct(raw) when is_map(raw), do: EDA.Event.PresenceUpdate.from_raw(raw)
 end

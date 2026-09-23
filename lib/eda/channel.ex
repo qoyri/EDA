@@ -526,6 +526,40 @@ defmodule EDA.Channel do
     if Enum.any?(mod.raw_keys(), &Map.has_key?(raw, &1)), do: mod.from_raw(raw)
   end
 
+  @doc """
+  Applies a partial update from Discord to the channel: `EDA.Entity.patch/2`, with the parts of
+  a thread, forum, voice or DM channel updated from the keys they are read from.
+  """
+  @spec patch(t(), map()) :: t()
+  def patch(%__MODULE__{} = channel, raw) when is_map(raw) do
+    patched = EDA.Entity.patch_fields(channel, raw)
+
+    Enum.reduce(
+      [
+        thread: EDA.Channel.Thread,
+        forum: EDA.Channel.Forum,
+        voice: EDA.Channel.Voice,
+        dm: EDA.Channel.DM
+      ],
+      patched,
+      fn {field, mod}, acc -> patch_part(acc, field, mod, raw) end
+    )
+  end
+
+  defp patch_part(channel, field, mod, raw) do
+    cond do
+      not Enum.any?(mod.raw_keys(), &Map.has_key?(raw, &1)) ->
+        channel
+
+      # A thread's metadata comes nested and whole; the other parts keep Discord's own keys.
+      field == :thread or is_nil(Map.fetch!(channel, field)) ->
+        Map.put(channel, field, mod.from_raw(raw))
+
+      true ->
+        Map.put(channel, field, EDA.Entity.patch_fields(Map.fetch!(channel, field), raw))
+    end
+  end
+
   defp parse_overwrites(nil), do: nil
 
   defp parse_overwrites(list) when is_list(list),
@@ -544,7 +578,7 @@ defmodule EDA.Channel do
   def fetch(channel_id) do
     case EDA.Cache.get_channel(channel_id) do
       nil -> EDA.API.Channel.get(channel_id) |> parse_response()
-      raw -> {:ok, from_raw(raw)}
+      channel -> {:ok, channel}
     end
   end
 

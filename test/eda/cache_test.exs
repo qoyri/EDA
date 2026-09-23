@@ -9,7 +9,7 @@ defmodule EDA.CacheTest do
       guild = %{"id" => "111", "name" => "Test Guild"}
       EDA.Cache.Guild.create(guild)
 
-      assert EDA.Cache.Guild.get("111") == guild
+      assert EDA.Cache.Guild.get("111") == EDA.Guild.from_raw(guild)
     end
 
     test "get returns nil for missing guild" do
@@ -25,12 +25,12 @@ defmodule EDA.CacheTest do
     end
 
     test "update merges fields" do
-      EDA.Cache.Guild.create(%{"id" => "333", "name" => "Old Name", "region" => "us-east"})
+      EDA.Cache.Guild.create(%{"id" => "333", "name" => "Old Name", "preferred_locale" => "fr"})
       EDA.Cache.Guild.update("333", %{"name" => "New Name"})
 
       updated = EDA.Cache.Guild.get("333")
       assert updated["name"] == "New Name"
-      assert updated["region"] == "us-east"
+      assert updated.preferred_locale == "fr"
     end
 
     test "update returns nil for missing guild" do
@@ -68,7 +68,7 @@ defmodule EDA.CacheTest do
       user = %{"id" => "u1", "username" => "testuser"}
       EDA.Cache.User.create(user)
 
-      assert EDA.Cache.User.get("u1") == user
+      assert EDA.Cache.User.get("u1") == EDA.User.from_raw(user)
     end
 
     test "get returns nil for missing user" do
@@ -93,7 +93,7 @@ defmodule EDA.CacheTest do
       channel = %{"id" => "ch1", "name" => "general", "guild_id" => "g1"}
       EDA.Cache.Channel.create(channel)
 
-      assert EDA.Cache.Channel.get("ch1") == channel
+      assert EDA.Cache.Channel.get("ch1") == EDA.Channel.from_raw(channel)
     end
 
     test "for_guild filters by guild_id" do

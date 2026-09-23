@@ -152,7 +152,7 @@ defmodule EDA.User do
   Returns the CDN URL for the user's avatar, or `nil` if none set.
 
   An animated avatar (its hash starts with `a_`) comes as a GIF unless another format is asked
-  for. Accepts both `%EDA.User{}` structs and raw maps (from cache).
+  for. Accepts both `%EDA.User{}` structs and raw maps.
 
   ## Options
 
@@ -390,7 +390,7 @@ defmodule EDA.User do
   @doc """
   Returns the display name (global_name if set, otherwise username).
 
-  Accepts both `%EDA.User{}` structs and raw maps (from cache).
+  Accepts both `%EDA.User{}` structs and raw maps.
 
   > #### Not the raw `display_name` field {: .info}
   >
@@ -425,7 +425,7 @@ defmodule EDA.User do
   def fetch(user_id) do
     case EDA.Cache.get_user(user_id) do
       nil -> EDA.API.User.get(user_id) |> parse_response()
-      raw -> {:ok, from_raw(raw)}
+      user -> {:ok, user}
     end
   end
 

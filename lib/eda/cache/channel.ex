@@ -24,7 +24,7 @@ defmodule EDA.Cache.Channel do
   @doc """
   Gets a channel from the cache by channel ID.
   """
-  @spec get(String.t() | integer()) :: map() | nil
+  @spec get(String.t() | integer()) :: EDA.Channel.t() | nil
   def get(channel_id) do
     channel_id = to_string(channel_id)
 
@@ -49,7 +49,7 @@ defmodule EDA.Cache.Channel do
   @doc """
   Gets all cached channels.
   """
-  @spec all() :: [map()]
+  @spec all() :: [EDA.Channel.t()]
   def all do
     adapter().all(@table)
   end
@@ -57,7 +57,7 @@ defmodule EDA.Cache.Channel do
   @doc """
   Gets all channels for a guild. O(guild_size) via match_object.
   """
-  @spec for_guild(String.t() | integer()) :: [map()]
+  @spec for_guild(String.t() | integer()) :: [EDA.Channel.t()]
   def for_guild(guild_id) do
     guild_id = to_string(guild_id)
 
@@ -67,10 +67,11 @@ defmodule EDA.Cache.Channel do
   @doc """
   Creates or replaces a channel in the cache.
   """
-  @spec create(map()) :: map()
+  @spec create(map() | EDA.Channel.t()) :: EDA.Channel.t()
   def create(channel) do
-    channel_id = to_string(channel["id"])
-    guild_id = if gid = channel["guild_id"], do: to_string(gid)
+    channel = to_struct(channel)
+    channel_id = to_string(channel.id)
+    guild_id = if gid = channel.guild_id, do: to_string(gid)
     key = {guild_id, channel_id}
 
     case EDA.Cache.Policy.check(EDA.Cache.Config.policy(@cache_name), :channel, key, channel) do
@@ -90,14 +91,14 @@ defmodule EDA.Cache.Channel do
   @doc """
   Updates a channel in the cache.
   """
-  @spec update(String.t() | integer(), map()) :: map() | nil
+  @spec update(String.t() | integer(), map()) :: EDA.Channel.t() | nil
   def update(channel_id, updates) do
     case get(to_string(channel_id)) do
       nil ->
         nil
 
       existing ->
-        updated = Map.merge(existing, updates)
+        updated = EDA.Entity.patch(existing, updates)
         create(updated)
         updated
     end
@@ -157,4 +158,7 @@ defmodule EDA.Cache.Channel do
   end
 
   defp adapter, do: EDA.Cache.Adapter.current()
+
+  defp to_struct(%EDA.Channel{} = channel), do: channel
+  defp to_struct(raw) when is_map(raw), do: EDA.Channel.from_raw(raw)
 end

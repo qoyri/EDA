@@ -21,7 +21,7 @@ defmodule EDA.Cache.VoiceState do
   @doc """
   Gets a user's voice state in a guild.
   """
-  @spec get(String.t() | integer(), String.t() | integer()) :: map() | nil
+  @spec get(String.t() | integer(), String.t() | integer()) :: EDA.VoiceState.t() | nil
   def get(guild_id, user_id) do
     key = {to_string(guild_id), to_string(user_id)}
 
@@ -39,7 +39,7 @@ defmodule EDA.Cache.VoiceState do
   @doc """
   Gets all voice states for a guild.
   """
-  @spec for_guild(String.t() | integer()) :: [map()]
+  @spec for_guild(String.t() | integer()) :: [EDA.VoiceState.t()]
   def for_guild(guild_id) do
     guild_id = to_string(guild_id)
 
@@ -49,13 +49,13 @@ defmodule EDA.Cache.VoiceState do
   @doc """
   Gets all voice states for a specific voice channel in a guild.
   """
-  @spec for_channel(String.t() | integer(), String.t() | integer()) :: [map()]
+  @spec for_channel(String.t() | integer(), String.t() | integer()) :: [EDA.VoiceState.t()]
   def for_channel(guild_id, channel_id) do
     guild_id = to_string(guild_id)
     channel_id = to_string(channel_id)
 
     for_guild(guild_id)
-    |> Enum.filter(fn vs -> vs["channel_id"] == channel_id end)
+    |> Enum.filter(&(&1.channel_id == channel_id))
   end
 
   @doc """
@@ -64,17 +64,16 @@ defmodule EDA.Cache.VoiceState do
   @spec upsert(String.t(), map()) :: :ok
   def upsert(guild_id, data) do
     guild_id = to_string(guild_id)
-    user_id = to_string(data["user_id"])
+    voice_state = %{to_struct(data) | guild_id: guild_id}
+    user_id = to_string(voice_state.user_id)
     key = {guild_id, user_id}
 
-    case data["channel_id"] do
+    case voice_state.channel_id do
       nil ->
         adapter().delete(@table, key)
         EDA.Cache.Evictor.remove(@table, key)
 
       _channel_id ->
-        voice_state = Map.put(data, "guild_id", guild_id)
-
         case EDA.Cache.Policy.check(
                EDA.Cache.Config.policy(@cache_name),
                :voice_state,
@@ -119,4 +118,7 @@ defmodule EDA.Cache.VoiceState do
   end
 
   defp adapter, do: EDA.Cache.Adapter.current()
+
+  defp to_struct(%EDA.VoiceState{} = voice_state), do: voice_state
+  defp to_struct(raw) when is_map(raw), do: EDA.VoiceState.from_raw(raw)
 end

@@ -3,9 +3,9 @@ defmodule EDA.Timestamp do
   Reads the timestamps Discord sends into `DateTime` structs.
 
   Every date EDA parses — a message's `timestamp`, a member's `joined_at`, an invite's
-  `expires_at`… — goes through `parse/1`, and it is available for the raw maps the cache holds:
+  `expires_at`… — goes through `parse/1`, which is also there for a date in a raw payload:
 
-      EDA.Timestamp.parse(EDA.Cache.get_member(guild_id, user_id)["joined_at"])
+      EDA.Timestamp.parse(raw["joined_at"])
 
   Discord writes them in two shapes, always in UTC, seen on every date of a real bot:
   `2026-09-23T10:15:30.123456+00:00` and `2026-09-23T10:15:30+00:00`. Those are read by matching

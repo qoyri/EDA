@@ -94,7 +94,8 @@ defmodule EDA.Permission do
   @max_bit 52
 
   # Voice and stage channel types
-  @voice_types [2, 13]
+  # A cached channel carries its type as an atom; a raw one, as Discord's integer.
+  @voice_types [2, 13, :guild_voice, :guild_stage_voice]
 
   @type flag ::
           :create_instant_invite
@@ -459,9 +460,7 @@ defmodule EDA.Permission do
     end
   end
 
-  # The raw shape compute_guild_permissions/2 reads: the struct's user is an EDA.User.
-  defp member_raw(%EDA.Member{user: %{id: id}, roles: roles}) when id != nil,
-    do: %{"user" => %{"id" => id}, "roles" => roles || []}
+  defp member_raw(%EDA.Member{user: %{id: id}} = member) when id != nil, do: member
 
   defp member_raw(%EDA.Member{}), do: nil
   defp member_raw(%{"user" => %{"id" => _}} = raw), do: raw
@@ -790,6 +789,7 @@ defmodule EDA.Permission do
 
   # ── Helpers ───────────────────────────────────────────────────────
 
+  defp get_user_id(%EDA.Member{user: %{id: id}}), do: to_string(id)
   defp get_user_id(%{"user" => %{"id" => id}}), do: to_string(id)
   defp get_user_id(%{"user_id" => id}), do: to_string(id)
 

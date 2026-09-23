@@ -227,10 +227,10 @@ defmodule EDA.Guild do
 
   # A guild always has @everyone, so no role at all means the role cache is off: say nil rather
   # than an empty list.
-  defp with_cached_roles(raw, guild_id) do
+  defp with_cached_roles(guild, guild_id) do
     case EDA.Cache.roles(guild_id) do
-      [] -> raw
-      roles -> Map.put(raw, "roles", roles)
+      [] -> guild
+      roles -> %{guild | roles: roles}
     end
   end
 
@@ -355,7 +355,7 @@ defmodule EDA.Guild do
   def everyone_role(guild_id) when is_binary(guild_id) do
     case EDA.Cache.Role.get(guild_id, guild_id) do
       nil -> nil
-      raw -> %{EDA.Role.from_raw(raw) | guild_id: guild_id}
+      role -> role
     end
   end
 
@@ -372,7 +372,6 @@ defmodule EDA.Guild do
   def sorted_roles(guild_id) when is_binary(guild_id) do
     guild_id
     |> EDA.Cache.roles()
-    |> Enum.map(&%{EDA.Role.from_raw(&1) | guild_id: guild_id})
     |> Enum.sort_by(&EDA.Role.rank/1, :desc)
   end
 
@@ -396,7 +395,7 @@ defmodule EDA.Guild do
   def fetch(guild_id) do
     case EDA.Cache.get_guild(guild_id) do
       nil -> EDA.API.Guild.get(guild_id) |> parse_response()
-      raw -> {:ok, from_raw(with_cached_roles(raw, guild_id))}
+      guild -> {:ok, with_cached_roles(guild, guild_id)}
     end
   end
 

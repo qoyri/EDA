@@ -110,7 +110,7 @@ defmodule EDA.GuildCompleteTest do
     end
 
     test "the active threads of GUILD_CREATE reach the channel cache" do
-      assert %{"parent_id" => "7700000000000001010"} =
+      assert %EDA.Channel{parent_id: "7700000000000001010"} =
                EDA.Cache.get_channel("7700000000000001020")
     end
 
@@ -136,7 +136,7 @@ defmodule EDA.GuildCompleteTest do
 
       entry = EDA.Cache.get_guild(@guild_id)
       assert entry["name"] == "Renamed"
-      assert entry["premium_tier"] == 2
+      assert entry["premium_tier"] == :tier_2
       refute Map.has_key?(entry, "roles")
     end
 

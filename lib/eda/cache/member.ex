@@ -21,7 +21,7 @@ defmodule EDA.Cache.Member do
   @doc """
   Gets a member in a guild.
   """
-  @spec get(String.t() | integer(), String.t() | integer()) :: map() | nil
+  @spec get(String.t() | integer(), String.t() | integer()) :: EDA.Member.t() | nil
   def get(guild_id, user_id) do
     key = {to_string(guild_id), to_string(user_id)}
 
@@ -39,7 +39,7 @@ defmodule EDA.Cache.Member do
   @doc """
   Gets all members for a guild.
   """
-  @spec for_guild(String.t() | integer()) :: [map()]
+  @spec for_guild(String.t() | integer()) :: [EDA.Member.t()]
   def for_guild(guild_id) do
     guild_id = to_string(guild_id)
 
@@ -49,12 +49,12 @@ defmodule EDA.Cache.Member do
   @doc """
   Creates or replaces a member in the cache.
   """
-  @spec create(String.t(), map()) :: map()
+  @spec create(String.t(), map() | EDA.Member.t()) :: EDA.Member.t()
   def create(guild_id, member) do
     guild_id = to_string(guild_id)
-    user_id = to_string(member["user"]["id"])
+    member_with_guild = %{to_struct(member) | guild_id: guild_id}
+    user_id = to_string(member_with_guild.user.id)
     key = {guild_id, user_id}
-    member_with_guild = Map.put(member, "guild_id", guild_id)
 
     case EDA.Cache.Policy.check(
            EDA.Cache.Config.policy(@cache_name),
@@ -77,13 +77,13 @@ defmodule EDA.Cache.Member do
   @doc """
   Updates a member in the cache (merges fields).
   """
-  @spec update(String.t(), String.t(), map()) :: map() | nil
+  @spec update(String.t(), String.t(), map()) :: EDA.Member.t() | nil
   def update(guild_id, user_id, updates) do
     key = {to_string(guild_id), to_string(user_id)}
 
     case adapter().get(@table, key) do
       existing when not is_nil(existing) ->
-        updated = Map.merge(existing, updates)
+        updated = EDA.Entity.patch(existing, updates)
         adapter().put(@table, key, updated)
         updated
 
@@ -136,4 +136,7 @@ defmodule EDA.Cache.Member do
   end
 
   defp adapter, do: EDA.Cache.Adapter.current()
+
+  defp to_struct(%EDA.Member{} = member), do: member
+  defp to_struct(raw) when is_map(raw), do: EDA.Member.from_raw(raw)
 end
