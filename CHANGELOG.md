@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The invite target user endpoints Discord added on 2026-09-18: `EDA.API.Invite`, and
+  `EDA.Invite` for structs, gained `add_target_user/2`, `remove_target_user/2`,
+  `add_target_users/2` and `remove_target_users/2` (up to 1000 at a time). They change a list in
+  place, and apply at once, where `update_target_users/2` replaces it through a CSV upload that
+  Discord processes in the background.
 - `EDA.User.Flags` names the badges on a profile, and `EDA.Member.Flags` what a member has done
   in a guild — both with the `to_list/1`, `has?/2`, `to_bit/1` and `to_bitset/1` of
   `EDA.Permission`. `EDA.User.badges/1`, `badge?/2`, `EDA.Member.flags/1` and `flag?/2` read them
@@ -25,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `EDA.API.Invite.create/2` sends up to 1000 `target_users` as the JSON array Discord now
+  accepts, so the list is in force when the call returns, instead of uploading a CSV and leaving
+  the caller to poll. A longer list, or a CSV binary, still uploads. Two findings from that
+  route, both documented: an invite created this way carries **no** `flags`, so
+  `EDA.Invite.has_target_users?/1` answers `false` although the invite is restricted; and there
+  is no job to poll, so `target_users_job_status/1` answers error `10124`.
 - `avatar_decoration_data` and `collectibles` on a user or member are `EDA.User.AvatarDecoration`
   and `EDA.User.Collectibles` (holding an `EDA.User.Nameplate`) instead of raw maps. The
   decoration carries `expires_at`, which Discord sends but does not document. Code that read them

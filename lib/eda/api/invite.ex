@@ -7,16 +7,18 @@ defmodule EDA.API.Invite do
   ## Target users
 
   An invite can be restricted to a named list of people: only those users may accept it.
-  Discord carries that list as a **CSV file** rather than a JSON array, uploaded as
-  `multipart/form-data` and processed asynchronously.
+  EDA takes and returns plain lists of user ids everywhere, so `target_users/1` gives a list
+  rather than the CSV Discord answers with, and `create/2` takes one.
 
-  EDA takes and returns plain lists of user ids and does the CSV on both sides, so
-  `target_users: [...]` on `create/2` or `update_target_users/2` is all there is to it, and
-  `target_users/1` gives a list back rather than a blob of text. The CSV itself is still
-  reachable if you have one already — see `update_target_users/2`.
+  There are two ways to send that list, and `create/2` and `update_target_users/2` pick the
+  right one. Up to 1000 ids go as a JSON array and are **in force when the call returns**.
+  Beyond that, or when you hand over a CSV binary you already have, it is uploaded as
+  `multipart/form-data` and applied **asynchronously**: poll `target_users_job_status/1` until
+  it reports `:completed`.
 
-  Because the upload is asynchronous, the ids are **not** in force when the call returns.
-  Poll `target_users_job_status/1` until it reports `:completed`.
+  To change a list without rebuilding it, `add_target_user/2` and `remove_target_user/2` take
+  one user, `add_target_users/2` and `remove_target_users/2` up to 1000 at a time. All four
+  apply at once.
   """
 
   import EDA.HTTP.Client
@@ -79,8 +81,9 @@ defmodule EDA.API.Invite do
         role_ids: ["41771983423143936"]
       )
 
-  Uploading `:target_users` makes this a `multipart/form-data` request and the list is
-  applied asynchronously — see `target_users_job_status/1`.
+  Up to 1000 target users are sent as a JSON array and are in force when the call returns.
+  A longer list, or a CSV binary, is uploaded instead and applied asynchronously — see
+  `target_users_job_status/1`.
   """
   @spec create(String.t() | integer(), keyword() | map()) :: {:ok, map()} | {:error, term()}
   def create(channel_id, opts \\ []) do
@@ -91,7 +94,8 @@ defmodule EDA.API.Invite do
 
     case target_users do
       nil -> post(path, body, reason)
-      csv -> request_form(:post, path, body, [target_users_field(csv)], reason)
+      {:ids, ids} -> post(path, Map.put(body, :target_user_ids, ids), reason)
+      {:csv, csv} -> request_form(:post, path, body, [target_users_field(csv)], reason)
     end
   end
 
@@ -140,8 +144,10 @@ defmodule EDA.API.Invite do
 
   The list **replaces** whatever was there; passing `[]` clears it.
 
-  Discord applies it asynchronously, so a success here means the upload was accepted, not
-  that the restriction is live. Poll `target_users_job_status/1`.
+  This is the CSV upload, which Discord applies asynchronously: a success here means the upload
+  was accepted, not that the restriction is live. Poll `target_users_job_status/1`. To change a
+  list in place instead, and at once, use `add_target_user/2`, `remove_target_user/2`,
+  `add_target_users/2` or `remove_target_users/2`.
 
   ## Examples
 
@@ -162,7 +168,56 @@ defmodule EDA.API.Invite do
   end
 
   @doc """
+  Lets one more user accept an invite, leaving the rest of the list alone.
+
+  `PUT /invites/{code}/target-users/{user_id}`. Applies at once, unlike a CSV upload. The
+  caller must be the inviter or hold `MANAGE_GUILD`.
+
+      EDA.API.Invite.add_target_user("abc123", "80351110224678912")
+  """
+  @spec add_target_user(String.t(), String.t() | integer()) :: :ok | {:error, term()}
+  def add_target_user(invite_code, user_id) do
+    no_content(EDA.HTTP.Client.put("/invites/#{invite_code}/target-users/#{user_id}", nil))
+  end
+
+  @doc """
+  Stops one user from accepting an invite, leaving the rest of the list alone.
+
+  `DELETE /invites/{code}/target-users/{user_id}`. Same permissions as `add_target_user/2`.
+  """
+  @spec remove_target_user(String.t(), String.t() | integer()) :: :ok | {:error, term()}
+  def remove_target_user(invite_code, user_id) do
+    no_content(EDA.HTTP.Client.delete("/invites/#{invite_code}/target-users/#{user_id}"))
+  end
+
+  @doc """
+  Adds up to 1000 users to an invite's list at once, leaving the rest of it alone.
+
+  `POST /invites/{code}/target-users/bulk-add`. Applies at once. Same permissions as
+  `add_target_user/2`.
+
+      EDA.API.Invite.add_target_users("abc123", ["80351110224678912", "82198898841029460"])
+  """
+  @spec add_target_users(String.t(), [String.t() | integer()]) :: :ok | {:error, term()}
+  def add_target_users(invite_code, user_ids) when is_list(user_ids),
+    do: bulk(invite_code, "bulk-add", user_ids)
+
+  @doc """
+  Removes up to 1000 users from an invite's list at once, leaving the rest of it alone.
+
+  `POST /invites/{code}/target-users/bulk-delete`. Applies at once. Same permissions as
+  `add_target_user/2`.
+  """
+  @spec remove_target_users(String.t(), [String.t() | integer()]) :: :ok | {:error, term()}
+  def remove_target_users(invite_code, user_ids) when is_list(user_ids),
+    do: bulk(invite_code, "bulk-delete", user_ids)
+
+  @doc """
   Reports how far Discord has got applying an invite's target users.
+
+  Only a CSV upload creates a job. A list sent as JSON — up to 1000 ids on `create/2`, or any
+  of the in-place calls — applies at once and leaves nothing to poll, so this answers error
+  `10124` (`EDA.Error.unknown_invite_target_users_job/0`).
 
   The raw `status` integer is replaced by an atom — `:unspecified`, `:processing`,
   `:completed` or `:failed` — under the `:status` key, with the rest of the payload left as
@@ -248,19 +303,50 @@ defmodule EDA.API.Invite do
 
   # ── Internals ──
 
+  # Discord takes at most 1000 ids in one JSON array, on create and on the bulk routes.
+  @max_ids 1000
+
   defp target_users_field(csv), do: {"target_users_file", "target_users.csv", csv}
+
+  defp bulk(_invite_code, _action, []), do: :ok
+
+  defp bulk(invite_code, action, user_ids) do
+    if length(user_ids) > @max_ids do
+      raise ArgumentError,
+            "at most #{@max_ids} target users per call, got #{length(user_ids)}; " <>
+              "send them in batches, or replace the list with update_target_users/2"
+    end
+
+    no_content(
+      post("/invites/#{invite_code}/target-users/#{action}", %{
+        user_ids: Enum.map(user_ids, &to_string/1)
+      })
+    )
+  end
+
+  defp no_content({:ok, _}), do: :ok
+  defp no_content(error), do: error
+
+  # A list short enough goes as JSON and applies at once; anything else is a CSV upload.
+  defp classify_target_users(csv) when is_binary(csv), do: {:csv, csv}
+
+  defp classify_target_users(ids) when is_list(ids) do
+    if length(ids) > @max_ids,
+      do: {:csv, to_csv(ids)},
+      else: {:ids, Enum.map(ids, &to_string/1)}
+  end
 
   defp pop_target_users(opts) when is_list(opts) do
     case Keyword.pop(opts, :target_users) do
       {nil, rest} -> {nil, rest}
-      {value, rest} -> {to_csv(value), rest}
+      {value, rest} -> {classify_target_users(value), rest}
     end
   end
 
   defp pop_target_users(opts) when is_map(opts) do
     case Map.pop(opts, :target_users) do
       {nil, rest} -> {nil, rest}
-      {value, rest} -> {to_csv(value), rest}
+      {value, rest} -> {classify_target_users(value), rest}
     end
   end
 
