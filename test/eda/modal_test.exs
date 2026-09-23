@@ -8,15 +8,15 @@ defmodule EDA.ModalTest do
   describe "text_input/4" do
     test "short style" do
       input = text_input("name", "Your Name", :short)
-      assert input.type == 4
+      assert input.type == :text_input
       assert input.custom_id == "name"
       assert input.label == "Your Name"
-      assert input.style == 1
+      assert input.style == :short
     end
 
     test "paragraph style" do
       input = text_input("bio", "About You", :paragraph)
-      assert input.style == 2
+      assert input.style == :paragraph
     end
 
     test "all options" do
@@ -38,15 +38,15 @@ defmodule EDA.ModalTest do
 
     test "required defaults to omitted (Discord defaults to true)" do
       input = text_input("id", "Label", :short)
-      refute Map.has_key?(input, :required)
+      assert input.required == nil
     end
 
     test "optional fields are omitted when nil" do
       input = text_input("id", "Label", :short)
-      refute Map.has_key?(input, :placeholder)
-      refute Map.has_key?(input, :min_length)
-      refute Map.has_key?(input, :max_length)
-      refute Map.has_key?(input, :value)
+      assert input.placeholder == nil
+      assert input.min_length == nil
+      assert input.max_length == nil
+      assert input.value == nil
     end
 
     test "invalid style raises" do
@@ -109,7 +109,7 @@ defmodule EDA.ModalTest do
       assert length(m.components) == 1
 
       [row] = m.components
-      assert row.type == 1
+      assert row.type == :action_row
       assert length(row.components) == 1
       assert hd(row.components).custom_id == "f1"
     end

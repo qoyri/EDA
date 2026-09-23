@@ -3,7 +3,10 @@ defmodule EDA.Command.Option do
   Builder for command option objects.
 
   Provides type-specific constructors that produce validated option structs.
-  Options are added to commands via `EDA.Command.option/2`.
+  Options are added to commands via `EDA.Command.option/2`. The same struct is what
+  `EDA.Command.from_raw/1` reads a registered command's options into: `type` is an atom named
+  after Discord's (`:sub_command`, `:string`, `:channel`…), `channel_types` are channel type
+  atoms, and `choices` are `EDA.Command.Option.Choice` structs.
 
   ## Example
 
@@ -29,7 +32,10 @@ defmodule EDA.Command.Option do
       ])
   """
 
-  @enforce_keys [:type, :name, :description]
+  use EDA.Event.Access
+
+  alias EDA.Command.Option.Choice
+
   defstruct [
     :type,
     :name,
@@ -49,20 +55,87 @@ defmodule EDA.Command.Option do
   ]
 
   @type t :: %__MODULE__{
-          type: 1..11,
-          name: String.t(),
-          description: String.t(),
+          type: type() | nil,
+          name: String.t() | nil,
+          description: String.t() | nil,
           required: boolean() | nil,
-          choices: [map()] | nil,
+          choices: [Choice.t()] | nil,
           options: [t()] | nil,
-          channel_types: [non_neg_integer()] | nil,
+          channel_types: [EDA.Channel.channel_type()] | nil,
           min_value: number() | nil,
           max_value: number() | nil,
           min_length: non_neg_integer() | nil,
           max_length: pos_integer() | nil,
           autocomplete: boolean() | nil,
-          file_types: [String.t()] | nil
+          file_types: [String.t()] | nil,
+          name_localizations: %{String.t() => String.t()} | nil,
+          description_localizations: %{String.t() => String.t()} | nil
         }
+
+  @type type ::
+          :sub_command
+          | :sub_command_group
+          | :string
+          | :integer
+          | :boolean
+          | :user
+          | :channel
+          | :role
+          | :mentionable
+          | :number
+          | :attachment
+          | integer()
+
+  @types %{
+    1 => :sub_command,
+    2 => :sub_command_group,
+    3 => :string,
+    4 => :integer,
+    5 => :boolean,
+    6 => :user,
+    7 => :channel,
+    8 => :role,
+    9 => :mentionable,
+    10 => :number,
+    11 => :attachment
+  }
+
+  @doc false
+  # Shared with EDA.Interaction.Option.
+  def type_name(value), do: EDA.Enum.name(@types, value)
+
+  @doc false
+  def type_value(type), do: EDA.Enum.value!(@types, type, "command option type")
+
+  @doc """
+  An option of a registered command, as Discord sends it.
+
+      iex> EDA.Command.Option.from_raw(%{"type" => 3, "name" => "q", "description" => "Query",
+      ...>   "choices" => [%{"name" => "Red", "value" => "red"}]})
+      %EDA.Command.Option{type: :string, name: "q", description: "Query",
+        choices: [%EDA.Command.Option.Choice{name: "Red", value: "red"}]}
+  """
+  @spec from_raw(map()) :: t()
+  def from_raw(raw) when is_map(raw) do
+    %__MODULE__{
+      type: type_name(raw["type"]),
+      name: raw["name"],
+      description: raw["description"],
+      required: raw["required"],
+      choices: raw["choices"] && Enum.map(raw["choices"], &Choice.from_raw/1),
+      options: raw["options"] && Enum.map(raw["options"], &from_raw/1),
+      channel_types:
+        raw["channel_types"] && Enum.map(raw["channel_types"], &EDA.Channel.type_name/1),
+      min_value: raw["min_value"],
+      max_value: raw["max_value"],
+      min_length: raw["min_length"],
+      max_length: raw["max_length"],
+      autocomplete: raw["autocomplete"],
+      file_types: raw["file_types"],
+      name_localizations: raw["name_localizations"],
+      description_localizations: raw["description_localizations"]
+    }
+  end
 
   @option_name_regex ~r/^[-_\p{L}\p{N}]{1,32}$/u
 
@@ -79,7 +152,12 @@ defmodule EDA.Command.Option do
       raise ArgumentError, "sub_command cannot have more than 25 options"
     end
 
-    %__MODULE__{type: 1, name: name, description: description, options: non_empty(options)}
+    %__MODULE__{
+      type: :sub_command,
+      name: name,
+      description: description,
+      options: non_empty(options)
+    }
   end
 
   @doc "Creates a SUB_COMMAND_GROUP option (type 2) containing sub_commands."
@@ -98,7 +176,7 @@ defmodule EDA.Command.Option do
     end
 
     Enum.each(sub_commands, fn
-      %__MODULE__{type: 1} ->
+      %__MODULE__{type: :sub_command} ->
         :ok
 
       other ->
@@ -106,13 +184,18 @@ defmodule EDA.Command.Option do
               "sub_command_group children must be sub_commands, got: #{inspect(other)}"
     end)
 
-    %__MODULE__{type: 2, name: name, description: description, options: sub_commands}
+    %__MODULE__{
+      type: :sub_command_group,
+      name: name,
+      description: description,
+      options: sub_commands
+    }
   end
 
   @doc "Creates a STRING option (type 3)."
   @spec string(String.t(), String.t(), keyword()) :: t()
   def string(name, description, opts \\ []) do
-    build(3, name, description, opts, [
+    build(:string, name, description, opts, [
       :required,
       :choices,
       :autocomplete,
@@ -124,19 +207,25 @@ defmodule EDA.Command.Option do
   @doc "Creates an INTEGER option (type 4)."
   @spec integer(String.t(), String.t(), keyword()) :: t()
   def integer(name, description, opts \\ []) do
-    build(4, name, description, opts, [:required, :choices, :autocomplete, :min_value, :max_value])
+    build(:integer, name, description, opts, [
+      :required,
+      :choices,
+      :autocomplete,
+      :min_value,
+      :max_value
+    ])
   end
 
   @doc "Creates a BOOLEAN option (type 5)."
   @spec boolean(String.t(), String.t(), keyword()) :: t()
   def boolean(name, description, opts \\ []) do
-    build(5, name, description, opts, [:required])
+    build(:boolean, name, description, opts, [:required])
   end
 
   @doc "Creates a USER option (type 6)."
   @spec user(String.t(), String.t(), keyword()) :: t()
   def user(name, description, opts \\ []) do
-    build(6, name, description, opts, [:required])
+    build(:user, name, description, opts, [:required])
   end
 
   @doc """
@@ -152,25 +241,25 @@ defmodule EDA.Command.Option do
   """
   @spec channel(String.t(), String.t(), keyword()) :: t()
   def channel(name, description, opts \\ []) do
-    build(7, name, description, opts, [:required, :channel_types])
+    build(:channel, name, description, opts, [:required, :channel_types])
   end
 
   @doc "Creates a ROLE option (type 8)."
   @spec role(String.t(), String.t(), keyword()) :: t()
   def role(name, description, opts \\ []) do
-    build(8, name, description, opts, [:required])
+    build(:role, name, description, opts, [:required])
   end
 
   @doc "Creates a MENTIONABLE option (type 9) — accepts users or roles."
   @spec mentionable(String.t(), String.t(), keyword()) :: t()
   def mentionable(name, description, opts \\ []) do
-    build(9, name, description, opts, [:required])
+    build(:mentionable, name, description, opts, [:required])
   end
 
   @doc "Creates a NUMBER option (type 10) — double-precision float."
   @spec number(String.t(), String.t(), keyword()) :: t()
   def number(name, description, opts \\ []) do
-    build(10, name, description, opts, [
+    build(:number, name, description, opts, [
       :required,
       :choices,
       :autocomplete,
@@ -201,7 +290,7 @@ defmodule EDA.Command.Option do
   """
   @spec attachment(String.t(), String.t(), keyword()) :: t()
   def attachment(name, description, opts \\ []) do
-    build(11, name, description, opts, [:required, :file_types])
+    build(:attachment, name, description, opts, [:required, :file_types])
   end
 
   @doc """
@@ -239,13 +328,16 @@ defmodule EDA.Command.Option do
   @doc "Converts the option struct to a plain map for the Discord API."
   @spec to_map(t()) :: map()
   def to_map(%__MODULE__{} = opt) do
-    map = %{type: opt.type, name: opt.name, description: opt.description}
+    map = %{type: type_value(opt.type), name: opt.name, description: opt.description}
 
     map
     |> put_if(:required, opt.required)
-    |> put_if(:choices, opt.choices)
+    |> put_if(:choices, opt.choices && Enum.map(opt.choices, &choice_map/1))
     |> put_if(:options, opt.options && Enum.map(opt.options, &to_map/1))
-    |> put_if(:channel_types, opt.channel_types)
+    |> put_if(
+      :channel_types,
+      opt.channel_types && Enum.map(opt.channel_types, &EDA.Channel.type_value/1)
+    )
     |> put_if(:min_value, opt.min_value)
     |> put_if(:max_value, opt.max_value)
     |> put_if(:min_length, opt.min_length)
@@ -267,7 +359,7 @@ defmodule EDA.Command.Option do
 
     if unexpected != [] do
       raise ArgumentError,
-            "unexpected options #{inspect(unexpected)} for option type #{type_name(type)}"
+            "unexpected options #{inspect(unexpected)} for option type #{type |> Atom.to_string() |> String.upcase()}"
     end
 
     opt = %__MODULE__{type: type, name: name, description: description}
@@ -296,7 +388,7 @@ defmodule EDA.Command.Option do
         {name, value} when is_binary(name) ->
           validate_choice_name!(name)
           validate_choice_value!(value)
-          %{name: name, value: value}
+          %Choice{name: name, value: value}
 
         other ->
           raise ArgumentError,
@@ -333,7 +425,9 @@ defmodule EDA.Command.Option do
   end
 
   defp apply_opt({:channel_types, types}, opt) when is_list(types) do
-    %{opt | channel_types: Enum.map(types, &EDA.Channel.type_value/1)}
+    # Checked now, so an unknown type fails where it is written rather than when sent.
+    Enum.each(types, &EDA.Channel.type_value/1)
+    %{opt | channel_types: types}
   end
 
   defp validate_name!(name) do
@@ -382,17 +476,8 @@ defmodule EDA.Command.Option do
   defp put_if(map, _key, nil), do: map
   defp put_if(map, key, value), do: Map.put(map, key, value)
 
-  # Only reached from build/5, which handles value types. sub_command/3 and
-  # sub_command_group/3 build their structs directly, so types 1 and 2 never arrive here.
-  defp type_name(3), do: "STRING"
-  defp type_name(4), do: "INTEGER"
-  defp type_name(5), do: "BOOLEAN"
-  defp type_name(6), do: "USER"
-  defp type_name(7), do: "CHANNEL"
-  defp type_name(8), do: "ROLE"
-  defp type_name(9), do: "MENTIONABLE"
-  defp type_name(10), do: "NUMBER"
-  defp type_name(11), do: "ATTACHMENT"
+  defp choice_map(%Choice{} = choice), do: Choice.to_map(choice)
+  defp choice_map(map) when is_map(map), do: map
 end
 
 defimpl Jason.Encoder, for: EDA.Command.Option do

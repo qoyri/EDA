@@ -8,6 +8,11 @@ defmodule EDA.Event.PresenceUpdate do
   (announced 2026-09-22, and not something an app opts into). Its absence therefore does not mean
   the user has no custom status, and expect to see it more often as those protections roll out.
   The other activity types are not affected, though Activity Sharing can hide them.
+
+  `status` is `:online`, `:idle`, `:dnd` or `:offline` (an invisible user shows as offline).
+  `client_status` maps each platform with a session to its status, as `EDA.Presence.platform/1`
+  names them: `%{desktop: :idle, mobile: :online}`; `EDA.Presence.platforms/1` and
+  `status_on/2` read it.
   """
   use EDA.Event.Access
 
@@ -16,9 +21,9 @@ defmodule EDA.Event.PresenceUpdate do
   @type t :: %__MODULE__{
           guild_id: String.t() | nil,
           user: EDA.User.t() | nil,
-          status: String.t() | nil,
+          status: :online | :idle | :dnd | :offline | String.t() | nil,
           activities: [EDA.Activity.t()] | nil,
-          client_status: map() | nil
+          client_status: %{EDA.Presence.platform() => EDA.Presence.session_status()} | nil
         }
 
   @doc "Converts a raw Discord payload into this event struct."
@@ -27,9 +32,9 @@ defmodule EDA.Event.PresenceUpdate do
     %__MODULE__{
       guild_id: raw["guild_id"],
       user: parse_user(raw["user"]),
-      status: raw["status"],
+      status: EDA.Presence.status_name(raw["status"]),
       activities: parse_activities(raw["activities"]),
-      client_status: raw["client_status"]
+      client_status: EDA.Presence.parse_client_status(raw["client_status"])
     }
   end
 

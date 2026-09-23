@@ -167,14 +167,14 @@ defmodule EDA.API.RestCommonTest do
         "items" => [%{"id" => "5", "name" => "lul"}]
       })
 
-      assert {:ok, [%EDA.Emoji{id: "5", name: "lul"}]} = EDA.API.Emoji.list_application()
+      assert {:ok, [%EDA.Emoji{id: "5", name: "lul"}]} = EDA.Emoji.list_application()
     end
 
     test "create takes raw image bytes and sends image data", %{bypass: bypass} do
       capture(bypass, "POST", "/applications/999/emojis", %{"id" => "5", "name" => "lul"})
       png = <<0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0>>
 
-      assert {:ok, %EDA.Emoji{id: "5"}} = EDA.API.Emoji.create_application("lul", png)
+      assert {:ok, %EDA.Emoji{id: "5"}} = EDA.Emoji.create_application("lul", png)
 
       assert_receive {:captured, _, %{"name" => "lul", "image" => "data:image/png;base64," <> _},
                       _}
@@ -185,10 +185,10 @@ defmodule EDA.API.RestCommonTest do
       capture(bypass, "GET", "/applications/999/emojis/5", %{"id" => "5", "name" => "kek"})
       capture(bypass, "DELETE", "/applications/999/emojis/5", nil, 204)
 
-      assert {:ok, %EDA.Emoji{name: "kek"}} = EDA.API.Emoji.modify_application("5", "kek")
+      assert {:ok, %EDA.Emoji{name: "kek"}} = EDA.Emoji.rename_application("5", "kek")
       assert_receive {:captured, _, %{"name" => "kek"}, _}
-      assert {:ok, %EDA.Emoji{id: "5"}} = EDA.API.Emoji.get_application("5")
-      assert :ok = EDA.API.Emoji.delete_application("5")
+      assert {:ok, %EDA.Emoji{id: "5"}} = EDA.Emoji.fetch_application("5")
+      assert :ok = EDA.Emoji.delete_application("5")
     end
   end
 end

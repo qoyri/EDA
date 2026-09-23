@@ -61,7 +61,7 @@ defmodule EDA.GuildNestedTest do
         "guild_scheduled_events" => [%{"id" => "5", "name" => "Launch", "status" => 2}]
       })
 
-    assert [%EDA.Event.PresenceUpdate{guild_id: "1", status: "idle"}] = guild.presences
+    assert [%EDA.Event.PresenceUpdate{guild_id: "1", status: :idle}] = guild.presences
     assert [%EDA.StageInstance{topic: "Q&A", privacy_level: :guild_only}] = guild.stage_instances
     assert [%EDA.ScheduledEvent{name: "Launch", status: :active}] = guild.guild_scheduled_events
   end
@@ -75,7 +75,7 @@ defmodule EDA.GuildNestedTest do
       })
 
     assert [%EDA.Member{guild_id: "1"}] = chunk.members
-    assert [%EDA.Event.PresenceUpdate{guild_id: "1", status: "online"}] = chunk.presences
+    assert [%EDA.Event.PresenceUpdate{guild_id: "1", status: :online}] = chunk.presences
   end
 
   test "a forum's default reaction, sent back as Discord takes it" do

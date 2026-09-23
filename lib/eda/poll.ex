@@ -353,6 +353,30 @@ defmodule EDA.Poll do
   """
   @spec layout_type_value(atom() | integer()) :: integer()
   def layout_type_value(value), do: EDA.Enum.value!(@layout_types, value, "poll layout")
+
+  @doc """
+  Ends a poll now, before its expiry. Only the bot's own polls can be ended; returns the message
+  with its final results.
+  """
+  @spec expire(EDA.Message.t()) :: {:ok, EDA.Message.t()} | {:error, term()}
+  def expire(%EDA.Message{channel_id: cid, id: mid}) do
+    case EDA.API.Poll.expire(cid, mid) do
+      {:ok, raw} when is_map(raw) -> {:ok, EDA.Message.from_raw(raw)}
+      {:error, _} = err -> err
+    end
+  end
+
+  @doc """
+  The users who voted for an answer, by its `answer_id`, as `EDA.User` structs. Takes `:after`
+  and `:limit` (1–100, default 25).
+  """
+  @spec voters(EDA.Message.t(), integer(), keyword()) :: {:ok, [EDA.User.t()]} | {:error, term()}
+  def voters(%EDA.Message{channel_id: cid, id: mid}, answer_id, opts \\ []) do
+    case EDA.API.Poll.get_voters(cid, mid, answer_id, opts) do
+      {:ok, %{"users" => users}} -> {:ok, Enum.map(users, &EDA.User.from_raw/1)}
+      {:error, _} = err -> err
+    end
+  end
 end
 
 defimpl Jason.Encoder, for: EDA.Poll do

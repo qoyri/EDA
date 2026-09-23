@@ -1,7 +1,8 @@
 defmodule EDA.API.AutoModTest do
   use ExUnit.Case
 
-  alias EDA.API.AutoMod
+  # The API layer returns Discord's maps; these tests go through the entity, which parses them.
+  alias EDA.AutoMod
 
   setup do
     bypass = Bypass.open()
@@ -60,7 +61,8 @@ defmodule EDA.API.AutoModTest do
         json(conn, @rule_json)
       end)
 
-      assert {:ok, %EDA.AutoMod{id: "r1", trigger_type: :keyword}} = AutoMod.get_rule("g1", "r1")
+      assert {:ok, %EDA.AutoMod{id: "r1", trigger_type: :keyword}} =
+               AutoMod.fetch_rule("g1", "r1")
     end
   end
 
@@ -109,7 +111,7 @@ defmodule EDA.API.AutoModTest do
         Plug.Conn.resp(conn, 204, "")
       end)
 
-      assert :ok = AutoMod.delete_rule("g1", "r1")
+      assert :ok = AutoMod.delete("g1", "r1")
     end
   end
 end

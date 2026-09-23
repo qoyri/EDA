@@ -88,4 +88,19 @@ defmodule EDA.PresenceClientStatusTest do
       assert Presence.to_map(p).status == "dnd"
     end
   end
+
+  test "PRESENCE_UPDATE names the status and each platform's status" do
+    event =
+      EDA.Event.from_raw("PRESENCE_UPDATE", %{
+        "user" => %{"id" => "1"},
+        "status" => "dnd",
+        "client_status" => %{"desktop" => "dnd", "mobile" => "idle", "watch" => "online"}
+      })
+
+    assert event.status == :dnd
+    assert event.client_status == %{:desktop => :dnd, :mobile => :idle, "watch" => :online}
+    assert Presence.platforms(event) == [:desktop, :mobile, "watch"]
+    assert Presence.status_on(event, :mobile) == :idle
+    assert EDA.Event.from_raw("PRESENCE_UPDATE", %{"status" => "offline"}).status == :offline
+  end
 end

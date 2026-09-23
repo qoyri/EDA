@@ -483,4 +483,83 @@ defmodule EDA.Message do
       {:ok, entity}
     end
   end
+
+  @doc """
+  Lists one page of a channel's messages, newest first. Takes the options of
+  `EDA.API.Message.list/2`: `:before`, `:after`, `:around`, `:limit` (1–100).
+  """
+  @spec list(EDA.Channel.t() | String.t() | integer(), keyword()) ::
+          {:ok, [t()]} | {:error, term()}
+  def list(channel, opts \\ []),
+    do: EDA.API.Message.list(channel_id(channel), opts) |> parse_messages()
+
+  @doc """
+  Fetches up to `limit` messages (or `:infinity`), paging past Discord's 100 per request.
+  Takes `:before`, `:after` or `:around`.
+  """
+  @spec history(EDA.Channel.t() | String.t() | integer(), pos_integer() | :infinity, keyword()) ::
+          {:ok, [t()]} | {:error, term()}
+  def history(channel, limit, opts \\ []),
+    do: EDA.API.Message.history(channel_id(channel), limit, opts) |> parse_messages()
+
+  @doc """
+  A lazy stream of a channel's messages, page by page. Takes `:before`, `:after` and
+  `:per_page`.
+
+      EDA.Message.stream(channel_id) |> Enum.find(&(&1.author.id == user_id))
+  """
+  @spec stream(EDA.Channel.t() | String.t() | integer(), keyword()) :: Enumerable.t()
+  def stream(channel, opts \\ []),
+    do: channel |> channel_id() |> EDA.API.Message.stream(opts) |> Stream.map(&from_raw/1)
+
+  @doc "A channel's pinned messages, paging automatically. Takes `:limit`."
+  @spec pinned(EDA.Channel.t() | String.t() | integer(), keyword()) ::
+          {:ok, [t()]} | {:error, term()}
+  def pinned(channel, opts \\ []),
+    do: EDA.API.Message.pinned(channel_id(channel), opts) |> parse_messages()
+
+  @doc """
+  One page of a channel's pins, each with when it was pinned. Takes `:before` (a `DateTime` or
+  an ISO 8601 string: the `pinned_at` of the last pin of the previous page) and `:limit`.
+  """
+  @spec pins(EDA.Channel.t() | String.t() | integer(), keyword()) ::
+          {:ok, %{items: [%{pinned_at: DateTime.t() | nil, message: t()}], has_more: boolean()}}
+          | {:error, term()}
+  def pins(channel, opts \\ []) do
+    opts =
+      case opts[:before] do
+        %DateTime{} = before -> Keyword.put(opts, :before, DateTime.to_iso8601(before))
+        _ -> opts
+      end
+
+    case EDA.API.Message.pins(channel_id(channel), opts) do
+      {:ok, %{"items" => items} = page} ->
+        pins =
+          Enum.map(items, fn pin ->
+            %{
+              pinned_at: EDA.Timestamp.parse(pin["pinned_at"]),
+              message: from_raw(pin["message"])
+            }
+          end)
+
+        {:ok, %{items: pins, has_more: page["has_more"] == true}}
+
+      {:error, _} = err ->
+        err
+    end
+  end
+
+  @doc """
+  Forwards the message to another channel, returning the forward: a message whose
+  `message_reference` has `type: :forward` and whose `message_snapshots` hold the original.
+  """
+  @spec forward(t(), EDA.Channel.t() | String.t() | integer()) :: {:ok, t()} | {:error, term()}
+  def forward(%__MODULE__{channel_id: cid, id: mid}, target),
+    do: EDA.API.Message.forward(channel_id(target), cid, mid) |> parse_response()
+
+  defp channel_id(%EDA.Channel{id: id}), do: id
+  defp channel_id(id), do: id
+
+  defp parse_messages({:ok, list}) when is_list(list), do: {:ok, Enum.map(list, &from_raw/1)}
+  defp parse_messages({:error, _} = err), do: err
 end

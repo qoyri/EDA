@@ -55,4 +55,22 @@ defmodule EDA.VoiceState do
 
   defp parse_member(nil), do: nil
   defp parse_member(raw) when is_map(raw), do: EDA.Member.from_raw(raw)
+
+  @doc """
+  Fetches a user's voice state in a guild, or the bot's with `:me`, from Discord rather than
+  the cache.
+
+  Named `fetch_state/2` rather than `fetch/2` because `Access.fetch/2` owns that arity.
+  """
+  @spec fetch_state(String.t() | integer(), :me | String.t() | integer()) ::
+          {:ok, t()} | {:error, term()}
+  def fetch_state(guild_id, user) do
+    case EDA.API.Voice.voice_state(guild_id, user) do
+      {:ok, raw} when is_map(raw) ->
+        {:ok, from_raw(Map.put_new(raw, "guild_id", to_string(guild_id)))}
+
+      {:error, _} = err ->
+        err
+    end
+  end
 end

@@ -153,6 +153,74 @@ defmodule EDA.Emoji do
   defp parse_user(nil), do: nil
   defp parse_user(raw) when is_map(raw), do: EDA.User.from_raw(raw)
 
+  # ── Entity Manager ──
+
+  use EDA.Entity
+
+  @doc "Lists a guild's emojis. See `EDA.API.Emoji.list/1`."
+  @spec list(String.t() | integer()) :: {:ok, [t()]} | {:error, term()}
+  def list(guild_id), do: EDA.API.Emoji.list(guild_id) |> parse_list()
+
+  @doc """
+  Fetches one of a guild's emojis.
+
+  Named `fetch_emoji/2` rather than `fetch/2` because `Access.fetch/2` owns that arity.
+  """
+  @spec fetch_emoji(String.t() | integer(), String.t() | integer()) ::
+          {:ok, t()} | {:error, term()}
+  def fetch_emoji(guild_id, emoji_id),
+    do: EDA.API.Emoji.get(guild_id, emoji_id) |> parse_response()
+
+  @doc "Creates a guild emoji. Takes the parameters of `EDA.API.Emoji.create/2`."
+  @spec create(String.t() | integer(), map()) :: {:ok, t()} | {:error, term()}
+  def create(guild_id, params), do: EDA.API.Emoji.create(guild_id, params) |> parse_response()
+
+  @doc "Modifies a guild emoji: its `name` or the `roles` allowed to use it."
+  @spec modify(String.t() | integer(), t() | String.t() | integer(), map()) ::
+          {:ok, t()} | {:error, term()}
+  def modify(guild_id, %__MODULE__{id: id}, params), do: modify(guild_id, id, params)
+
+  def modify(guild_id, emoji_id, params),
+    do: EDA.API.Emoji.modify(guild_id, emoji_id, params) |> parse_response()
+
+  @doc "Deletes a guild emoji."
+  @spec delete(String.t() | integer(), t() | String.t() | integer()) :: :ok | {:error, term()}
+  def delete(guild_id, %__MODULE__{id: id}), do: delete(guild_id, id)
+  def delete(guild_id, emoji_id), do: EDA.API.Emoji.delete(guild_id, emoji_id)
+
+  @doc """
+  Lists the application's own emojis: up to 2000, usable by the bot anywhere without being
+  uploaded to a guild.
+  """
+  @spec list_application() :: {:ok, [t()]} | {:error, term()}
+  def list_application, do: EDA.API.Emoji.list_application() |> parse_list()
+
+  @doc "Fetches one of the application's emojis."
+  @spec fetch_application(String.t() | integer()) :: {:ok, t()} | {:error, term()}
+  def fetch_application(emoji_id),
+    do: EDA.API.Emoji.get_application(emoji_id) |> parse_response()
+
+  @doc "Creates an application emoji. See `EDA.API.Emoji.create_application/2` for `image`."
+  @spec create_application(String.t(), String.t() | binary()) :: {:ok, t()} | {:error, term()}
+  def create_application(name, image),
+    do: EDA.API.Emoji.create_application(name, image) |> parse_response()
+
+  @doc "Renames an application emoji."
+  @spec rename_application(t() | String.t() | integer(), String.t()) ::
+          {:ok, t()} | {:error, term()}
+  def rename_application(%__MODULE__{id: id}, name), do: rename_application(id, name)
+
+  def rename_application(emoji_id, name),
+    do: EDA.API.Emoji.modify_application(emoji_id, name) |> parse_response()
+
+  @doc "Deletes an application emoji."
+  @spec delete_application(t() | String.t() | integer()) :: :ok | {:error, term()}
+  def delete_application(%__MODULE__{id: id}), do: delete_application(id)
+  def delete_application(emoji_id), do: EDA.API.Emoji.delete_application(emoji_id)
+
+  defp parse_list({:ok, list}) when is_list(list), do: {:ok, Enum.map(list, &from_raw/1)}
+  defp parse_list({:error, _} = err), do: err
+
   defimpl String.Chars do
     def to_string(emoji), do: EDA.Emoji.mention(emoji)
   end

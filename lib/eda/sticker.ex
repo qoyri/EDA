@@ -107,4 +107,67 @@ defmodule EDA.Sticker do
 
   defp parse_user(nil), do: nil
   defp parse_user(raw) when is_map(raw), do: EDA.User.from_raw(raw)
+
+  # ── Entity Manager ──
+
+  use EDA.Entity
+
+  @doc "Lists a guild's stickers."
+  @spec list(String.t() | integer()) :: {:ok, [t()]} | {:error, term()}
+  def list(guild_id), do: EDA.API.Sticker.list(guild_id) |> parse_list()
+
+  @doc """
+  Fetches a sticker by id: a guild's or a standard one from a pack.
+  """
+  @spec fetch(String.t() | integer()) :: {:ok, t()} | {:error, term()}
+  def fetch(sticker_id), do: EDA.API.Sticker.get(sticker_id) |> parse_response()
+
+  @doc """
+  Fetches one of a guild's stickers, with the `user` who uploaded it when the bot can manage
+  the guild's expressions.
+
+  Named `fetch_sticker/2` rather than `fetch/2` because `Access.fetch/2` owns that arity.
+  """
+  @spec fetch_sticker(String.t() | integer(), String.t() | integer()) ::
+          {:ok, t()} | {:error, term()}
+  def fetch_sticker(guild_id, sticker_id),
+    do: EDA.API.Sticker.get_guild(guild_id, sticker_id) |> parse_response()
+
+  @doc "Uploads a guild sticker. Takes the parameters of `EDA.API.Sticker.create/2`."
+  @spec create(String.t() | integer(), map()) :: {:ok, t()} | {:error, term()}
+  def create(guild_id, params), do: EDA.API.Sticker.create(guild_id, params) |> parse_response()
+
+  @doc "Modifies a guild sticker: its `name`, `description` or `tags`."
+  @spec modify(String.t() | integer(), t() | String.t() | integer(), map()) ::
+          {:ok, t()} | {:error, term()}
+  def modify(guild_id, %__MODULE__{id: id}, params), do: modify(guild_id, id, params)
+
+  def modify(guild_id, sticker_id, params),
+    do: EDA.API.Sticker.modify(guild_id, sticker_id, params) |> parse_response()
+
+  @doc "Deletes a guild sticker."
+  @spec delete(String.t() | integer(), t() | String.t() | integer()) :: :ok | {:error, term()}
+  def delete(guild_id, %__MODULE__{id: id}), do: delete(guild_id, id)
+  def delete(guild_id, sticker_id), do: EDA.API.Sticker.delete_guild(guild_id, sticker_id)
+
+  @doc "Lists the standard sticker packs, as `EDA.Sticker.Pack` structs."
+  @spec list_packs() :: {:ok, [EDA.Sticker.Pack.t()]} | {:error, term()}
+  def list_packs do
+    case EDA.API.Sticker.list_packs() do
+      {:ok, packs} when is_list(packs) -> {:ok, Enum.map(packs, &EDA.Sticker.Pack.from_raw/1)}
+      {:error, _} = err -> err
+    end
+  end
+
+  @doc "Fetches a standard sticker pack, as an `EDA.Sticker.Pack`."
+  @spec fetch_pack(String.t() | integer()) :: {:ok, EDA.Sticker.Pack.t()} | {:error, term()}
+  def fetch_pack(pack_id) do
+    case EDA.API.Sticker.get_pack(pack_id) do
+      {:ok, raw} when is_map(raw) -> {:ok, EDA.Sticker.Pack.from_raw(raw)}
+      {:error, _} = err -> err
+    end
+  end
+
+  defp parse_list({:ok, list}) when is_list(list), do: {:ok, Enum.map(list, &from_raw/1)}
+  defp parse_list({:error, _} = err), do: err
 end

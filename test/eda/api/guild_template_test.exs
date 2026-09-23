@@ -1,7 +1,8 @@
 defmodule EDA.API.GuildTemplateTest do
   use ExUnit.Case
 
-  alias EDA.API.GuildTemplate
+  # The API layer returns Discord's maps; these tests go through the entity, which parses them.
+  alias EDA.GuildTemplate
 
   setup do
     bypass = Bypass.open()
@@ -60,7 +61,7 @@ defmodule EDA.API.GuildTemplateTest do
       end)
 
       assert {:ok, %EDA.GuildTemplate{code: "hgM48av5Q69A", name: "My Template"}} =
-               GuildTemplate.get("hgM48av5Q69A")
+               GuildTemplate.fetch("hgM48av5Q69A")
     end
   end
 
@@ -150,7 +151,7 @@ defmodule EDA.API.GuildTemplateTest do
   # ── create_guild/2 ───────────────────────────────────────────────────
 
   describe "create_guild/2" do
-    test "POST /guilds/templates/:code sends params and returns raw guild map", %{bypass: bypass} do
+    test "POST /guilds/templates/:code sends params and returns an EDA.Guild", %{bypass: bypass} do
       guild_data = %{"id" => "999", "name" => "New Guild", "icon" => nil}
 
       Bypass.expect_once(bypass, "POST", "/guilds/templates/hgM48av5Q69A", fn conn ->
@@ -159,7 +160,7 @@ defmodule EDA.API.GuildTemplateTest do
         json(conn, guild_data)
       end)
 
-      assert {:ok, %{"id" => "999", "name" => "New Guild"}} =
+      assert {:ok, %EDA.Guild{id: "999", name: "New Guild"}} =
                GuildTemplate.create_guild("hgM48av5Q69A", %{name: "New Guild"})
     end
   end

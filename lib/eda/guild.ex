@@ -421,4 +421,63 @@ defmodule EDA.Guild do
   """
   @spec mfa_level_value(atom() | integer()) :: integer()
   def mfa_level_value(value), do: EDA.Enum.value!(@mfa_levels, value, "MFA level")
+
+  @doc "The guild's integrations: bots, Twitch and YouTube links. Needs `MANAGE_GUILD`."
+  @spec integrations(t() | String.t() | integer()) ::
+          {:ok, [EDA.Integration.t()]} | {:error, term()}
+  def integrations(%__MODULE__{id: id}), do: integrations(id)
+
+  def integrations(guild_id) do
+    case EDA.API.Guild.integrations(guild_id) do
+      {:ok, list} when is_list(list) ->
+        {:ok, Enum.map(list, &%{EDA.Integration.from_raw(&1) | guild_id: to_string(guild_id)})}
+
+      {:error, _} = err ->
+        err
+    end
+  end
+
+  @doc "The guild's welcome screen."
+  @spec welcome_screen(t() | String.t() | integer()) ::
+          {:ok, EDA.Guild.WelcomeScreen.t()} | {:error, term()}
+  def welcome_screen(%__MODULE__{id: id}), do: welcome_screen(id)
+
+  def welcome_screen(guild_id),
+    do: EDA.API.Guild.welcome_screen(guild_id) |> parse_with(&EDA.Guild.WelcomeScreen.from_raw/1)
+
+  @doc """
+  Changes the welcome screen: `:enabled`, `:description`, `:welcome_channels` (maps or
+  `EDA.Guild.WelcomeScreen.Channel` structs).
+  """
+  @spec modify_welcome_screen(t() | String.t() | integer(), keyword() | map()) ::
+          {:ok, EDA.Guild.WelcomeScreen.t()} | {:error, term()}
+  def modify_welcome_screen(%__MODULE__{id: id}, opts), do: modify_welcome_screen(id, opts)
+
+  def modify_welcome_screen(guild_id, opts) do
+    EDA.API.Guild.modify_welcome_screen(guild_id, opts)
+    |> parse_with(&EDA.Guild.WelcomeScreen.from_raw/1)
+  end
+
+  @doc """
+  Pauses invites or DMs until a time, or resumes them with `nil`: `:invites_disabled_until`,
+  `:dms_disabled_until`, as `DateTime`s. Returns the guild's safety actions.
+  """
+  @spec modify_incident_actions(t() | String.t() | integer(), keyword()) ::
+          {:ok, EDA.Guild.IncidentsData.t()} | {:error, term()}
+  def modify_incident_actions(%__MODULE__{id: id}, opts), do: modify_incident_actions(id, opts)
+
+  def modify_incident_actions(guild_id, opts) do
+    EDA.API.Guild.modify_incident_actions(guild_id, opts)
+    |> parse_with(&EDA.Guild.IncidentsData.from_raw/1)
+  end
+
+  @doc """
+  A guild's public preview, readable without being in it when it is discoverable: its name,
+  icon, features, emojis, stickers and approximate counts, as a partial `EDA.Guild`.
+  """
+  @spec preview(String.t() | integer()) :: {:ok, t()} | {:error, term()}
+  def preview(guild_id), do: EDA.API.Guild.preview(guild_id) |> parse_with(&from_raw/1)
+
+  defp parse_with({:ok, raw}, from_raw) when is_map(raw), do: {:ok, from_raw.(raw)}
+  defp parse_with({:error, _} = err, _from_raw), do: err
 end

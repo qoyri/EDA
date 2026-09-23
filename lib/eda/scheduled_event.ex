@@ -107,4 +107,74 @@ defmodule EDA.ScheduledEvent do
   @spec entity_type_value(atom() | integer()) :: integer()
   def entity_type_value(value),
     do: EDA.Enum.value!(@entity_types, value, "scheduled event entity type")
+
+  # ── Entity Manager ──
+
+  use EDA.Entity
+
+  @doc "Lists a guild's scheduled events. With `with_user_count: true`, each has `user_count`."
+  @spec list(String.t() | integer(), keyword()) :: {:ok, [t()]} | {:error, term()}
+  def list(guild_id, opts \\ []),
+    do: EDA.API.ScheduledEvent.list(guild_id, opts) |> parse_list()
+
+  @doc """
+  Fetches one scheduled event. Takes `with_user_count: true`.
+
+  Named `fetch_event/3` rather than `fetch/2` because `Access.fetch/2` owns that arity.
+  """
+  @spec fetch_event(String.t() | integer(), String.t() | integer(), keyword()) ::
+          {:ok, t()} | {:error, term()}
+  def fetch_event(guild_id, event_id, opts \\ []),
+    do: EDA.API.ScheduledEvent.get(guild_id, event_id, opts) |> parse_response()
+
+  @doc """
+  Creates a scheduled event. Takes the parameters of `EDA.API.ScheduledEvent.create/2`, with
+  atoms for the enumerations and an `EDA.ScheduledEvent.RecurrenceRule` if it repeats.
+  """
+  @spec create(String.t() | integer(), map()) :: {:ok, t()} | {:error, term()}
+  def create(guild_id, params),
+    do: EDA.API.ScheduledEvent.create(guild_id, params) |> parse_response()
+
+  @doc "Modifies a scheduled event, or starts, ends or cancels it through `status`."
+  @spec modify(String.t() | integer(), t() | String.t() | integer(), map()) ::
+          {:ok, t()} | {:error, term()}
+  def modify(guild_id, %__MODULE__{id: id}, params), do: modify(guild_id, id, params)
+
+  def modify(guild_id, event_id, params),
+    do: EDA.API.ScheduledEvent.modify(guild_id, event_id, params) |> parse_response()
+
+  @doc "Deletes a scheduled event."
+  @spec delete(String.t() | integer(), t() | String.t() | integer()) :: :ok | {:error, term()}
+  def delete(guild_id, %__MODULE__{id: id}), do: delete(guild_id, id)
+  def delete(guild_id, event_id), do: EDA.API.ScheduledEvent.delete(guild_id, event_id)
+
+  @doc """
+  One page of the users interested in the event, as `EDA.ScheduledEvent.Subscriber` structs.
+  Takes `:limit`, `:before`, `:after` and `with_member: true`.
+  """
+  @spec subscribers(t(), keyword()) ::
+          {:ok, [EDA.ScheduledEvent.Subscriber.t()]} | {:error, term()}
+  def subscribers(%__MODULE__{guild_id: guild_id, id: id}, opts \\ []) do
+    case EDA.API.ScheduledEvent.users(guild_id, id, opts) do
+      {:ok, list} when is_list(list) ->
+        {:ok, Enum.map(list, &EDA.ScheduledEvent.Subscriber.from_raw/1)}
+
+      {:error, _} = err ->
+        err
+    end
+  end
+
+  @doc """
+  A lazy stream of every user interested in the event. Takes the options of `subscribers/2`
+  and `:per_page`.
+  """
+  @spec stream_subscribers(t(), keyword()) :: Enumerable.t()
+  def stream_subscribers(%__MODULE__{guild_id: guild_id, id: id}, opts \\ []) do
+    guild_id
+    |> EDA.API.ScheduledEvent.user_stream(id, opts)
+    |> Stream.map(&EDA.ScheduledEvent.Subscriber.from_raw/1)
+  end
+
+  defp parse_list({:ok, list}) when is_list(list), do: {:ok, Enum.map(list, &from_raw/1)}
+  defp parse_list({:error, _} = err), do: err
 end

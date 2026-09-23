@@ -28,7 +28,7 @@ defmodule EDA.API.Poll do
   end
 
   @doc """
-  Gets users who voted for a specific poll answer.
+  Gets users who voted for a specific poll answer, as Discord sends them: `%{"users" => [user]}`.
 
   ## Parameters
 
@@ -47,7 +47,7 @@ defmodule EDA.API.Poll do
       EDA.API.Poll.get_voters("123456", "789012", 1, after: "111222", limit: 50)
   """
   @spec get_voters(String.t() | integer(), String.t() | integer(), integer(), keyword()) ::
-          {:ok, [map()]} | {:error, term()}
+          {:ok, map()} | {:error, term()}
   def get_voters(channel_id, message_id, answer_id, opts \\ []) do
     query =
       Enum.reject(

@@ -380,4 +380,16 @@ defmodule EDA.Invite do
   defp user_id(%EDA.Member{user: %{id: id}}), do: id
   defp user_id(%{"id" => id}), do: id
   defp user_id(id) when is_binary(id) or is_integer(id), do: id
+
+  @doc "Lists a channel's invites."
+  @spec list_channel(EDA.Channel.t() | String.t() | integer()) :: {:ok, [t()]} | {:error, term()}
+  def list_channel(%EDA.Channel{id: id}), do: list_channel(id)
+  def list_channel(channel_id), do: EDA.API.Invite.list_channel(channel_id) |> parse_invites()
+
+  @doc "Lists a guild's invites."
+  @spec list_guild(String.t() | integer()) :: {:ok, [t()]} | {:error, term()}
+  def list_guild(guild_id), do: EDA.API.Guild.invites(guild_id) |> parse_invites()
+
+  defp parse_invites({:ok, list}) when is_list(list), do: {:ok, Enum.map(list, &from_raw/1)}
+  defp parse_invites({:error, _} = err), do: err
 end

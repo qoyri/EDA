@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `EDA.Ban`, a banned user and the reason, with `list/2`, `stream/2`, `fetch_ban/2`,
+  `create/3`, `remove/2` and `bulk/3`.
+- More typed calls: `EDA.Channel.create/3`, `start_thread/2` (from a message or not),
+  `create_post/3`, `thread_member/2`, `thread_members/1`, `active_threads/1`,
+  `archived_threads/3` and `stream_archived_threads/3`; `EDA.Member.list/2`, `search/3`,
+  `stream/2` and `move_voice/3`, their members carrying `guild_id`; `EDA.Invite.list_channel/1`
+  and `list_guild/1`; `EDA.Guild.integrations/1`, `welcome_screen/1`,
+  `modify_welcome_screen/2`, `modify_incident_actions/2` and `preview/1`;
+  `EDA.Role.modify_positions/2`; `EDA.User.me/0`, `modify_me/1`, `guilds/1` and
+  `stream_guilds/1`; `EDA.VoiceState.fetch_state/2`.
+
+- Typed calls for webhooks, scheduled events, stages, entitlements and soundboard sounds:
+  `EDA.Webhook` (`create/2`, `list_channel/1`, `list_guild/1`, `fetch/1`, `modify/2`,
+  `delete/1`, and `execute/2`, `fetch_message/2`, `edit_message/3`, `delete_message/2` with the
+  webhook's token), `EDA.ScheduledEvent` (`list/2`, `fetch_event/3`, `create/2`, `modify/3`,
+  `delete/2`, `subscribers/2` and `stream_subscribers/2` returning the new
+  `EDA.ScheduledEvent.Subscriber`), `EDA.StageInstance` (`create/1`, `fetch/1`, `modify/2`,
+  `delete/1`), `EDA.Entitlement` (`list/1`, `fetch/1`, `consume/1`, `create_test/1`,
+  `delete_test/1`) and `EDA.SoundboardSound` (`create/2`, `modify/3`, `delete/3`).
+
+- Typed message calls: `EDA.Message.list/2`, `history/3`, `stream/2`, `pinned/2`, `pins/2`
+  (each pin with its `pinned_at` as a `DateTime`) and `forward/2`; `EDA.Poll.expire/1` and
+  `voters/3`; `EDA.Reaction.users/3` and `stream_users/3`. They return `EDA.Message` and
+  `EDA.User` structs where the `EDA.API` calls return Discord's maps.
+
 - `EDA.User` has a `member` field, set on the users a guild message mentions: Discord attaches
   their partial member to each, which EDA used to drop. It is an `EDA.Member` with the
   message's `guild_id`, and `nil` on any other user.
@@ -65,6 +90,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   struct, so a bit Discord adds later is not lost.
 
 ### Changed
+
+- **`EDA.Interaction.edit_response/2` and `followup/2` return an `EDA.Message`** instead of the
+  raw map, and `edit_followup/3` and `delete_followup/2` are new.
+
+- **A presence's `status` is an atom** (`:online`, `:idle`, `:dnd`, `:offline`), like the
+  statuses `EDA.Presence` sends, and `client_status` names its platforms and statuses:
+  `%{desktop: :idle, mobile: :online}`. A platform or status Discord adds later stays its
+  string. The `EDA.Presence` helpers read both this and the raw maps the cache holds.
+
+- **The `EDA.Component` and `EDA.Modal` builders return the component structs**, the same a
+  received message's components are read into: `button/2` an `EDA.Component.Button` with
+  `style: :primary`, `separator/1` an `EDA.Component.Separator` with `spacing: :large`,
+  `text_field/3` an `EDA.Component.TextInput` with `style: :short`, a select's
+  `default_values` `{:user, id}` tuples, and so on. They encode to Discord's integers when
+  sent, so nothing changes on the wire; code that read the builders' maps (`button.style == 1`)
+  reads atoms now. `:emoji` also takes an `EDA.Emoji` or a bare Unicode string.
+  `EDA.Component.FileUpload` gained `file_types`.
+
+- **`EDA.Command` is also a registered command**, read by `from_raw/1`: it gained `id`,
+  `application_id`, `guild_id`, `version`, `handler` and `integration_types`, and its `type`
+  (`:slash`, `:user`, `:message`, `:primary_entry_point`) and `contexts` (`:guild`, `:bot_dm`,
+  `:private_channel`) are atoms, in the builder too. `EDA.Command.Option` likewise: its `type`
+  is an atom (`:string`, `:sub_command`…), `channel_types` channel type atoms, and `choices`
+  `EDA.Command.Option.Choice` structs. `to_map/1` still sends Discord's integers.
+  `integration_types/2` sets where a command can be installed. The typed calls are new:
+  `list_global/0`, `list_guild/1`, `create_global/1`, `create_guild/2`, `edit_global/2`,
+  `edit_guild/3`, `delete_global/1`, `delete_guild/2`, `bulk_overwrite_global/1`,
+  `bulk_overwrite_guild/2` and `permissions/1,2`. An audit log's `application_commands` are
+  `EDA.Command` structs.
+
+- **`EDA.API.*` returns Discord's maps everywhere**, as its moduledocs said; the typed surface
+  is the entity modules. `EDA.API.Emoji`, `Sticker`, `AutoMod` and `GuildTemplate` used to
+  parse into structs, and `EDA.API.Guild.audit_log/2` into a hybrid map. Their typed
+  equivalents are new: `EDA.Emoji` (`list/1`, `fetch_emoji/2`, `create/2`, `modify/3`,
+  `delete/2`, and `list_application/0`, `fetch_application/1`, `create_application/2`,
+  `rename_application/2`, `delete_application/1`), `EDA.Sticker` (`list/1`, `fetch/1`,
+  `fetch_sticker/2`, `create/2`, `modify/3`, `delete/2`, `list_packs/0`, `fetch_pack/1`),
+  `EDA.AutoMod` (`list/1`, `fetch_rule/2`, `create/2`, `modify/3`, `delete/2`),
+  `EDA.GuildTemplate` (`fetch/1`, `list/1`, `create/2`, `modify/3`, `sync/2`, `delete/2`,
+  `create_guild/2` returning an `EDA.Guild`), and `EDA.AuditLog`, now a struct, with
+  `fetch_log/2` returning every list it references as structs.
 
 - **Every event whose payload is an entity delivers the entity**, not a struct wrapping it:
   `GUILD_ROLE_CREATE` and `_UPDATE` an `EDA.Role` (which gained `guild_id`, also set by a

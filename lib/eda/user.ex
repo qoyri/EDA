@@ -400,4 +400,32 @@ defmodule EDA.User do
       {:error, _} = err -> err
     end
   end
+
+  @doc "Fetches the bot's own user from Discord. `EDA.Cache.me/0` holds it without a request."
+  @spec me() :: {:ok, t()} | {:error, term()}
+  def me, do: EDA.API.User.me() |> parse_user()
+
+  @doc "Changes the bot's `:username`, `:avatar` or `:banner`."
+  @spec modify_me(map() | keyword()) :: {:ok, t()} | {:error, term()}
+  def modify_me(opts), do: EDA.API.User.modify_me(opts) |> parse_user()
+
+  @doc """
+  One page of the guilds the bot is in, as partial `EDA.Guild` structs. Takes `:before`,
+  `:after`, `:limit` and `with_counts: true`.
+  """
+  @spec guilds(keyword()) :: {:ok, [EDA.Guild.t()]} | {:error, term()}
+  def guilds(opts \\ []) do
+    case EDA.API.User.guilds(opts) do
+      {:ok, list} when is_list(list) -> {:ok, Enum.map(list, &EDA.Guild.from_raw/1)}
+      {:error, _} = err -> err
+    end
+  end
+
+  @doc "A lazy stream of every guild the bot is in, as partial `EDA.Guild` structs."
+  @spec stream_guilds(keyword()) :: Enumerable.t()
+  def stream_guilds(opts \\ []),
+    do: opts |> EDA.API.User.stream_guilds() |> Stream.map(&EDA.Guild.from_raw/1)
+
+  defp parse_user({:ok, raw}) when is_map(raw), do: {:ok, from_raw(raw)}
+  defp parse_user({:error, _} = err), do: err
 end

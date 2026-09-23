@@ -627,4 +627,115 @@ defmodule EDA.Channel do
   def follow(%__MODULE__{id: id}, target, opts), do: follow(id, target, opts)
   def follow(channel_id, %__MODULE__{id: id}, opts), do: follow(channel_id, id, opts)
   def follow(channel_id, target_id, opts), do: EDA.API.Channel.follow(channel_id, target_id, opts)
+
+  # ── Creation and threads ──
+
+  @doc """
+  Creates a channel in a guild. Takes the payload of `EDA.API.Channel.create/3` (`:name`,
+  `:type` as an atom, `:parent_id`…) and `:reason`.
+  """
+  @spec create(String.t() | integer(), map(), keyword()) :: {:ok, t()} | {:error, term()}
+  def create(guild_id, payload, opts \\ []),
+    do: EDA.API.Channel.create(guild_id, payload, opts) |> parse_response()
+
+  @doc """
+  Starts a thread: from a message when given an `EDA.Message`, or on its own in a channel.
+  Takes `:name`, `:auto_archive_duration` and, without a message, `:type` and `:invitable`.
+  """
+  @spec start_thread(EDA.Message.t() | t() | String.t() | integer(), map() | keyword()) ::
+          {:ok, t()} | {:error, term()}
+  def start_thread(%EDA.Message{channel_id: cid, id: mid}, opts),
+    do: EDA.API.Thread.start_from_message(cid, mid, opts) |> parse_response()
+
+  def start_thread(channel, opts),
+    do: EDA.API.Thread.start(id_of(channel), opts) |> parse_response()
+
+  @doc """
+  Creates a post in a forum or media channel: a thread with its first message. Takes the
+  thread's options (`:name`, `:applied_tags`…) and the message's, as
+  `EDA.API.Thread.create_post/3` does.
+  """
+  @spec create_post(t() | String.t() | integer(), keyword(), keyword()) ::
+          {:ok, t()} | {:error, term()}
+  def create_post(forum, opts, message_opts \\ []),
+    do: EDA.API.Thread.create_post(id_of(forum), opts, message_opts) |> parse_response()
+
+  @doc "A user's membership of a thread, with their `member` when Discord includes it."
+  @spec thread_member(t() | String.t() | integer(), EDA.User.t() | String.t() | integer()) ::
+          {:ok, EDA.Channel.ThreadMember.t()} | {:error, term()}
+  def thread_member(thread, user) do
+    case EDA.API.Thread.get_member(id_of(thread), id_of(user)) do
+      {:ok, raw} when is_map(raw) -> {:ok, EDA.Channel.ThreadMember.from_raw(raw)}
+      {:error, _} = err -> err
+    end
+  end
+
+  @doc "The members of a thread."
+  @spec thread_members(t() | String.t() | integer()) ::
+          {:ok, [EDA.Channel.ThreadMember.t()]} | {:error, term()}
+  def thread_members(thread) do
+    case EDA.API.Thread.list_members(id_of(thread)) do
+      {:ok, list} when is_list(list) ->
+        {:ok, Enum.map(list, &EDA.Channel.ThreadMember.from_raw/1)}
+
+      {:error, _} = err ->
+        err
+    end
+  end
+
+  @doc """
+  A guild's active threads, with the bot's own membership of those it joined.
+  """
+  @spec active_threads(String.t() | integer()) ::
+          {:ok, %{threads: [t()], members: [EDA.Channel.ThreadMember.t()]}} | {:error, term()}
+  def active_threads(guild_id),
+    do: EDA.API.Thread.list_active(guild_id) |> parse_threads()
+
+  @doc """
+  One page of a channel's archived threads: `kind` is `:public`, `:private` or
+  `:joined_private`. Takes `:before` (a `DateTime`, or a thread id for `:joined_private`) and
+  `:limit`.
+  """
+  @spec archived_threads(
+          t() | String.t() | integer(),
+          :public | :private | :joined_private,
+          keyword()
+        ) ::
+          {:ok, %{threads: [t()], members: [EDA.Channel.ThreadMember.t()], has_more: boolean()}}
+          | {:error, term()}
+  def archived_threads(channel, kind, opts \\ []) do
+    id = id_of(channel)
+
+    case kind do
+      :public -> EDA.API.Thread.list_public_archived(id, opts)
+      :private -> EDA.API.Thread.list_private_archived(id, opts)
+      :joined_private -> EDA.API.Thread.list_joined_private_archived(id, opts)
+    end
+    |> parse_threads()
+  end
+
+  @doc "A lazy stream of a channel's archived threads, page after page. Takes `:per_page`."
+  @spec stream_archived_threads(
+          t() | String.t() | integer(),
+          :public | :private | :joined_private,
+          keyword()
+        ) :: Enumerable.t()
+  def stream_archived_threads(channel, kind, opts \\ []),
+    do:
+      channel |> id_of() |> EDA.API.Thread.stream_archived(kind, opts) |> Stream.map(&from_raw/1)
+
+  defp parse_threads({:ok, %{"threads" => threads} = raw}) do
+    page = %{
+      threads: Enum.map(threads, &from_raw/1),
+      members: Enum.map(raw["members"] || [], &EDA.Channel.ThreadMember.from_raw/1)
+    }
+
+    {:ok,
+     if(Map.has_key?(raw, "has_more"), do: Map.put(page, :has_more, raw["has_more"]), else: page)}
+  end
+
+  defp parse_threads({:error, _} = err), do: err
+
+  defp id_of(%{id: id}), do: id
+  defp id_of(id), do: id
 end

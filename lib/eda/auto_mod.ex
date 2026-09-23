@@ -225,4 +225,45 @@ defmodule EDA.AutoMod do
   @doc false
   # The trigger names, for the execution event.
   def trigger_types, do: @trigger_types
+
+  # ── Entity Manager ──
+
+  use EDA.Entity
+
+  @doc "Lists a guild's AutoMod rules."
+  @spec list(String.t() | integer()) :: {:ok, [t()]} | {:error, term()}
+  def list(guild_id), do: EDA.API.AutoMod.list(guild_id) |> parse_list()
+
+  @doc """
+  Fetches one AutoMod rule.
+
+  Named `fetch_rule/2` rather than `fetch/2` because `Access.fetch/2` owns that arity.
+  """
+  @spec fetch_rule(String.t() | integer(), String.t() | integer()) ::
+          {:ok, t()} | {:error, term()}
+  def fetch_rule(guild_id, rule_id),
+    do: EDA.API.AutoMod.get_rule(guild_id, rule_id) |> parse_response()
+
+  @doc """
+  Creates an AutoMod rule. Takes the parameters of `EDA.API.AutoMod.create/2`, with atoms for
+  the enumerations and `EDA.AutoMod.Action` / `EDA.AutoMod.TriggerMetadata` structs if wanted.
+  """
+  @spec create(String.t() | integer(), map()) :: {:ok, t()} | {:error, term()}
+  def create(guild_id, params), do: EDA.API.AutoMod.create(guild_id, params) |> parse_response()
+
+  @doc "Modifies an AutoMod rule. Takes the parameters of `create/2`, all optional."
+  @spec modify(String.t() | integer(), t() | String.t() | integer(), map()) ::
+          {:ok, t()} | {:error, term()}
+  def modify(guild_id, %__MODULE__{id: id}, params), do: modify(guild_id, id, params)
+
+  def modify(guild_id, rule_id, params),
+    do: EDA.API.AutoMod.modify(guild_id, rule_id, params) |> parse_response()
+
+  @doc "Deletes an AutoMod rule."
+  @spec delete(String.t() | integer(), t() | String.t() | integer()) :: :ok | {:error, term()}
+  def delete(guild_id, %__MODULE__{id: id}), do: delete(guild_id, id)
+  def delete(guild_id, rule_id), do: EDA.API.AutoMod.delete_rule(guild_id, rule_id)
+
+  defp parse_list({:ok, list}) when is_list(list), do: {:ok, Enum.map(list, &from_raw/1)}
+  defp parse_list({:error, _} = err), do: err
 end

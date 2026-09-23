@@ -1,5 +1,37 @@
 defmodule EDA.AuditLog do
-  @moduledoc "Audit log types, action type mappings, and pagination helpers."
+  @moduledoc """
+  A guild's audit log: its `entries`, as `EDA.AuditLog.Entry` structs, and what they point at,
+  so an entry's target can be named without another request — `users`, `webhooks`,
+  `application_commands`, `auto_moderation_rules`, `guild_scheduled_events`, `integrations` and
+  `threads` as their structs.
+
+      {:ok, log} = EDA.AuditLog.fetch_log(guild_id, action_type: :member_ban_add, limit: 10)
+
+  `stream/2` pages through the entries; `action_name/1` and `action_type/1` convert between the
+  atoms and Discord's integers.
+  """
+
+  use EDA.Event.Access
+
+  defstruct entries: [],
+            users: [],
+            webhooks: [],
+            application_commands: [],
+            auto_moderation_rules: [],
+            guild_scheduled_events: [],
+            integrations: [],
+            threads: []
+
+  @type t :: %__MODULE__{
+          entries: [EDA.AuditLog.Entry.t()],
+          users: [EDA.User.t()],
+          webhooks: [EDA.Webhook.t()],
+          application_commands: [EDA.Command.t()],
+          auto_moderation_rules: [EDA.AutoMod.t()],
+          guild_scheduled_events: [EDA.ScheduledEvent.t()],
+          integrations: [EDA.Integration.t()],
+          threads: [EDA.Channel.t()]
+        }
 
   @action_types %{
     1 => :guild_update,
@@ -94,12 +126,48 @@ defmodule EDA.AuditLog do
   def action_types, do: @action_types
 
   @doc """
+  An audit log as Discord sends it, with every list parsed.
+  """
+  @spec from_raw(map()) :: t()
+  def from_raw(raw) when is_map(raw) do
+    %__MODULE__{
+      entries: parse(raw["audit_log_entries"], &EDA.AuditLog.Entry.from_raw/1),
+      users: parse(raw["users"], &EDA.User.from_raw/1),
+      webhooks: parse(raw["webhooks"], &EDA.Webhook.from_raw/1),
+      application_commands: parse(raw["application_commands"], &EDA.Command.from_raw/1),
+      auto_moderation_rules: parse(raw["auto_moderation_rules"], &EDA.AutoMod.from_raw/1),
+      guild_scheduled_events:
+        parse(raw["guild_scheduled_events"], &EDA.ScheduledEvent.from_raw/1),
+      integrations: parse(raw["integrations"], &EDA.Integration.from_raw/1),
+      threads: parse(raw["threads"], &EDA.Channel.from_raw/1)
+    }
+  end
+
+  defp parse(nil, _from_raw), do: []
+  defp parse(list, from_raw), do: Enum.map(list, from_raw)
+
+  @doc """
+  Fetches a guild's audit log.
+
+  Named `fetch_log/2` rather than `fetch/2` because `Access.fetch/2` owns that arity. Takes the
+  options of `EDA.API.Guild.audit_log/2`: `:user_id`, `:action_type` (an atom or an integer),
+  `:before`, `:after`, `:limit`.
+  """
+  @spec fetch_log(String.t() | integer(), keyword()) :: {:ok, t()} | {:error, term()}
+  def fetch_log(guild_id, opts \\ []) do
+    case EDA.API.Guild.audit_log(guild_id, opts) do
+      {:ok, raw} when is_map(raw) -> {:ok, from_raw(raw)}
+      {:error, _} = err -> err
+    end
+  end
+
+  @doc """
   Returns a lazy Stream that paginates through audit log entries.
   Uses snowflake-based `before` pagination via `Stream.resource/3`.
   Stops when a page returns fewer entries than `per_page`.
 
   ## Options
-  Same as `EDA.API.Guild.audit_log/2` plus:
+  Same as `fetch_log/2` plus:
   - `:per_page` — entries per page (default 50, max 100)
 
   ## Example
@@ -117,8 +185,8 @@ defmodule EDA.AuditLog do
         query = [{:limit, per_page} | opts]
         query = if cursor, do: [{:before, cursor} | query], else: query
 
-        case EDA.API.Guild.audit_log(guild_id, query) do
-          {:ok, %{entries: entries}} -> {:ok, entries}
+        case fetch_log(guild_id, query) do
+          {:ok, %__MODULE__{entries: entries}} -> {:ok, entries}
           error -> error
         end
       end,

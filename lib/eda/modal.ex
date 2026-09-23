@@ -64,43 +64,11 @@ defmodule EDA.Modal do
       end
   """
 
-  @action_row_type 1
-  @text_input_type 4
-  @text_display_type 10
-  @label_type 18
-  @file_upload_type 19
-  @radio_group_type 21
-  @checkbox_group_type 22
-  @checkbox_type 23
+  alias EDA.Component
 
-  @select_types [3, 5, 6, 7, 8]
-  @label_children [@text_input_type, @file_upload_type, @radio_group_type] ++
-                    [@checkbox_group_type, @checkbox_type | @select_types]
-
-  @component_names %{
-    1 => "action row",
-    2 => "button",
-    3 => "string select",
-    4 => "text input",
-    5 => "user select",
-    6 => "role select",
-    7 => "mentionable select",
-    8 => "channel select",
-    9 => "section",
-    10 => "text display",
-    11 => "thumbnail",
-    12 => "media gallery",
-    13 => "file",
-    14 => "separator",
-    17 => "container",
-    18 => "label",
-    19 => "file upload",
-    21 => "radio group",
-    22 => "checkbox group",
-    23 => "checkbox"
-  }
-
-  @text_input_styles %{short: 1, paragraph: 2}
+  @select_kinds [:string_select, :user_select, :role_select, :mentionable_select, :channel_select]
+  @label_children [:text_input, :file_upload, :radio_group, :checkbox_group, :checkbox] ++
+                    @select_kinds
 
   # ── Label ─────────────────────────────────────────────────────────
 
@@ -124,12 +92,12 @@ defmodule EDA.Modal do
       label("Your name", text_field("name", :short))
       label("Favourite colour", string_select("colour", options), description: "Pick one")
   """
-  @spec label(String.t(), map(), keyword()) :: map()
+  @spec label(String.t(), Component.t(), keyword()) :: Component.Label.t()
   def label(text, component, opts \\ []) when is_binary(text) and is_map(component) do
     validate_label!(text)
     validate_label_child!(component)
 
-    %{type: @label_type, label: text, component: component}
+    %Component.Label{label: text, component: component}
     |> put_if(:description, validate_max(opts[:description], 100, "label description"))
     |> put_if(:id, opts[:id])
   end
@@ -153,10 +121,10 @@ defmodule EDA.Modal do
 
       label("About you", text_field("bio", :paragraph, max_length: 1000, required: false))
   """
-  @spec text_field(String.t(), :short | :paragraph, keyword()) :: map()
+  @spec text_field(String.t(), :short | :paragraph, keyword()) :: Component.TextInput.t()
   def text_field(custom_id, style, opts \\ []) when is_binary(custom_id) do
     validate_custom_id!(custom_id)
-    build_text_input(%{type: @text_input_type, custom_id: custom_id}, style, opts)
+    build_text_input(%Component.TextInput{custom_id: custom_id}, style, opts)
   end
 
   @doc """
@@ -180,13 +148,14 @@ defmodule EDA.Modal do
       text_input("name", "Your Name", :short, placeholder: "John Doe")
       text_input("bio", "About You", :paragraph, required: false, max_length: 1000)
   """
-  @spec text_input(String.t(), String.t(), :short | :paragraph, keyword()) :: map()
+  @spec text_input(String.t(), String.t(), :short | :paragraph, keyword()) ::
+          Component.TextInput.t()
   def text_input(custom_id, label, style, opts \\ [])
       when is_binary(custom_id) and is_binary(label) do
     validate_custom_id!(custom_id)
     validate_label!(label)
 
-    build_text_input(%{type: @text_input_type, custom_id: custom_id, label: label}, style, opts)
+    build_text_input(%Component.TextInput{custom_id: custom_id, label: label}, style, opts)
   end
 
   # ── File upload ───────────────────────────────────────────────────
@@ -212,11 +181,11 @@ defmodule EDA.Modal do
 
       label("Screenshots", file_upload("shots", max_values: 5, file_types: [:image]))
   """
-  @spec file_upload(String.t(), keyword()) :: map()
+  @spec file_upload(String.t(), keyword()) :: Component.FileUpload.t()
   def file_upload(custom_id, opts \\ []) when is_binary(custom_id) do
     validate_custom_id!(custom_id)
 
-    %{type: @file_upload_type, custom_id: custom_id}
+    %Component.FileUpload{custom_id: custom_id}
     |> put_values_range(opts, 0..10, 1..10)
     |> put_required(opts)
     |> put_if(:file_types, file_types(opts[:file_types]))
@@ -237,12 +206,12 @@ defmodule EDA.Modal do
 
       choice("Warrior", "warrior", description: "Strong and brave")
   """
-  @spec choice(String.t(), String.t(), keyword()) :: map()
+  @spec choice(String.t(), String.t(), keyword()) :: Component.SelectOption.t()
   def choice(label, value, opts \\ []) when is_binary(label) and is_binary(value) do
     validate_max(label, 100, "choice label")
     validate_max(value, 100, "choice value")
 
-    %{label: label, value: value}
+    %Component.SelectOption{label: label, value: value}
     |> put_if(:description, validate_max(opts[:description], 100, "choice description"))
     |> put_if(:default, validate_boolean(opts[:default], :default))
   end
@@ -261,7 +230,8 @@ defmodule EDA.Modal do
 
       label("Class", radio_group("class", [choice("Warrior", "warrior"), choice("Rogue", "rogue")]))
   """
-  @spec radio_group(String.t(), [map()], keyword()) :: map()
+  @spec radio_group(String.t(), [Component.SelectOption.t()], keyword()) ::
+          Component.RadioGroup.t()
   def radio_group(custom_id, options, opts \\ [])
       when is_binary(custom_id) and is_list(options) do
     validate_custom_id!(custom_id)
@@ -271,7 +241,7 @@ defmodule EDA.Modal do
       raise ArgumentError, "radio_group allows at most one default option"
     end
 
-    put_required(%{type: @radio_group_type, custom_id: custom_id, options: options}, opts)
+    put_required(%Component.RadioGroup{custom_id: custom_id, options: options}, opts)
   end
 
   @doc """
@@ -292,13 +262,14 @@ defmodule EDA.Modal do
 
       label("Free days", checkbox_group("days", [choice("Monday", "mon"), choice("Friday", "fri")]))
   """
-  @spec checkbox_group(String.t(), [map()], keyword()) :: map()
+  @spec checkbox_group(String.t(), [Component.SelectOption.t()], keyword()) ::
+          Component.CheckboxGroup.t()
   def checkbox_group(custom_id, options, opts \\ [])
       when is_binary(custom_id) and is_list(options) do
     validate_custom_id!(custom_id)
     validate_choices!(options, 1..10, "checkbox_group")
 
-    %{type: @checkbox_group_type, custom_id: custom_id, options: options}
+    %Component.CheckboxGroup{custom_id: custom_id, options: options}
     |> put_values_range(opts, 0..10, 1..10)
     |> put_required(opts)
     |> check_min_against_required(opts)
@@ -318,7 +289,7 @@ defmodule EDA.Modal do
 
       label("Subscribe to updates", checkbox("subscribe", default: true))
   """
-  @spec checkbox(String.t(), keyword()) :: map()
+  @spec checkbox(String.t(), keyword()) :: Component.Checkbox.t()
   def checkbox(custom_id, opts \\ []) when is_binary(custom_id) do
     validate_custom_id!(custom_id)
 
@@ -328,7 +299,7 @@ defmodule EDA.Modal do
     end
 
     put_if(
-      %{type: @checkbox_type, custom_id: custom_id},
+      %Component.Checkbox{custom_id: custom_id},
       :default,
       validate_boolean(opts[:default], :default)
     )
@@ -501,58 +472,58 @@ defmodule EDA.Modal do
 
   # A bare text input is the earlier form and goes in an action row; labels and text displays
   # are top-level as they are. Anything else would be refused by Discord.
-  defp top_level(%{type: @text_input_type} = input),
-    do: %{type: @action_row_type, components: [input]}
+  defp top_level(component) do
+    case Component.kind(component) do
+      :text_input ->
+        %Component.ActionRow{components: [component]}
 
-  defp top_level(%{type: type} = component) when type in [@label_type, @text_display_type],
-    do: component
+      kind when kind in [:label, :text_display, :action_row] ->
+        component
 
-  defp top_level(%{type: @action_row_type} = row), do: row
+      kind when kind in @label_children ->
+        raise ArgumentError, "a #{name(kind)} must be wrapped in label/3 to be placed in a modal"
 
-  defp top_level(%{type: type}) when type in @label_children do
-    raise ArgumentError,
-          "a #{component_name(type)} must be wrapped in label/3 to be placed in a modal"
-  end
+      nil ->
+        raise ArgumentError, "not a component: #{inspect(component)}"
 
-  defp top_level(%{type: type}) do
-    raise ArgumentError, "a #{component_name(type)} cannot be placed in a modal"
-  end
-
-  defp top_level(other) do
-    raise ArgumentError, "not a component: #{inspect(other)}"
-  end
-
-  defp validate_label_child!(%{type: type} = component) when type in @label_children do
-    if component[:disabled] do
-      raise ArgumentError, "a modal cannot contain a disabled component"
+      kind ->
+        raise ArgumentError, "a #{name(kind)} cannot be placed in a modal"
     end
+  end
 
-    if type == @text_input_type and Map.has_key?(component, :label) do
-      raise ArgumentError,
-            "a text input inside a label takes no label of its own; " <>
-              "build it with text_field/3 instead of text_input/4"
+  defp validate_label_child!(component) do
+    case Component.kind(component) do
+      kind when kind in @label_children ->
+        if component[:disabled] do
+          raise ArgumentError, "a modal cannot contain a disabled component"
+        end
+
+        if kind == :text_input and component[:label] != nil do
+          raise ArgumentError,
+                "a text input inside a label takes no label of its own; " <>
+                  "build it with text_field/3 instead of text_input/4"
+        end
+
+        :ok
+
+      nil ->
+        raise ArgumentError, "not a component: #{inspect(component)}"
+
+      kind ->
+        raise ArgumentError, "a label cannot contain a #{name(kind)}"
     end
-
-    :ok
   end
 
-  defp validate_label_child!(%{type: type}) do
-    raise ArgumentError, "a label cannot contain a #{component_name(type)}"
-  end
-
-  defp validate_label_child!(other) do
-    raise ArgumentError, "not a component: #{inspect(other)}"
-  end
-
-  defp component_name(type), do: Map.get(@component_names, type, "component of type #{type}")
+  defp name(kind) when is_atom(kind), do: kind |> Atom.to_string() |> String.replace("_", " ")
+  defp name(kind), do: "component of type #{kind}"
 
   defp build_text_input(input, style, opts) do
-    style_val =
-      Map.get(@text_input_styles, style) ||
-        raise ArgumentError, "style must be :short or :paragraph, got: #{inspect(style)}"
+    if style not in [:short, :paragraph] do
+      raise ArgumentError, "style must be :short or :paragraph, got: #{inspect(style)}"
+    end
 
     input
-    |> Map.put(:style, style_val)
+    |> Map.put(:style, style)
     |> put_if(:placeholder, validate_max(opts[:placeholder], 100, "placeholder"))
     |> put_if(:min_length, validate_length_bound(opts[:min_length], :min_length))
     |> put_if(:max_length, validate_length_bound(opts[:max_length], :max_length))

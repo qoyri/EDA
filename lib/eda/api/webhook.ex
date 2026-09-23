@@ -71,10 +71,10 @@ defmodule EDA.API.Webhook do
 
   Pass `wait: true` in opts to receive the created message back (required for
   subsequent `get_message/3`, `edit_message/4`, `delete_message/3`).
-  Without `wait: true`, Discord returns 204 No Content.
+  Without `wait: true`, Discord returns 204 No Content, and this `{:ok, nil}`.
   """
   @spec execute(String.t() | integer(), String.t(), map() | keyword()) ::
-          {:ok, map()} | {:error, term()}
+          {:ok, map() | nil} | {:error, term()}
   def execute(webhook_id, webhook_token, opts) when is_list(opts) do
     check_options!(
       opts,

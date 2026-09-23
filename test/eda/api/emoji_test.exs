@@ -1,7 +1,8 @@
 defmodule EDA.API.EmojiTest do
   use ExUnit.Case
 
-  alias EDA.API.Emoji
+  # The API layer returns Discord's maps; these tests go through the entity, which parses them.
+  alias EDA.Emoji
 
   setup do
     bypass = Bypass.open()
@@ -52,7 +53,7 @@ defmodule EDA.API.EmojiTest do
         json(conn, %{"id" => "e1", "name" => "cool", "animated" => true})
       end)
 
-      assert {:ok, %EDA.Emoji{id: "e1", animated: true}} = Emoji.get("111", "e1")
+      assert {:ok, %EDA.Emoji{id: "e1", animated: true}} = Emoji.fetch_emoji("111", "e1")
     end
   end
 

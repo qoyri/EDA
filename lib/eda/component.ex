@@ -2,8 +2,11 @@ defmodule EDA.Component do
   @moduledoc """
   Builder for Discord Components V2.
 
-  All builders return plain maps ready for JSON encoding — no structs needed.
-  Components V2 messages require the `IS_COMPONENTS_V2` flag (`1 << 15 = 32768`).
+  Every builder returns the struct of its kind — `button/2` an `EDA.Component.Button`,
+  `container/1` an `EDA.Component.Container` — the same a received message's components are
+  read into, so a component built and one received look alike and both encode to what Discord
+  takes. Components V2 messages require the `IS_COMPONENTS_V2` flag (`1 << 15 = 32768`), which
+  `v2: true` sets.
 
   ## Example
 
@@ -45,23 +48,7 @@ defmodule EDA.Component do
       EDA.Message.edit(message, components: components)
   """
 
-  # ── Component Type Constants ───────────────────────────────────────
-
-  @action_row 1
-  @button 2
-  @string_select 3
-  @user_select 5
-  @role_select 6
-  @mentionable_select 7
-  @channel_select 8
-  @section 9
-  @text_display 10
-  @thumbnail 11
-  @media_gallery 12
-  # @file is reserved in Elixir, so we use the literal value inline
-  # File component type = 13
-  @separator 14
-  @container 17
+  @select_kinds [:string_select, :user_select, :role_select, :mentionable_select, :channel_select]
 
   @type_names %{
     1 => :action_row,
@@ -305,7 +292,7 @@ defmodule EDA.Component do
         ]
       )
   """
-  @spec container(keyword()) :: map()
+  @spec container(keyword()) :: EDA.Component.Container.t()
   def container(opts) when is_list(opts) do
     components = opts[:components] || raise ArgumentError, "container requires :components"
 
@@ -317,9 +304,11 @@ defmodule EDA.Component do
       raise ArgumentError, "container cannot have more than 10 components"
     end
 
-    map = %{type: @container, components: components}
-    map = put_if(map, :accent_color, opts[:accent_color])
-    put_if(map, :spoiler, opts[:spoiler])
+    %EDA.Component.Container{
+      components: components,
+      accent_color: opts[:accent_color],
+      spoiler: opts[:spoiler]
+    }
   end
 
   @doc """
@@ -334,22 +323,14 @@ defmodule EDA.Component do
         button("No", custom_id: "cancel", style: :danger)
       ])
   """
-  @spec action_row(list()) :: map()
+  @spec action_row(list()) :: EDA.Component.ActionRow.t()
   def action_row(components) when is_list(components) do
     if components == [] do
       raise ArgumentError, "action_row requires at least one component"
     end
 
-    select_types = [
-      @string_select,
-      @user_select,
-      @role_select,
-      @mentionable_select,
-      @channel_select
-    ]
-
-    has_select = Enum.any?(components, fn c -> c[:type] in select_types end)
-    has_button = Enum.any?(components, fn c -> c[:type] == @button end)
+    has_select = Enum.any?(components, &(kind(&1) in @select_kinds))
+    has_button = Enum.any?(components, &(kind(&1) == :button))
 
     cond do
       has_select and has_button ->
@@ -365,7 +346,7 @@ defmodule EDA.Component do
         :ok
     end
 
-    %{type: @action_row, components: components}
+    %EDA.Component.ActionRow{components: components}
   end
 
   @doc """
@@ -382,10 +363,11 @@ defmodule EDA.Component do
         text_display("Line 2")
       ], accessory: button("Click", custom_id: "btn"))
   """
-  @spec section(map() | [map()], keyword()) :: map()
+  @spec section(EDA.Component.TextDisplay.t() | [EDA.Component.TextDisplay.t()], keyword()) ::
+          EDA.Component.Section.t()
   def section(text, opts \\ [])
 
-  def section(%{type: @text_display} = single, opts) do
+  def section(%EDA.Component.TextDisplay{} = single, opts) do
     section([single], opts)
   end
 
@@ -394,11 +376,9 @@ defmodule EDA.Component do
       raise ArgumentError, "section requires 1–3 text_display components"
     end
 
-    unless Enum.all?(texts, fn c -> c[:type] == @text_display end) do
+    unless Enum.all?(texts, &(kind(&1) == :text_display)) do
       raise ArgumentError, "section components must all be text_display"
     end
-
-    map = %{type: @section, components: texts}
 
     case opts[:accessory] do
       nil ->
@@ -406,8 +386,12 @@ defmodule EDA.Component do
               "section requires an :accessory (thumbnail or button). " <>
                 "Example: section([text], accessory: thumbnail(\"url\"))"
 
-      %{type: type} = accessory when type in [@thumbnail, @button] ->
-        Map.put(map, :accessory, accessory)
+      accessory when is_map(accessory) ->
+        if kind(accessory) not in [:thumbnail, :button] do
+          raise ArgumentError, "section accessory must be a thumbnail or button"
+        end
+
+        %EDA.Component.Section{components: texts, accessory: accessory}
 
       _ ->
         raise ArgumentError, "section accessory must be a thumbnail or button"
@@ -428,27 +412,21 @@ defmodule EDA.Component do
       separator(spacing: :large)
       separator(divider: false, spacing: :small)
   """
-  @spec separator(keyword()) :: map()
+  @spec separator(keyword()) :: EDA.Component.Separator.t()
   def separator(opts \\ []) do
-    map = %{type: @separator}
-
-    map =
+    divider =
       case opts[:divider] do
-        nil -> map
-        val when is_boolean(val) -> Map.put(map, :divider, val)
+        val when is_nil(val) or is_boolean(val) -> val
         _ -> raise ArgumentError, "separator :divider must be a boolean"
       end
 
-    case opts[:spacing] do
-      nil ->
-        map
+    spacing =
+      case opts[:spacing] do
+        val when val in [nil, :small, :large] -> val
+        _ -> raise ArgumentError, "separator :spacing must be :small or :large"
+      end
 
-      spacing when spacing in [:small, :large] ->
-        Map.put(map, :spacing, @separator_spacing[spacing])
-
-      _ ->
-        raise ArgumentError, "separator :spacing must be :small or :large"
-    end
+    %EDA.Component.Separator{divider: divider, spacing: spacing}
   end
 
   # ── Content Components ─────────────────────────────────────────────
@@ -463,13 +441,13 @@ defmodule EDA.Component do
       text_display("# Hello World")
       text_display("**Bold** and *italic*")
   """
-  @spec text_display(String.t()) :: map()
+  @spec text_display(String.t()) :: EDA.Component.TextDisplay.t()
   def text_display(content) when is_binary(content) do
     if content == "" do
       raise ArgumentError, "text_display content cannot be empty"
     end
 
-    %{type: @text_display, content: content}
+    %EDA.Component.TextDisplay{content: content}
   end
 
   @doc """
@@ -485,15 +463,17 @@ defmodule EDA.Component do
       thumbnail("https://example.com/img.png")
       thumbnail("https://example.com/img.png", description: "A nice image", spoiler: true)
   """
-  @spec thumbnail(String.t(), keyword()) :: map()
+  @spec thumbnail(String.t(), keyword()) :: EDA.Component.Thumbnail.t()
   def thumbnail(url, opts \\ []) when is_binary(url) do
     if url == "" do
       raise ArgumentError, "thumbnail url cannot be empty"
     end
 
-    map = %{type: @thumbnail, media: %{url: url}}
-    map = put_if(map, :description, opts[:description])
-    put_if(map, :spoiler, opts[:spoiler])
+    %EDA.Component.Thumbnail{
+      media: %EDA.Component.Media{url: url},
+      description: opts[:description],
+      spoiler: opts[:spoiler]
+    }
   end
 
   @doc """
@@ -508,13 +488,13 @@ defmodule EDA.Component do
         media_item("https://example.com/img2.png")
       ])
   """
-  @spec media_gallery([map()]) :: map()
+  @spec media_gallery([EDA.Component.MediaGallery.Item.t()]) :: EDA.Component.MediaGallery.t()
   def media_gallery(items) when is_list(items) do
     if items == [] or length(items) > 10 do
       raise ArgumentError, "media_gallery requires 1–10 items"
     end
 
-    %{type: @media_gallery, items: items}
+    %EDA.Component.MediaGallery{items: items}
   end
 
   @doc """
@@ -529,15 +509,17 @@ defmodule EDA.Component do
 
       media_item("https://example.com/image.png", description: "My image")
   """
-  @spec media_item(String.t(), keyword()) :: map()
+  @spec media_item(String.t(), keyword()) :: EDA.Component.MediaGallery.Item.t()
   def media_item(url, opts \\ []) when is_binary(url) do
     if url == "" do
       raise ArgumentError, "media_item url cannot be empty"
     end
 
-    map = %{media: %{url: url}}
-    map = put_if(map, :description, opts[:description])
-    put_if(map, :spoiler, opts[:spoiler])
+    %EDA.Component.MediaGallery.Item{
+      media: %EDA.Component.Media{url: url},
+      description: opts[:description],
+      spoiler: opts[:spoiler]
+    }
   end
 
   @doc """
@@ -553,14 +535,13 @@ defmodule EDA.Component do
 
       file("attachment://report.pdf")
   """
-  @spec file(String.t(), keyword()) :: map()
+  @spec file(String.t(), keyword()) :: EDA.Component.File.t()
   def file(url, opts \\ []) when is_binary(url) do
     unless String.starts_with?(url, "attachment://") do
       raise ArgumentError, "file url must use the attachment:// scheme"
     end
 
-    map = %{type: 13, file: %{url: url}}
-    put_if(map, :spoiler, opts[:spoiler])
+    %EDA.Component.File{file: %EDA.Component.Media{url: url}, spoiler: opts[:spoiler]}
   end
 
   # ── Interactive Components ─────────────────────────────────────────
@@ -573,7 +554,7 @@ defmodule EDA.Component do
     * `:style` - Button style atom: `:primary`, `:secondary`, `:success`, `:danger`, `:link`, `:premium`
     * `:custom_id` - Unique ID for non-link buttons (max 100 chars)
     * `:url` - URL for link-style buttons
-    * `:emoji` - Emoji map `%{name: "👍"}` or `%{id: "12345", name: "custom"}`
+    * `:emoji` - An `EDA.Emoji`, a Unicode emoji `"👍"`, or a map `%{id: "12345", name: "custom"}`
     * `:disabled` - If `true`, button is greyed out
     * `:sku_id` - SKU ID for premium buttons
 
@@ -582,7 +563,7 @@ defmodule EDA.Component do
       button("Click me", custom_id: "my_btn", style: :primary)
       button("Visit", url: "https://example.com", style: :link)
   """
-  @spec button(String.t(), keyword()) :: map()
+  @spec button(String.t(), keyword()) :: EDA.Component.Button.t()
   def button(label, opts \\ []) when is_binary(label) do
     if String.length(label) > 80 do
       raise ArgumentError, "button label must be at most 80 characters"
@@ -590,15 +571,18 @@ defmodule EDA.Component do
 
     style_atom = opts[:style] || :secondary
 
-    style =
-      @button_styles[style_atom] ||
-        raise ArgumentError,
-              "unknown button style #{inspect(style_atom)}, expected one of: #{inspect(Map.keys(@button_styles))}"
+    if not Map.has_key?(@button_styles, style_atom) do
+      raise ArgumentError,
+            "unknown button style #{inspect(style_atom)}, expected one of: #{inspect(Map.keys(@button_styles))}"
+    end
 
-    %{type: @button, style: style, label: label}
+    %EDA.Component.Button{
+      style: style_atom,
+      label: label,
+      emoji: emoji(opts[:emoji]),
+      disabled: opts[:disabled]
+    }
     |> put_button_identifier(style_atom, opts)
-    |> put_if(:emoji, opts[:emoji])
-    |> put_if(:disabled, opts[:disabled])
   end
 
   @doc """
@@ -609,7 +593,7 @@ defmodule EDA.Component do
       link_button("Visit", "https://example.com")
       link_button("Docs", "https://docs.example.com", emoji: %{name: "📚"})
   """
-  @spec link_button(String.t(), String.t(), keyword()) :: map()
+  @spec link_button(String.t(), String.t(), keyword()) :: EDA.Component.Button.t()
   def link_button(label, url, opts \\ []) do
     button(label, Keyword.merge(opts, style: :link, url: url))
   end
@@ -634,7 +618,8 @@ defmodule EDA.Component do
         select_option("Green", "green", emoji: %{name: "🟢"})
       ], placeholder: "Pick a color")
   """
-  @spec string_select(String.t(), [map()], keyword()) :: map()
+  @spec string_select(String.t(), [EDA.Component.SelectOption.t()], keyword()) ::
+          EDA.Component.SelectMenu.t()
   def string_select(custom_id, options, opts \\ [])
       when is_binary(custom_id) and is_list(options) do
     validate_custom_id!(custom_id)
@@ -643,12 +628,8 @@ defmodule EDA.Component do
       raise ArgumentError, "string_select requires 1–25 options"
     end
 
-    map = %{type: @string_select, custom_id: custom_id, options: options}
-    map = put_if(map, :placeholder, opts[:placeholder])
-    map = put_if(map, :min_values, opts[:min_values])
-    map = put_if(map, :max_values, opts[:max_values])
-    map = put_if(map, :disabled, opts[:disabled])
-    put_required(map, opts)
+    select_menu(:string_select, custom_id, opts)
+    |> Map.put(:options, options)
   end
 
   @doc """
@@ -664,7 +645,7 @@ defmodule EDA.Component do
 
       select_option("Red", "red", description: "The color red", emoji: %{name: "🔴"})
   """
-  @spec select_option(String.t(), String.t(), keyword()) :: map()
+  @spec select_option(String.t(), String.t(), keyword()) :: EDA.Component.SelectOption.t()
   def select_option(label, value, opts \\ []) when is_binary(label) and is_binary(value) do
     if String.length(label) > 100 do
       raise ArgumentError, "select_option label must be at most 100 characters"
@@ -680,10 +661,13 @@ defmodule EDA.Component do
       raise ArgumentError, "select_option description must be at most 100 characters"
     end
 
-    map = %{label: label, value: value}
-    map = put_if(map, :description, desc)
-    map = put_if(map, :emoji, opts[:emoji])
-    put_if(map, :default, opts[:default])
+    %EDA.Component.SelectOption{
+      label: label,
+      value: value,
+      description: desc,
+      emoji: emoji(opts[:emoji]),
+      default: opts[:default]
+    }
   end
 
   @doc """
@@ -708,9 +692,9 @@ defmodule EDA.Component do
       user_select("pick_user", placeholder: "Choose a user")
       user_select("reviewers", max_values: 3, default_values: [author_id])
   """
-  @spec user_select(String.t(), keyword()) :: map()
+  @spec user_select(String.t(), keyword()) :: EDA.Component.SelectMenu.t()
   def user_select(custom_id, opts \\ []) when is_binary(custom_id) do
-    build_auto_select(@user_select, custom_id, opts)
+    build_auto_select(:user_select, custom_id, opts)
   end
 
   @doc """
@@ -720,9 +704,9 @@ defmodule EDA.Component do
 
       role_select("pick_role", placeholder: "Choose a role")
   """
-  @spec role_select(String.t(), keyword()) :: map()
+  @spec role_select(String.t(), keyword()) :: EDA.Component.SelectMenu.t()
   def role_select(custom_id, opts \\ []) when is_binary(custom_id) do
-    build_auto_select(@role_select, custom_id, opts)
+    build_auto_select(:role_select, custom_id, opts)
   end
 
   @doc """
@@ -732,9 +716,9 @@ defmodule EDA.Component do
 
       mentionable_select("pick_mention", placeholder: "Choose user or role")
   """
-  @spec mentionable_select(String.t(), keyword()) :: map()
+  @spec mentionable_select(String.t(), keyword()) :: EDA.Component.SelectMenu.t()
   def mentionable_select(custom_id, opts \\ []) when is_binary(custom_id) do
-    build_auto_select(@mentionable_select, custom_id, opts)
+    build_auto_select(:mentionable_select, custom_id, opts)
   end
 
   @doc """
@@ -749,64 +733,59 @@ defmodule EDA.Component do
 
       channel_select("pick_channel", channel_types: [:guild_text], placeholder: "Choose a channel")
   """
-  @spec channel_select(String.t(), keyword()) :: map()
+  @spec channel_select(String.t(), keyword()) :: EDA.Component.SelectMenu.t()
   def channel_select(custom_id, opts \\ []) when is_binary(custom_id) do
     validate_custom_id!(custom_id)
 
-    map = %{type: @channel_select, custom_id: custom_id}
-    map = put_if(map, :placeholder, opts[:placeholder])
-    map = put_if(map, :min_values, opts[:min_values])
-    map = put_if(map, :max_values, opts[:max_values])
-    map = put_if(map, :disabled, opts[:disabled])
-    map = put_required(map, opts)
-    map = put_default_values(map, @channel_select, opts)
+    select = build_auto_select(:channel_select, custom_id, opts)
 
     case opts[:channel_types] do
       nil ->
-        map
+        select
 
       types when is_list(types) ->
-        resolved =
-          Enum.map(types, &EDA.Channel.type_value/1)
-
-        Map.put(map, :channel_types, resolved)
+        # Checked now, so an unknown type fails where it is written rather than when sent.
+        Enum.each(types, &EDA.Channel.type_value/1)
+        %{select | channel_types: types}
     end
   end
 
   # ── Private Helpers ────────────────────────────────────────────────
 
   defp build_auto_select(type, custom_id, opts) do
-    validate_custom_id!(custom_id)
-
-    map = %{type: type, custom_id: custom_id}
-    map = put_if(map, :placeholder, opts[:placeholder])
-    map = put_if(map, :min_values, opts[:min_values])
-    map = put_if(map, :max_values, opts[:max_values])
-    map = put_if(map, :disabled, opts[:disabled])
-    map = put_required(map, opts)
-    put_default_values(map, type, opts)
+    select_menu(type, custom_id, opts)
+    |> put_default_values(type, opts)
   end
 
-  defp put_required(map, opts) do
+  defp select_menu(type, custom_id, opts) do
+    validate_custom_id!(custom_id)
+
+    %EDA.Component.SelectMenu{
+      type: type,
+      custom_id: custom_id,
+      placeholder: opts[:placeholder],
+      min_values: opts[:min_values],
+      max_values: opts[:max_values],
+      required: required(opts),
+      disabled: opts[:disabled]
+    }
+  end
+
+  defp required(opts) do
     case opts[:required] do
-      nil -> map
-      value when is_boolean(value) -> Map.put(map, :required, value)
+      value when is_nil(value) or is_boolean(value) -> value
       other -> raise ArgumentError, "required must be boolean, got: #{inspect(other)}"
     end
   end
 
-  @default_value_types %{
-    @user_select => "user",
-    @role_select => "role",
-    @channel_select => "channel"
-  }
+  @default_value_types %{user_select: :user, role_select: :role, channel_select: :channel}
 
   # Discord takes default values as `%{id, type}` objects, and refuses more of them than
   # max_values allows — which it defaults to 1.
-  defp put_default_values(map, select_type, opts) do
+  defp put_default_values(select, select_type, opts) do
     case opts[:default_values] do
       nil ->
-        map
+        select
 
       values when is_list(values) ->
         max = opts[:max_values] || 1
@@ -817,47 +796,65 @@ defmodule EDA.Component do
                   "raise :max_values to preselect more"
         end
 
-        Map.put(map, :default_values, Enum.map(values, &default_value(select_type, &1)))
+        %{select | default_values: Enum.map(values, &default_value(select_type, &1))}
 
       other ->
         raise ArgumentError, "default_values must be a list, got: #{inspect(other)}"
     end
   end
 
-  defp default_value(@mentionable_select, {type, id}) when type in [:user, :role],
-    do: %{id: to_string(id), type: Atom.to_string(type)}
+  defp default_value(:mentionable_select, {type, id}) when type in [:user, :role],
+    do: {type, to_string(id)}
 
-  defp default_value(@mentionable_select, other) do
+  defp default_value(:mentionable_select, other) do
     raise ArgumentError,
           "a mentionable select mixes users and roles, so each default value must be " <>
             "{:user, id} or {:role, id}, got: #{inspect(other)}"
   end
 
   defp default_value(select_type, id) when is_binary(id) or is_integer(id),
-    do: %{id: to_string(id), type: Map.fetch!(@default_value_types, select_type)}
+    do: {Map.fetch!(@default_value_types, select_type), to_string(id)}
 
   defp default_value(_select_type, other),
     do: raise(ArgumentError, "a default value must be an id, got: #{inspect(other)}")
 
-  defp put_button_identifier(map, :link, opts) do
+  defp put_button_identifier(button, :link, opts) do
     url = opts[:url] || raise ArgumentError, "link button requires :url"
-    Map.put(map, :url, url)
+    %{button | url: url}
   end
 
-  defp put_button_identifier(map, :premium, opts) do
+  defp put_button_identifier(button, :premium, opts) do
     sku_id = opts[:sku_id] || raise ArgumentError, "premium button requires :sku_id"
-    Map.put(map, :sku_id, sku_id)
+    %{button | sku_id: sku_id}
   end
 
-  defp put_button_identifier(map, _style, opts) do
+  defp put_button_identifier(button, _style, opts) do
     custom_id = opts[:custom_id] || raise ArgumentError, "non-link button requires :custom_id"
 
     if String.length(custom_id) > 100 do
       raise ArgumentError, "button custom_id must be at most 100 characters"
     end
 
-    Map.put(map, :custom_id, custom_id)
+    %{button | custom_id: custom_id}
   end
+
+  # The kind of a component, struct or map, built or received.
+  @doc false
+  def kind(%{type: type}) when is_atom(type), do: type
+  def kind(%{type: type}) when is_integer(type), do: type_name(type)
+  def kind(%{"type" => type}), do: type_name(type)
+  def kind(_), do: nil
+
+  defp emoji(nil), do: nil
+  defp emoji(%EDA.Emoji{} = emoji), do: emoji
+  defp emoji(name) when is_binary(name), do: %EDA.Emoji{name: name}
+
+  defp emoji(%{} = map),
+    do: %EDA.Emoji{
+      id: map[:id] || map["id"],
+      name: map[:name] || map["name"],
+      animated: map[:animated] || map["animated"]
+    }
 
   defp validate_custom_id!(custom_id) do
     if String.length(custom_id) > 100 do
@@ -925,8 +922,4 @@ defmodule EDA.Component do
   end
 
   defp disable_component(c), do: c
-
-  defp put_if(map, _key, nil), do: map
-  defp put_if(map, _key, false), do: map
-  defp put_if(map, key, value), do: Map.put(map, key, value)
 end
