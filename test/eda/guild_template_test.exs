@@ -49,7 +49,7 @@ defmodule EDA.GuildTemplateTest do
       assert template.description == "A cool server template"
       assert template.usage_count == 12
       assert template.creator_id == "123456789"
-      assert template.creator == %{"id" => "123456789", "username" => "creator"}
+      assert %EDA.User{id: "123456789", username: "creator"} = template.creator
       assert template.created_at == "2020-01-01T00:00:00+00:00"
       assert template.updated_at == "2020-06-01T12:00:00+00:00"
       assert template.source_guild_id == "987654321"

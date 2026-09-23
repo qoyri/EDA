@@ -95,6 +95,8 @@ defmodule EDA.Event do
 
   @type event() ::
           EDA.Event.Ready.t()
+          | EDA.Event.GatewayClose.t()
+          | EDA.Event.SessionResumed.t()
           | EDA.Guild.t()
           | EDA.Event.GuildDelete.t()
           | EDA.Channel.t()

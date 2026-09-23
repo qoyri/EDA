@@ -18,9 +18,9 @@ defmodule EDA.Poll.AnswerCount do
   defstruct [:id, :count, :me_voted]
 
   @type t :: %__MODULE__{
-          id: integer(),
-          count: integer(),
-          me_voted: boolean()
+          id: integer() | nil,
+          count: integer() | nil,
+          me_voted: boolean() | nil
         }
 
   @doc """

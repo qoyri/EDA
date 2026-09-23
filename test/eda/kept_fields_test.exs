@@ -90,4 +90,20 @@ defmodule EDA.KeptFieldsTest do
     assert %EDA.User.DisplayNameStyles{font_id: 12, effect_id: 4, colors: [16_752_459]} =
              user.display_name_styles
   end
+
+  test "the emoji of MESSAGE_REACTION_REMOVE_EMOJI is an EDA.Emoji, as on every reaction event" do
+    event =
+      EDA.Event.from_raw("MESSAGE_REACTION_REMOVE_EMOJI", %{
+        "channel_id" => "1",
+        "message_id" => "2",
+        "emoji" => %{"id" => nil, "name" => "🔥"}
+      })
+
+    assert %EDA.Emoji{name: "🔥"} = event.emoji
+  end
+
+  test "an entitlement built from a DateTime keeps it instead of crashing" do
+    at = ~U[2026-09-23 10:00:00Z]
+    assert %EDA.Entitlement{starts_at: ^at} = EDA.Entitlement.from_raw(%{"starts_at" => at})
+  end
 end
