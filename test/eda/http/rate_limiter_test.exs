@@ -122,9 +122,12 @@ defmodule EDA.HTTP.RateLimiterTest do
       shared_bucket = "/guilds/33333333333333333/test"
       shared_key = EDA.HTTP.Bucket.key(:get, shared_bucket)
 
+      # Long enough that the three requests are all queued before it resets, however loaded the
+      # suite is: with 0.2 s, the last one (urgent) sometimes arrived after the reset, found the
+      # low one already served, and the test failed about one full run in ten.
       RateLimiter.report_headers(shared_key, [
         {"x-ratelimit-remaining", "0"},
-        {"x-ratelimit-reset-after", "0.2"},
+        {"x-ratelimit-reset-after", "1.0"},
         {"x-ratelimit-bucket", "priority-test-bucket"}
       ])
 
@@ -176,18 +179,39 @@ defmodule EDA.HTTP.RateLimiterTest do
           )
         end)
 
+      # Wait until all three are in the queue, then free the bucket and let it drain.
+      wait_until(fn -> queued_for("priority-test-bucket") == 3 end)
+
+      RateLimiter.report_headers(shared_key, [
+        {"x-ratelimit-remaining", "0"},
+        {"x-ratelimit-reset-after", "0.01"},
+        {"x-ratelimit-bucket", "priority-test-bucket"}
+      ])
+
+      Process.sleep(20)
+      send(RateLimiter, :process_queue)
+
       Task.await_many([t_low, t_normal, t_urgent], 5000)
 
-      execution_order = Agent.get(results, & &1)
+      execution_order = results |> Agent.get(& &1) |> Enum.map(fn {priority, _} -> priority end)
       Agent.stop(results)
 
-      # Urgent should come before low
-      urgent_idx = Enum.find_index(execution_order, fn {p, _} -> p == :urgent end)
-      low_idx = Enum.find_index(execution_order, fn {p, _} -> p == :low end)
+      assert execution_order == [:urgent, :normal, :low]
+    end
+  end
 
-      if urgent_idx && low_idx do
-        assert urgent_idx < low_idx
-      end
+  defp queued_for(discord_bucket) do
+    RateLimiter
+    |> :sys.get_state()
+    |> Map.fetch!(:queue)
+    |> Enum.count(fn {_priority, _at, _from, bucket} -> bucket == discord_bucket end)
+  end
+
+  defp wait_until(check, attempts \\ 200) do
+    cond do
+      check.() -> :ok
+      attempts == 0 -> flunk("condition never met")
+      true -> Process.sleep(5) && wait_until(check, attempts - 1)
     end
   end
 
