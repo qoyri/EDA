@@ -30,7 +30,7 @@ defmodule EDA.Role do
           permissions: String.t() | nil,
           managed: boolean() | nil,
           mentionable: boolean() | nil,
-          tags: map() | nil,
+          tags: EDA.Role.Tags.t() | nil,
           flags: non_neg_integer() | nil
         }
 
@@ -48,7 +48,7 @@ defmodule EDA.Role do
       permissions: raw["permissions"],
       managed: raw["managed"],
       mentionable: raw["mentionable"],
-      tags: raw["tags"],
+      tags: EDA.Role.Tags.from_raw(raw["tags"]),
       flags: raw["flags"]
     }
   end

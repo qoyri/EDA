@@ -59,6 +59,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A role's `tags` and an activity's parts are structs.** `EDA.Role.Tags` reads the keys
+  Discord marks by sending them as `null` (`premium_subscriber`, `available_for_purchase`,
+  `guild_connections`) as booleans. An activity's `timestamps` is an
+  `EDA.Activity.Timestamps` of `DateTime`s, its `assets`, `party` and `secrets` are
+  `EDA.Activity.Assets`, `Party` and `Secrets`.
+
 - **Every object a message nests is a struct.** `message_reference` is an
   `EDA.Message.Reference` (`type` `:default` for a reply, `:forward` for a forward; it encodes
   as Discord takes it), `sticker_items` `EDA.Sticker.Item`s, `interaction_metadata` an
