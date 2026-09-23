@@ -19,15 +19,17 @@ defmodule EDA.Event.RateLimited do
 
   @doc "Converts a raw Discord payload into this event struct."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
-    meta = raw["meta"] || %{}
+    meta = :maps.get("meta", raw, nil) || %{}
 
     %__MODULE__{
-      opcode: raw["opcode"],
-      retry_after: raw["retry_after"],
+      opcode: :maps.get("opcode", raw, nil),
+      retry_after: :maps.get("retry_after", raw, nil),
       guild_id: meta["guild_id"],
       nonce: meta["nonce"],
-      meta: raw["meta"]
+      meta: :maps.get("meta", raw, nil)
     }
   end
 end

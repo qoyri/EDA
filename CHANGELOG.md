@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **zstd-stream transport compression, on by default.** The gateway now asks Discord for
+  `compress=zstd-stream` and decompresses in EDA's precompiled NIF: on the frames Discord sent to
+  a real bot, 74 % less time than zlib-stream for a `GUILD_CREATE`, 46 % less for a small event
+  (1.1 µs instead of 2.0). A bot without the NIF falls back to zlib-stream, and
+  `config :eda, gateway_compression: :zlib` chooses it. Decompression errors emit
+  `[:eda, :gateway, :zstd, :error]`, as zlib's emit `[:eda, :gateway, :zlib, :error]`.
+
+### Changed
+
+- **Less work per gateway event.** With a consumer, an event is parsed once and the caches take
+  the struct, where they used to parse the payload again: a `GUILD_CREATE` went from 1.24 ms to
+  0.7 ms on real guilds. `EDA.Collector` now receives an event only when a collector awaits its
+  type; every event used to be copied to the collector process whether or not one did.
+- **The consumer receives each event sooner.** Its handler runs in a process spawned directly,
+  where a call to `Task.Supervisor.start_child/2` on every event took 5 µs and made one
+  supervisor the queue of every shard. The handler still gets `$callers` and `$ancestors`, and
+  when the application stops, EDA still waits up to five seconds for the handlers still running,
+  as the supervisor did.
+- **Faster ETF decoding.** Normalizing a payload returns the field names EDA knows as literals
+  instead of allocating a new string for every key of every event: 10 to 20 % faster on every
+  event type, a `GUILD_CREATE` normalized in 0.32 ms instead of 0.39.
+- **Faster parsing.** Every entity's `from_raw/1`, nested ones included, reads the payload with a
+  direct map lookup instead of going through `Access`: a message parses in 5.5 µs instead of 6.2,
+  a member in 1.75 instead of 2.1, a role in 0.67 instead of 0.9.
+
+Measured through the whole dispatch path on real events, these changes together bring a message
+to about 13 µs instead of 19, a presence to 6.9 instead of 12, a role update to 4.8 instead of
+8.5, and a `GUILD_CREATE` to 0.56 ms instead of 1.24.
+
+### Fixed
+
+- **Cached entities no longer keep whole JSON payloads alive.** JSON was decoded with strings
+  that only referenced the body they came from, and a cache entry holding one of them, over 64
+  bytes, kept the whole body in memory. With the JSON gateway encoding, the channels of eight
+  real guilds kept 614 KB of their 786 KB `GUILD_CREATE` frames alive; REST responses did the
+  same on a smaller scale. Strings are now copied out of the body: 2 µs more per JSON event,
+  0.6 ms more on a 743 KB REST page. The default ETF encoding was not affected.
+- **Colours, flags and limits are integers on ETF, as on JSON.** The default ETF encoding turned
+  every integer from 2^22 into a string, taking it for a snowflake: a role colour above `#400000`
+  (half the roles of real guilds), an `accent_color`, flags with bit 22 set, a guild's
+  `max_members`, and more, arrived as `"13566001"` where JSON gave `13566001`. Only snowflakes,
+  from 2^48, and permission bitfields become strings now; on real payloads ETF and JSON decode to
+  the same maps.
+- **`from_raw/1` on a struct it already returned now gives it back unchanged.** It parsed the
+  struct again and lost what it held in nested structs: a message's author, a member's user,
+  a channel's voice and forum settings. Helpers that read the struct cache, such as
+  `EDA.Channel.children/1`, went through that path.
+
 ## [0.5.0-beta.3] - 2026-09-23
 
 The third beta reworks EDA's model of Discord from end to end, and breaks a lot on purpose, before

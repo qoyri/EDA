@@ -37,13 +37,15 @@ defmodule EDA.Interaction.Option do
 
   @doc false
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      name: raw["name"],
-      type: EDA.Command.Option.type_name(raw["type"]),
-      value: raw["value"],
-      options: parse(raw["options"]),
-      focused: raw["focused"] == true
+      name: :maps.get("name", raw, nil),
+      type: EDA.Command.Option.type_name(:maps.get("type", raw, nil)),
+      value: :maps.get("value", raw, nil),
+      options: parse(:maps.get("options", raw, nil)),
+      focused: :maps.get("focused", raw, nil) == true
     }
   end
 

@@ -53,13 +53,15 @@ defmodule EDA.Onboarding do
 
   @doc "Converts a raw onboarding object into this struct."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      guild_id: raw["guild_id"],
-      prompts: Enum.map(raw["prompts"] || [], &Prompt.from_raw/1),
-      default_channel_ids: raw["default_channel_ids"] || [],
-      enabled: raw["enabled"] || false,
-      mode: Map.get(@modes, raw["mode"], raw["mode"] || :default)
+      guild_id: :maps.get("guild_id", raw, nil),
+      prompts: Enum.map(:maps.get("prompts", raw, nil) || [], &Prompt.from_raw/1),
+      default_channel_ids: :maps.get("default_channel_ids", raw, nil) || [],
+      enabled: :maps.get("enabled", raw, nil) || false,
+      mode: Map.get(@modes, :maps.get("mode", raw, nil), :maps.get("mode", raw, nil) || :default)
     }
   end
 

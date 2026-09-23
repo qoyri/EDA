@@ -15,7 +15,7 @@ A complete, production-grade Discord library for Elixir. 27 API modules, 85+ eve
 - **Modals with every field Discord offers** — labels, text fields, select menus, file uploads, radio groups, checkbox groups and checkboxes, checked against Discord's limits when the modal is built, and a `get_values/1` that returns each answer in its natural shape
 - **Smart sharding** — Auto shard count from `/gateway/bot`, staggered startup respecting `max_concurrency`, per-shard ready tracking, exponential backoff with jitter
 - **Configurable cache** — ETS-backed O(1) lookups for 7 entity types (guilds, channels, users, members, roles, presences, voice states) with admission policies and LRW eviction
-- **ETF + zlib** — Binary ETF encoding and zlib-stream compression for lower bandwidth and faster deserialization
+- **ETF + zstd** — Binary ETF encoding and zstd-stream compression for lower bandwidth and faster deserialization
 - **DX helpers** — Event collectors (`await_message`, `await_component`), auto-delete messages, `Embed.error/success`, `Component.disable_all`, `Interaction.delete_source/defer_and_edit`, `Mention` formatting, `Color.random()`, and more
 - **25 entity structs** — First-class structs with `Access` behaviour for all Discord objects
 - **Telemetry built-in** — Instrument gateway, HTTP, cache, and DAVE operations out of the box
@@ -235,10 +235,13 @@ Plus 60+ more — see [HexDocs](https://hexdocs.pm/eda) for the full list.
 config :eda,
   intents: [:guilds, :guild_messages, :message_content],
   # or :all, :nonprivileged
-  gateway_encoding: :etf   # :etf (default, binary) or :json
+  gateway_encoding: :etf,     # :etf (default, binary) or :json
+  gateway_compression: :zstd  # :zstd (default) or :zlib
 ```
 
-zlib-stream transport compression is always enabled and has no configuration option.
+Transport compression is always on. `zstd-stream` decompresses Discord's payloads in about a
+quarter of the time `zlib-stream` takes; it runs in EDA's precompiled NIF, so without the NIF the
+gateway falls back to `zlib-stream` on its own.
 
 Gateway capabilities let you opt into a protocol change before Discord enforces it:
 

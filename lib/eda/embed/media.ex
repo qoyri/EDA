@@ -39,16 +39,18 @@ defmodule EDA.Embed.Media do
   @spec from_raw(map() | nil) :: t() | nil
   def from_raw(nil), do: nil
 
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      url: raw["url"],
-      proxy_url: raw["proxy_url"],
-      height: raw["height"],
-      width: raw["width"],
-      content_type: raw["content_type"],
-      placeholder: raw["placeholder"],
-      placeholder_version: raw["placeholder_version"],
-      flags: raw["flags"]
+      url: :maps.get("url", raw, nil),
+      proxy_url: :maps.get("proxy_url", raw, nil),
+      height: :maps.get("height", raw, nil),
+      width: :maps.get("width", raw, nil),
+      content_type: :maps.get("content_type", raw, nil),
+      placeholder: :maps.get("placeholder", raw, nil),
+      placeholder_version: :maps.get("placeholder_version", raw, nil),
+      flags: :maps.get("flags", raw, nil)
     }
   end
 

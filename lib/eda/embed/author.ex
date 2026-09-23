@@ -20,12 +20,14 @@ defmodule EDA.Embed.Author do
   @spec from_raw(map() | nil) :: t() | nil
   def from_raw(nil), do: nil
 
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      name: raw["name"],
-      url: raw["url"],
-      icon_url: raw["icon_url"],
-      proxy_icon_url: raw["proxy_icon_url"]
+      name: :maps.get("name", raw, nil),
+      url: :maps.get("url", raw, nil),
+      icon_url: :maps.get("icon_url", raw, nil),
+      proxy_icon_url: :maps.get("proxy_icon_url", raw, nil)
     }
   end
 end

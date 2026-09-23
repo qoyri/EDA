@@ -16,11 +16,13 @@ defmodule EDA.Command.Option.Choice do
 
   @doc false
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      name: raw["name"],
-      value: raw["value"],
-      name_localizations: raw["name_localizations"]
+      name: :maps.get("name", raw, nil),
+      value: :maps.get("value", raw, nil),
+      name_localizations: :maps.get("name_localizations", raw, nil)
     }
   end
 

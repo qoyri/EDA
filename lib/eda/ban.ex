@@ -18,11 +18,13 @@ defmodule EDA.Ban do
 
   @doc false
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      guild_id: raw["guild_id"],
-      user: raw["user"] && EDA.User.from_raw(raw["user"]),
-      reason: raw["reason"]
+      guild_id: :maps.get("guild_id", raw, nil),
+      user: :maps.get("user", raw, nil) && EDA.User.from_raw(:maps.get("user", raw, nil)),
+      reason: :maps.get("reason", raw, nil)
     }
   end
 

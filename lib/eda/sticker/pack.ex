@@ -26,19 +26,21 @@ defmodule EDA.Sticker.Pack do
       %EDA.Sticker.Pack{id: "1", name: "Wumpus", stickers: []}
   """
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     stickers =
-      (raw["stickers"] || [])
+      (:maps.get("stickers", raw, nil) || [])
       |> Enum.map(&EDA.Sticker.from_raw/1)
 
     %__MODULE__{
-      id: raw["id"],
+      id: :maps.get("id", raw, nil),
       stickers: stickers,
-      name: raw["name"],
-      sku_id: raw["sku_id"],
-      cover_sticker_id: raw["cover_sticker_id"],
-      description: raw["description"],
-      banner_asset_id: raw["banner_asset_id"]
+      name: :maps.get("name", raw, nil),
+      sku_id: :maps.get("sku_id", raw, nil),
+      cover_sticker_id: :maps.get("cover_sticker_id", raw, nil),
+      description: :maps.get("description", raw, nil),
+      banner_asset_id: :maps.get("banner_asset_id", raw, nil)
     }
   end
 

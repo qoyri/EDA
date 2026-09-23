@@ -45,26 +45,31 @@ defmodule EDA.Member do
         }
 
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      user: parse_user(raw["user"]),
-      nick: raw["nick"],
-      avatar: raw["avatar"],
-      banner: raw["banner"],
-      bio: raw["bio"],
-      roles: raw["roles"],
-      joined_at: EDA.Timestamp.parse(raw["joined_at"]),
-      premium_since: EDA.Timestamp.parse(raw["premium_since"]),
-      deaf: raw["deaf"],
-      mute: raw["mute"],
-      pending: raw["pending"],
-      permissions: raw["permissions"],
-      communication_disabled_until: EDA.Timestamp.parse(raw["communication_disabled_until"]),
-      flags: raw["flags"],
-      avatar_decoration_data: EDA.User.AvatarDecoration.from_raw(raw["avatar_decoration_data"]),
-      collectibles: EDA.User.Collectibles.from_raw(raw["collectibles"]),
-      display_name_styles: EDA.User.DisplayNameStyles.from_raw(raw["display_name_styles"]),
-      guild_id: raw["guild_id"]
+      user: parse_user(:maps.get("user", raw, nil)),
+      nick: :maps.get("nick", raw, nil),
+      avatar: :maps.get("avatar", raw, nil),
+      banner: :maps.get("banner", raw, nil),
+      bio: :maps.get("bio", raw, nil),
+      roles: :maps.get("roles", raw, nil),
+      joined_at: EDA.Timestamp.parse(:maps.get("joined_at", raw, nil)),
+      premium_since: EDA.Timestamp.parse(:maps.get("premium_since", raw, nil)),
+      deaf: :maps.get("deaf", raw, nil),
+      mute: :maps.get("mute", raw, nil),
+      pending: :maps.get("pending", raw, nil),
+      permissions: :maps.get("permissions", raw, nil),
+      communication_disabled_until:
+        EDA.Timestamp.parse(:maps.get("communication_disabled_until", raw, nil)),
+      flags: :maps.get("flags", raw, nil),
+      avatar_decoration_data:
+        EDA.User.AvatarDecoration.from_raw(:maps.get("avatar_decoration_data", raw, nil)),
+      collectibles: EDA.User.Collectibles.from_raw(:maps.get("collectibles", raw, nil)),
+      display_name_styles:
+        EDA.User.DisplayNameStyles.from_raw(:maps.get("display_name_styles", raw, nil)),
+      guild_id: :maps.get("guild_id", raw, nil)
     }
   end
 

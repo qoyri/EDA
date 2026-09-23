@@ -14,8 +14,14 @@ defmodule EDA.Gateway.Events do
   """
   @spec dispatch(String.t(), map()) :: :ok
   def dispatch(event_type, data) do
-    # Update caches based on event type
-    update_cache(event_type, data)
+    consumer = EDA.consumer()
+
+    # Parsed once, when a consumer will receive it: the caches then take the struct instead of
+    # parsing the payload again. GUILD_CREATE and GUILD_AVAILABLE, GUILD_DELETE and
+    # GUILD_UNAVAILABLE are parsed by the same module, so the rewrite below keeps it valid.
+    parsed = if consumer, do: EDA.Event.from_raw(event_type, data)
+
+    update_cache(event_type, data, parsed)
 
     # Rewrite GUILD_CREATE → GUILD_AVAILABLE during startup loading
     effective_type = resolve_event_type(event_type, data)
@@ -28,12 +34,12 @@ defmodule EDA.Gateway.Events do
     )
 
     # Dispatch to consumer
-    case EDA.consumer() do
+    case consumer do
       nil ->
         :ok
 
       consumer ->
-        struct = EDA.Event.from_raw(effective_type, data)
+        struct = parsed
         # An atom even for an event EDA does not know, so a bot can match a new one by name
         # before EDA types it. Discord's event names are a small fixed set, so this does not
         # grow the atom table without bound, unlike converting payload keys would.
@@ -100,7 +106,20 @@ defmodule EDA.Gateway.Events do
     else
       :counters.add(counter, 1, 1)
 
-      Task.Supervisor.start_child(EDA.Gateway.TaskSupervisor, fn ->
+      # A plain process rather than a Task.Supervisor child: no call to a supervisor on every event,
+      # which cost 5 µs and made one process the queue of every shard. EDA.Gateway.EventDrain waits
+      # for the running handlers when the application stops. $callers and $ancestors are set as a
+      # Task would, for tools that follow them (a database sandbox in tests, for instance). They are
+      # set by hand on a bare spawn: :proc_lib.spawn/1 costs 0.8 µs more per event, for a crash
+      # report the catch below never lets happen.
+      callers = [self() | Process.get(:"$callers", [])]
+      ancestors = [self() | Process.get(:"$ancestors", [])]
+
+      spawn(fn ->
+        Process.put(:"$callers", callers)
+        Process.put(:"$ancestors", ancestors)
+        Process.put(:"$initial_call", {consumer, :handle_event, 1})
+
         try do
           consumer.handle_event(event)
         catch
@@ -115,6 +134,75 @@ defmodule EDA.Gateway.Events do
           :counters.sub(counter, 1, 1)
         end
       end)
+    end
+  end
+
+  # ── Caching from the parsed event ─────────────────────────────────
+  #
+  # The events whose struct holds what the caches keep hand it over rather than the payload.
+  # Without a consumer nothing was parsed, and the payload path below runs.
+
+  defp update_cache("GUILD_CREATE", data, %EDA.Guild{id: guild_id} = guild) do
+    EDA.Cache.Guild.create(%{
+      guild
+      | roles: nil,
+        channels: nil,
+        threads: nil,
+        members: nil,
+        voice_states: nil,
+        presences: nil,
+        stage_instances: nil,
+        guild_scheduled_events: nil,
+        soundboard_sounds: nil
+    })
+
+    cache_parsed_channels(guild_id, List.wrap(guild.channels) ++ List.wrap(guild.threads))
+    cache_parsed_members(guild_id, List.wrap(guild.members))
+    Enum.each(List.wrap(guild.roles), &EDA.Cache.Role.create(guild_id, &1))
+    Enum.each(List.wrap(guild.voice_states), &EDA.Cache.VoiceState.upsert(guild_id, &1))
+    Enum.each(List.wrap(guild.presences), &EDA.Cache.Presence.upsert(guild_id, &1))
+    maybe_auto_chunk(data)
+  end
+
+  defp update_cache("CHANNEL_CREATE", _data, %EDA.Channel{} = channel),
+    do: EDA.Cache.Channel.create(channel)
+
+  defp update_cache("GUILD_MEMBER_ADD", data, %EDA.Member{} = member) do
+    if member.user, do: EDA.Cache.User.create(member.user)
+    EDA.Cache.Member.create(data["guild_id"], member)
+  end
+
+  defp update_cache(type, data, %EDA.Role{} = role)
+       when type in ["GUILD_ROLE_CREATE", "GUILD_ROLE_UPDATE"],
+       do: EDA.Cache.Role.create(data["guild_id"], role)
+
+  defp update_cache("MESSAGE_CREATE", _data, %EDA.Message{} = message) do
+    if message.author, do: EDA.Cache.User.create(message.author)
+
+    if message.member && message.guild_id do
+      EDA.Cache.Member.create(message.guild_id, %{message.member | user: message.author})
+    end
+  end
+
+  defp update_cache("PRESENCE_UPDATE", _data, %EDA.Event.PresenceUpdate{} = presence) do
+    if presence.guild_id, do: EDA.Cache.Presence.upsert(presence.guild_id, presence)
+
+    # Presence updates carry a partial user, cached only when it has a name.
+    if presence.user && presence.user.username, do: EDA.Cache.User.create(presence.user)
+  end
+
+  defp update_cache(type, data, _parsed), do: update_cache(type, data)
+
+  defp cache_parsed_channels(guild_id, channels) do
+    for channel <- channels do
+      EDA.Cache.Channel.create(%{channel | guild_id: channel.guild_id || guild_id})
+    end
+  end
+
+  defp cache_parsed_members(guild_id, members) do
+    for member <- members do
+      if member.user, do: EDA.Cache.User.create(member.user)
+      EDA.Cache.Member.create(guild_id, member)
     end
   end
 

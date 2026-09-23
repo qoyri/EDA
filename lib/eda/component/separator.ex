@@ -18,11 +18,13 @@ defmodule EDA.Component.Separator do
 
   @doc false
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      divider: raw["divider"],
-      spacing: Component.spacing(raw["spacing"])
+      id: :maps.get("id", raw, nil),
+      divider: :maps.get("divider", raw, nil),
+      spacing: Component.spacing(:maps.get("spacing", raw, nil))
     }
   end
 end

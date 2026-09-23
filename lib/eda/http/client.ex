@@ -239,7 +239,9 @@ defmodule EDA.HTTP.Client do
        when code in 200..299 do
     EDA.HTTP.RateLimiter.report_headers(bucket, headers)
 
-    case Jason.decode(body) do
+    # Strings are copied out of the body: the entities parsed from it may be cached, and a string
+    # that only referenced the body would keep all of it alive for as long as it stays there.
+    case Jason.decode(body, strings: :copy) do
       {:ok, data} -> {:ok, data}
       {:error, _} -> {:ok, body}
     end

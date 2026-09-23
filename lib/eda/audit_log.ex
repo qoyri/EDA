@@ -129,17 +129,21 @@ defmodule EDA.AuditLog do
   An audit log as Discord sends it, with every list parsed.
   """
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      entries: parse(raw["audit_log_entries"], &EDA.AuditLog.Entry.from_raw/1),
-      users: parse(raw["users"], &EDA.User.from_raw/1),
-      webhooks: parse(raw["webhooks"], &EDA.Webhook.from_raw/1),
-      application_commands: parse(raw["application_commands"], &EDA.Command.from_raw/1),
-      auto_moderation_rules: parse(raw["auto_moderation_rules"], &EDA.AutoMod.from_raw/1),
+      entries: parse(:maps.get("audit_log_entries", raw, nil), &EDA.AuditLog.Entry.from_raw/1),
+      users: parse(:maps.get("users", raw, nil), &EDA.User.from_raw/1),
+      webhooks: parse(:maps.get("webhooks", raw, nil), &EDA.Webhook.from_raw/1),
+      application_commands:
+        parse(:maps.get("application_commands", raw, nil), &EDA.Command.from_raw/1),
+      auto_moderation_rules:
+        parse(:maps.get("auto_moderation_rules", raw, nil), &EDA.AutoMod.from_raw/1),
       guild_scheduled_events:
-        parse(raw["guild_scheduled_events"], &EDA.ScheduledEvent.from_raw/1),
-      integrations: parse(raw["integrations"], &EDA.Integration.from_raw/1),
-      threads: parse(raw["threads"], &EDA.Channel.from_raw/1)
+        parse(:maps.get("guild_scheduled_events", raw, nil), &EDA.ScheduledEvent.from_raw/1),
+      integrations: parse(:maps.get("integrations", raw, nil), &EDA.Integration.from_raw/1),
+      threads: parse(:maps.get("threads", raw, nil), &EDA.Channel.from_raw/1)
     }
   end
 

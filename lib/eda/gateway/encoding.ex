@@ -16,10 +16,10 @@ defmodule EDA.Gateway.Encoding do
       config :eda, gateway_encoding: :etf   # default
       config :eda, gateway_encoding: :json
 
-  ## Interaction with zlib
+  ## Interaction with compression
 
-  Both encodings work with zlib-stream compression. The gateway connection
-  decompresses frames before passing them to `decode/1`, so the encoding
+  Both encodings work with either transport compression (`EDA.Gateway.Compression`). The
+  gateway connection decompresses frames before passing them to `decode/1`, so the encoding
   module always receives raw (uncompressed) binary data.
   """
 

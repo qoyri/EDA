@@ -25,9 +25,11 @@ defmodule EDA.User.Collectibles do
   @spec from_raw(map() | nil) :: t() | nil
   def from_raw(nil), do: nil
 
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      nameplate: EDA.User.Nameplate.from_raw(raw["nameplate"]),
+      nameplate: EDA.User.Nameplate.from_raw(:maps.get("nameplate", raw, nil)),
       other: Map.drop(raw, ["nameplate"])
     }
   end

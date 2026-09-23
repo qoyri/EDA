@@ -28,13 +28,15 @@ defmodule EDA.Event.PresenceUpdate do
 
   @doc "Converts a raw Discord payload into this event struct."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      guild_id: raw["guild_id"],
-      user: parse_user(raw["user"]),
-      status: EDA.Presence.status_name(raw["status"]),
-      activities: parse_activities(raw["activities"]),
-      client_status: EDA.Presence.parse_client_status(raw["client_status"])
+      guild_id: :maps.get("guild_id", raw, nil),
+      user: parse_user(:maps.get("user", raw, nil)),
+      status: EDA.Presence.status_name(:maps.get("status", raw, nil)),
+      activities: parse_activities(:maps.get("activities", raw, nil)),
+      client_status: EDA.Presence.parse_client_status(:maps.get("client_status", raw, nil))
     }
   end
 

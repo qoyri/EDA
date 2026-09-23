@@ -11,11 +11,13 @@ defmodule EDA.Event.VoiceChannelStatusUpdate do
 
   @doc "Converts a raw Discord payload into this event struct."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      channel_id: raw["id"],
-      guild_id: raw["guild_id"],
-      status: raw["status"]
+      channel_id: :maps.get("id", raw, nil),
+      guild_id: :maps.get("guild_id", raw, nil),
+      status: :maps.get("status", raw, nil)
     }
   end
 end

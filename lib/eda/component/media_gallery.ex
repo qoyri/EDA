@@ -15,10 +15,13 @@ defmodule EDA.Component.MediaGallery do
 
   @doc false
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      items: Enum.map(raw["items"] || [], &EDA.Component.MediaGallery.Item.from_raw/1)
+      id: :maps.get("id", raw, nil),
+      items:
+        Enum.map(:maps.get("items", raw, nil) || [], &EDA.Component.MediaGallery.Item.from_raw/1)
     }
   end
 end

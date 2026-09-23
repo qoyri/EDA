@@ -24,13 +24,15 @@ defmodule EDA.Message.Reference do
   @spec from_raw(map() | nil) :: t() | nil
   def from_raw(nil), do: nil
 
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      type: EDA.Enum.name(@types, raw["type"] || 0),
-      message_id: raw["message_id"],
-      channel_id: raw["channel_id"],
-      guild_id: raw["guild_id"],
-      fail_if_not_exists: raw["fail_if_not_exists"]
+      type: EDA.Enum.name(@types, :maps.get("type", raw, nil) || 0),
+      message_id: :maps.get("message_id", raw, nil),
+      channel_id: :maps.get("channel_id", raw, nil),
+      guild_id: :maps.get("guild_id", raw, nil),
+      fail_if_not_exists: :maps.get("fail_if_not_exists", raw, nil)
     }
   end
 

@@ -29,14 +29,16 @@ defmodule EDA.Onboarding.Prompt do
 
   @doc "Converts a raw prompt into this struct."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      title: raw["title"],
-      type: Map.get(@types, raw["type"], raw["type"]),
-      options: Enum.map(raw["options"] || [], &Option.from_raw/1),
-      single_select: raw["single_select"] || false,
-      required: raw["required"] || false,
+      id: :maps.get("id", raw, nil),
+      title: :maps.get("title", raw, nil),
+      type: Map.get(@types, :maps.get("type", raw, nil), :maps.get("type", raw, nil)),
+      options: Enum.map(:maps.get("options", raw, nil) || [], &Option.from_raw/1),
+      single_select: :maps.get("single_select", raw, nil) || false,
+      required: :maps.get("required", raw, nil) || false,
       in_onboarding: Map.get(raw, "in_onboarding", true)
     }
   end

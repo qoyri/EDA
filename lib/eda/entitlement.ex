@@ -62,18 +62,20 @@ defmodule EDA.Entitlement do
 
   @doc "Converts a raw entitlement object into this struct."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      sku_id: raw["sku_id"],
-      application_id: raw["application_id"],
-      user_id: raw["user_id"],
-      guild_id: raw["guild_id"],
-      type: Map.get(@types, raw["type"], raw["type"]),
-      starts_at: parse_time(raw["starts_at"]),
-      ends_at: parse_time(raw["ends_at"]),
-      deleted: raw["deleted"] || false,
-      consumed: raw["consumed"]
+      id: :maps.get("id", raw, nil),
+      sku_id: :maps.get("sku_id", raw, nil),
+      application_id: :maps.get("application_id", raw, nil),
+      user_id: :maps.get("user_id", raw, nil),
+      guild_id: :maps.get("guild_id", raw, nil),
+      type: Map.get(@types, :maps.get("type", raw, nil), :maps.get("type", raw, nil)),
+      starts_at: parse_time(:maps.get("starts_at", raw, nil)),
+      ends_at: parse_time(:maps.get("ends_at", raw, nil)),
+      deleted: :maps.get("deleted", raw, nil) || false,
+      consumed: :maps.get("consumed", raw, nil)
     }
   end
 

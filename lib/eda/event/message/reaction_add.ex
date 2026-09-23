@@ -13,14 +13,16 @@ defmodule EDA.Event.MessageReactionAdd do
         }
   @doc "Converts a raw Discord payload into this event struct."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      user_id: raw["user_id"],
-      channel_id: raw["channel_id"],
-      message_id: raw["message_id"],
-      guild_id: raw["guild_id"],
-      member: parse_member(raw["member"]),
-      emoji: parse_emoji(raw["emoji"])
+      user_id: :maps.get("user_id", raw, nil),
+      channel_id: :maps.get("channel_id", raw, nil),
+      message_id: :maps.get("message_id", raw, nil),
+      guild_id: :maps.get("guild_id", raw, nil),
+      member: parse_member(:maps.get("member", raw, nil)),
+      emoji: parse_emoji(:maps.get("emoji", raw, nil))
     }
   end
 

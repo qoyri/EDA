@@ -36,16 +36,18 @@ defmodule EDA.Emoji do
       %EDA.Emoji{id: nil, name: "👍"}
   """
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      name: raw["name"],
-      animated: raw["animated"],
-      roles: raw["roles"],
-      user: parse_user(raw["user"]),
-      require_colons: raw["require_colons"],
-      managed: raw["managed"],
-      available: raw["available"]
+      id: :maps.get("id", raw, nil),
+      name: :maps.get("name", raw, nil),
+      animated: :maps.get("animated", raw, nil),
+      roles: :maps.get("roles", raw, nil),
+      user: parse_user(:maps.get("user", raw, nil)),
+      require_colons: :maps.get("require_colons", raw, nil),
+      managed: :maps.get("managed", raw, nil),
+      available: :maps.get("available", raw, nil)
     }
   end
 

@@ -35,20 +35,26 @@ defmodule EDA.Webhook do
         }
 
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      type: EDA.Enum.name(@types, raw["type"]),
-      guild_id: raw["guild_id"],
-      channel_id: raw["channel_id"],
-      user: parse_user(raw["user"]),
-      name: raw["name"],
-      avatar: raw["avatar"],
-      token: raw["token"],
-      application_id: raw["application_id"],
-      source_guild: raw["source_guild"] && EDA.Guild.from_raw(raw["source_guild"]),
-      source_channel: raw["source_channel"] && EDA.Channel.from_raw(raw["source_channel"]),
-      url: raw["url"]
+      id: :maps.get("id", raw, nil),
+      type: EDA.Enum.name(@types, :maps.get("type", raw, nil)),
+      guild_id: :maps.get("guild_id", raw, nil),
+      channel_id: :maps.get("channel_id", raw, nil),
+      user: parse_user(:maps.get("user", raw, nil)),
+      name: :maps.get("name", raw, nil),
+      avatar: :maps.get("avatar", raw, nil),
+      token: :maps.get("token", raw, nil),
+      application_id: :maps.get("application_id", raw, nil),
+      source_guild:
+        :maps.get("source_guild", raw, nil) &&
+          EDA.Guild.from_raw(:maps.get("source_guild", raw, nil)),
+      source_channel:
+        :maps.get("source_channel", raw, nil) &&
+          EDA.Channel.from_raw(:maps.get("source_channel", raw, nil)),
+      url: :maps.get("url", raw, nil)
     }
   end
 

@@ -25,6 +25,7 @@ defmodule EDA.Gateway.ShardManager do
   defstruct [
     :token,
     :gateway_url,
+    :compression,
     :total_shards,
     :max_concurrency,
     shard_ids: [],
@@ -106,9 +107,13 @@ defmodule EDA.Gateway.ShardManager do
     case EDA.API.Gateway.bot() do
       {:ok, data} ->
         encoding = EDA.Gateway.Encoding.module()
+        # Chosen once, so the URL and every shard's decompressor agree.
+        compression = EDA.Gateway.Compression.module()
 
         gateway_url =
-          data["url"] <> "/?v=10&encoding=#{encoding.url_encoding()}&compress=zlib-stream"
+          data["url"] <>
+            "/?v=10&encoding=#{encoding.url_encoding()}" <>
+            "&compress=#{EDA.Gateway.Compression.url_param(compression)}"
 
         recommended = data["shards"] || 1
         max_concurrency = get_in(data, ["session_start_limit", "max_concurrency"]) || 1
@@ -130,6 +135,7 @@ defmodule EDA.Gateway.ShardManager do
         new_state = %{
           state
           | gateway_url: gateway_url,
+            compression: compression,
             total_shards: total,
             max_concurrency: max_concurrency,
             shard_ids: shard_ids,
@@ -252,7 +258,8 @@ defmodule EDA.Gateway.ShardManager do
     opts = [
       token: state.token,
       shard: {shard_id, state.total_shards},
-      gateway_url: state.gateway_url
+      gateway_url: state.gateway_url,
+      compression: state.compression
     ]
 
     case DynamicSupervisor.start_child(

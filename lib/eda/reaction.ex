@@ -14,14 +14,16 @@ defmodule EDA.Reaction do
         }
 
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      count: raw["count"],
-      me: raw["me"],
-      emoji: parse_emoji(raw["emoji"]),
-      count_details: parse_count_details(raw["count_details"]),
-      me_burst: raw["me_burst"],
-      burst_colors: raw["burst_colors"]
+      count: :maps.get("count", raw, nil),
+      me: :maps.get("me", raw, nil),
+      emoji: parse_emoji(:maps.get("emoji", raw, nil)),
+      count_details: parse_count_details(:maps.get("count_details", raw, nil)),
+      me_burst: :maps.get("me_burst", raw, nil),
+      burst_colors: :maps.get("burst_colors", raw, nil)
     }
   end
 

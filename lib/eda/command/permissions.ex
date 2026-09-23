@@ -30,13 +30,15 @@ defmodule EDA.Command.Permissions do
 
   @doc "Converts a raw guild application command permissions object into this struct."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      application_id: raw["application_id"],
-      guild_id: raw["guild_id"],
+      id: :maps.get("id", raw, nil),
+      application_id: :maps.get("application_id", raw, nil),
+      guild_id: :maps.get("guild_id", raw, nil),
       permissions:
-        Enum.map(raw["permissions"] || [], fn p ->
+        Enum.map(:maps.get("permissions", raw, nil) || [], fn p ->
           %{id: p["id"], type: Map.get(@types, p["type"], p["type"]), permission: p["permission"]}
         end)
     }

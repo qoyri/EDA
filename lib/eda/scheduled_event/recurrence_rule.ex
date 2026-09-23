@@ -88,20 +88,25 @@ defmodule EDA.ScheduledEvent.RecurrenceRule do
   @spec from_raw(map() | nil) :: t() | nil
   def from_raw(nil), do: nil
 
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      start: EDA.Timestamp.parse(raw["start"]),
-      end: EDA.Timestamp.parse(raw["end"]),
-      frequency: EDA.Enum.name(@frequencies, raw["frequency"]),
-      interval: raw["interval"],
-      by_weekday: names(raw["by_weekday"], @weekdays),
+      start: EDA.Timestamp.parse(:maps.get("start", raw, nil)),
+      end: EDA.Timestamp.parse(:maps.get("end", raw, nil)),
+      frequency: EDA.Enum.name(@frequencies, :maps.get("frequency", raw, nil)),
+      interval: :maps.get("interval", raw, nil),
+      by_weekday: names(:maps.get("by_weekday", raw, nil), @weekdays),
       by_n_weekday:
-        raw["by_n_weekday"] &&
-          Enum.map(raw["by_n_weekday"], &{&1["n"], EDA.Enum.name(@weekdays, &1["day"])}),
-      by_month: names(raw["by_month"], @months),
-      by_month_day: raw["by_month_day"],
-      by_year_day: raw["by_year_day"],
-      count: raw["count"]
+        :maps.get("by_n_weekday", raw, nil) &&
+          Enum.map(
+            :maps.get("by_n_weekday", raw, nil),
+            &{&1["n"], EDA.Enum.name(@weekdays, &1["day"])}
+          ),
+      by_month: names(:maps.get("by_month", raw, nil), @months),
+      by_month_day: :maps.get("by_month_day", raw, nil),
+      by_year_day: :maps.get("by_year_day", raw, nil),
+      count: :maps.get("count", raw, nil)
     }
   end
 

@@ -27,15 +27,17 @@ defmodule EDA.Interaction.CommandData do
 
   @doc false
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      name: raw["name"],
-      type: EDA.Enum.name(@types, raw["type"]),
-      resolved: EDA.Resolved.from_raw(raw["resolved"]),
-      options: EDA.Interaction.Option.parse(raw["options"]),
-      guild_id: raw["guild_id"],
-      target_id: raw["target_id"]
+      id: :maps.get("id", raw, nil),
+      name: :maps.get("name", raw, nil),
+      type: EDA.Enum.name(@types, :maps.get("type", raw, nil)),
+      resolved: EDA.Resolved.from_raw(:maps.get("resolved", raw, nil)),
+      options: EDA.Interaction.Option.parse(:maps.get("options", raw, nil)),
+      guild_id: :maps.get("guild_id", raw, nil),
+      target_id: :maps.get("target_id", raw, nil)
     }
   end
 end

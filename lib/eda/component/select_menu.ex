@@ -44,20 +44,22 @@ defmodule EDA.Component.SelectMenu do
 
   @doc false
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      type: Component.type_name(raw["type"]),
-      id: raw["id"],
-      custom_id: raw["custom_id"],
-      options: Component.parse_options(raw["options"]),
-      channel_types: parse_channel_types(raw["channel_types"]),
-      placeholder: raw["placeholder"],
-      default_values: parse_default_values(raw["default_values"]),
-      min_values: raw["min_values"],
-      max_values: raw["max_values"],
-      required: raw["required"],
-      disabled: raw["disabled"] == true,
-      values: raw["values"]
+      type: Component.type_name(:maps.get("type", raw, nil)),
+      id: :maps.get("id", raw, nil),
+      custom_id: :maps.get("custom_id", raw, nil),
+      options: Component.parse_options(:maps.get("options", raw, nil)),
+      channel_types: parse_channel_types(:maps.get("channel_types", raw, nil)),
+      placeholder: :maps.get("placeholder", raw, nil),
+      default_values: parse_default_values(:maps.get("default_values", raw, nil)),
+      min_values: :maps.get("min_values", raw, nil),
+      max_values: :maps.get("max_values", raw, nil),
+      required: :maps.get("required", raw, nil),
+      disabled: :maps.get("disabled", raw, nil) == true,
+      values: :maps.get("values", raw, nil)
     }
   end
 

@@ -35,19 +35,21 @@ defmodule EDA.Resolved do
   @spec from_raw(map() | nil) :: t() | nil
   def from_raw(nil), do: nil
 
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
-    users = parse(raw["users"], &EDA.User.from_raw/1)
+    users = parse(:maps.get("users", raw, nil), &EDA.User.from_raw/1)
 
     %__MODULE__{
       users: users,
       members:
-        Map.new(raw["members"] || %{}, fn {id, member} ->
+        Map.new(:maps.get("members", raw, nil) || %{}, fn {id, member} ->
           {id, %{EDA.Member.from_raw(member) | user: users[id]}}
         end),
-      roles: parse(raw["roles"], &EDA.Role.from_raw/1),
-      channels: parse(raw["channels"], &EDA.Channel.from_raw/1),
-      messages: parse(raw["messages"], &EDA.Message.from_raw/1),
-      attachments: parse(raw["attachments"], &EDA.Attachment.from_raw/1)
+      roles: parse(:maps.get("roles", raw, nil), &EDA.Role.from_raw/1),
+      channels: parse(:maps.get("channels", raw, nil), &EDA.Channel.from_raw/1),
+      messages: parse(:maps.get("messages", raw, nil), &EDA.Message.from_raw/1),
+      attachments: parse(:maps.get("attachments", raw, nil), &EDA.Attachment.from_raw/1)
     }
   end
 

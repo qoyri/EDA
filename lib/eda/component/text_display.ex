@@ -15,10 +15,12 @@ defmodule EDA.Component.TextDisplay do
 
   @doc false
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      content: raw["content"]
+      id: :maps.get("id", raw, nil),
+      content: :maps.get("content", raw, nil)
     }
   end
 end

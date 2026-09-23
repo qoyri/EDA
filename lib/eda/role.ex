@@ -42,22 +42,24 @@ defmodule EDA.Role do
         }
 
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      guild_id: raw["guild_id"],
-      name: raw["name"],
-      color: raw["color"],
-      colors: EDA.Role.Colors.from_raw(raw["colors"]),
-      hoist: raw["hoist"],
-      icon: raw["icon"],
-      unicode_emoji: raw["unicode_emoji"],
-      position: raw["position"],
-      permissions: raw["permissions"],
-      managed: raw["managed"],
-      mentionable: raw["mentionable"],
-      tags: EDA.Role.Tags.from_raw(raw["tags"]),
-      flags: raw["flags"]
+      id: :maps.get("id", raw, nil),
+      guild_id: :maps.get("guild_id", raw, nil),
+      name: :maps.get("name", raw, nil),
+      color: :maps.get("color", raw, nil),
+      colors: EDA.Role.Colors.from_raw(:maps.get("colors", raw, nil)),
+      hoist: :maps.get("hoist", raw, nil),
+      icon: :maps.get("icon", raw, nil),
+      unicode_emoji: :maps.get("unicode_emoji", raw, nil),
+      position: :maps.get("position", raw, nil),
+      permissions: :maps.get("permissions", raw, nil),
+      managed: :maps.get("managed", raw, nil),
+      mentionable: :maps.get("mentionable", raw, nil),
+      tags: EDA.Role.Tags.from_raw(:maps.get("tags", raw, nil)),
+      flags: :maps.get("flags", raw, nil)
     }
   end
 

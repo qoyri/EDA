@@ -12,7 +12,9 @@ defmodule EDA.Gateway.Encoding.JSON do
   @impl true
   @spec decode(binary()) :: map()
   def decode(binary) do
-    Jason.decode!(binary)
+    # Strings are copied out of the frame. By default they only reference it, so a cached member's
+    # name would keep its whole GUILD_CREATE, often hundreds of kilobytes, alive.
+    Jason.decode!(binary, strings: :copy)
   end
 
   @doc "Encodes a map as a JSON text frame."

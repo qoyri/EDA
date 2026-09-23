@@ -46,16 +46,18 @@ defmodule EDA.SoundboardSound do
       %EDA.SoundboardSound{sound_id: "1", name: "quack", volume: 1.0, emoji_name: "🦆", available: true}
   """
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      sound_id: id(raw["sound_id"]),
-      name: raw["name"],
-      volume: raw["volume"],
-      emoji_id: raw["emoji_id"],
-      emoji_name: raw["emoji_name"],
-      guild_id: raw["guild_id"],
-      available: raw["available"],
-      user: parse_user(raw["user"])
+      sound_id: id(:maps.get("sound_id", raw, nil)),
+      name: :maps.get("name", raw, nil),
+      volume: :maps.get("volume", raw, nil),
+      emoji_id: :maps.get("emoji_id", raw, nil),
+      emoji_name: :maps.get("emoji_name", raw, nil),
+      guild_id: :maps.get("guild_id", raw, nil),
+      available: :maps.get("available", raw, nil),
+      user: parse_user(:maps.get("user", raw, nil))
     }
   end
 

@@ -10,7 +10,13 @@ defmodule EDA.Event.MessageDeleteBulk do
         }
   @doc "Converts a raw Discord payload into this event struct."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
-    %__MODULE__{ids: raw["ids"], channel_id: raw["channel_id"], guild_id: raw["guild_id"]}
+    %__MODULE__{
+      ids: :maps.get("ids", raw, nil),
+      channel_id: :maps.get("channel_id", raw, nil),
+      guild_id: :maps.get("guild_id", raw, nil)
+    }
   end
 end

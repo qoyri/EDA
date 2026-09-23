@@ -70,26 +70,29 @@ defmodule EDA.Activity do
         }
 
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      name: raw["name"],
-      type: EDA.Enum.name(@types, raw["type"]),
-      url: raw["url"],
-      created_at: EDA.Timestamp.from_unix_ms(raw["created_at"]),
-      timestamps: EDA.Activity.Timestamps.from_raw(raw["timestamps"]),
-      application_id: raw["application_id"],
-      details: raw["details"],
-      state: raw["state"],
-      emoji: parse_emoji(raw["emoji"]),
-      party: EDA.Activity.Party.from_raw(raw["party"]),
-      assets: EDA.Activity.Assets.from_raw(raw["assets"]),
-      secrets: EDA.Activity.Secrets.from_raw(raw["secrets"]),
-      instance: raw["instance"],
-      flags: raw["flags"],
-      buttons: raw["buttons"],
-      status_display_type: EDA.Enum.name(@status_display_types, raw["status_display_type"]),
-      details_url: raw["details_url"],
-      state_url: raw["state_url"]
+      name: :maps.get("name", raw, nil),
+      type: EDA.Enum.name(@types, :maps.get("type", raw, nil)),
+      url: :maps.get("url", raw, nil),
+      created_at: EDA.Timestamp.from_unix_ms(:maps.get("created_at", raw, nil)),
+      timestamps: EDA.Activity.Timestamps.from_raw(:maps.get("timestamps", raw, nil)),
+      application_id: :maps.get("application_id", raw, nil),
+      details: :maps.get("details", raw, nil),
+      state: :maps.get("state", raw, nil),
+      emoji: parse_emoji(:maps.get("emoji", raw, nil)),
+      party: EDA.Activity.Party.from_raw(:maps.get("party", raw, nil)),
+      assets: EDA.Activity.Assets.from_raw(:maps.get("assets", raw, nil)),
+      secrets: EDA.Activity.Secrets.from_raw(:maps.get("secrets", raw, nil)),
+      instance: :maps.get("instance", raw, nil),
+      flags: :maps.get("flags", raw, nil),
+      buttons: :maps.get("buttons", raw, nil),
+      status_display_type:
+        EDA.Enum.name(@status_display_types, :maps.get("status_display_type", raw, nil)),
+      details_url: :maps.get("details_url", raw, nil),
+      state_url: :maps.get("state_url", raw, nil)
     }
   end
 

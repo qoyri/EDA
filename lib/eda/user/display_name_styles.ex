@@ -31,11 +31,13 @@ defmodule EDA.User.DisplayNameStyles do
   @spec from_raw(map() | nil) :: t() | nil
   def from_raw(nil), do: nil
 
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      font_id: raw["font_id"],
-      effect_id: raw["effect_id"],
-      colors: parse_colors(raw["colors"])
+      font_id: :maps.get("font_id", raw, nil),
+      effect_id: :maps.get("effect_id", raw, nil),
+      colors: parse_colors(:maps.get("colors", raw, nil))
     }
   end
 

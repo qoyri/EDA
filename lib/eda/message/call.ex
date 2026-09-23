@@ -17,10 +17,12 @@ defmodule EDA.Message.Call do
   @spec from_raw(map() | nil) :: t() | nil
   def from_raw(nil), do: nil
 
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      participants: raw["participants"],
-      ended_timestamp: EDA.Timestamp.parse(raw["ended_timestamp"])
+      participants: :maps.get("participants", raw, nil),
+      ended_timestamp: EDA.Timestamp.parse(:maps.get("ended_timestamp", raw, nil))
     }
   end
 end

@@ -35,21 +35,24 @@ defmodule EDA.VoiceState do
         }
 
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      guild_id: raw["guild_id"],
-      channel_id: raw["channel_id"],
-      user_id: raw["user_id"],
-      member: parse_member(raw["member"]),
-      session_id: raw["session_id"],
-      deaf: raw["deaf"],
-      mute: raw["mute"],
-      self_deaf: raw["self_deaf"],
-      self_mute: raw["self_mute"],
-      self_stream: raw["self_stream"],
-      self_video: raw["self_video"],
-      suppress: raw["suppress"],
-      request_to_speak_timestamp: EDA.Timestamp.parse(raw["request_to_speak_timestamp"])
+      guild_id: :maps.get("guild_id", raw, nil),
+      channel_id: :maps.get("channel_id", raw, nil),
+      user_id: :maps.get("user_id", raw, nil),
+      member: parse_member(:maps.get("member", raw, nil)),
+      session_id: :maps.get("session_id", raw, nil),
+      deaf: :maps.get("deaf", raw, nil),
+      mute: :maps.get("mute", raw, nil),
+      self_deaf: :maps.get("self_deaf", raw, nil),
+      self_mute: :maps.get("self_mute", raw, nil),
+      self_stream: :maps.get("self_stream", raw, nil),
+      self_video: :maps.get("self_video", raw, nil),
+      suppress: :maps.get("suppress", raw, nil),
+      request_to_speak_timestamp:
+        EDA.Timestamp.parse(:maps.get("request_to_speak_timestamp", raw, nil))
     }
   end
 

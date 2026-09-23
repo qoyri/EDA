@@ -73,11 +73,13 @@ defmodule EDA.Role.Colors do
   @spec from_raw(map() | nil) :: t() | nil
   def from_raw(nil), do: nil
 
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      primary_color: raw["primary_color"],
-      secondary_color: raw["secondary_color"],
-      tertiary_color: raw["tertiary_color"]
+      primary_color: :maps.get("primary_color", raw, nil),
+      secondary_color: :maps.get("secondary_color", raw, nil),
+      tertiary_color: :maps.get("tertiary_color", raw, nil)
     }
   end
 

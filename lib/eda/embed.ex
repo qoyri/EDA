@@ -149,22 +149,24 @@ defmodule EDA.Embed do
       {:rich, "Hi", "bye"}
   """
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      title: raw["title"],
-      type: Map.get(@types, raw["type"], raw["type"]),
-      description: raw["description"],
-      url: raw["url"],
-      timestamp: EDA.Timestamp.parse(raw["timestamp"]),
-      color: raw["color"],
-      footer: Footer.from_raw(raw["footer"]),
-      image: Media.from_raw(raw["image"]),
-      thumbnail: Media.from_raw(raw["thumbnail"]),
-      video: Media.from_raw(raw["video"]),
-      provider: Provider.from_raw(raw["provider"]),
-      author: Author.from_raw(raw["author"]),
-      flags: raw["flags"],
-      fields: Enum.map(raw["fields"] || [], &Field.from_raw/1)
+      title: :maps.get("title", raw, nil),
+      type: Map.get(@types, :maps.get("type", raw, nil), :maps.get("type", raw, nil)),
+      description: :maps.get("description", raw, nil),
+      url: :maps.get("url", raw, nil),
+      timestamp: EDA.Timestamp.parse(:maps.get("timestamp", raw, nil)),
+      color: :maps.get("color", raw, nil),
+      footer: Footer.from_raw(:maps.get("footer", raw, nil)),
+      image: Media.from_raw(:maps.get("image", raw, nil)),
+      thumbnail: Media.from_raw(:maps.get("thumbnail", raw, nil)),
+      video: Media.from_raw(:maps.get("video", raw, nil)),
+      provider: Provider.from_raw(:maps.get("provider", raw, nil)),
+      author: Author.from_raw(:maps.get("author", raw, nil)),
+      flags: :maps.get("flags", raw, nil),
+      fields: Enum.map(:maps.get("fields", raw, nil) || [], &Field.from_raw/1)
     }
   end
 

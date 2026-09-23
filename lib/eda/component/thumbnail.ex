@@ -17,12 +17,14 @@ defmodule EDA.Component.Thumbnail do
 
   @doc false
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      media: EDA.Component.Media.from_raw(raw["media"]),
-      description: raw["description"],
-      spoiler: raw["spoiler"] == true
+      id: :maps.get("id", raw, nil),
+      media: EDA.Component.Media.from_raw(:maps.get("media", raw, nil)),
+      description: :maps.get("description", raw, nil),
+      spoiler: :maps.get("spoiler", raw, nil) == true
     }
   end
 end

@@ -15,7 +15,13 @@ defmodule EDA.Embed.Field do
 
   @doc false
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
-    %__MODULE__{name: raw["name"], value: raw["value"], inline: raw["inline"] == true}
+    %__MODULE__{
+      name: :maps.get("name", raw, nil),
+      value: :maps.get("value", raw, nil),
+      inline: :maps.get("inline", raw, nil) == true
+    }
   end
 end

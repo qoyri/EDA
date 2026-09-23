@@ -20,12 +20,14 @@ defmodule EDA.Message.SharedClientTheme do
   @spec from_raw(map() | nil) :: t() | nil
   def from_raw(nil), do: nil
 
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      colors: raw["colors"],
-      gradient_angle: raw["gradient_angle"],
-      base_mix: raw["base_mix"],
-      base_theme: raw["base_theme"]
+      colors: :maps.get("colors", raw, nil),
+      gradient_angle: :maps.get("gradient_angle", raw, nil),
+      base_mix: :maps.get("base_mix", raw, nil),
+      base_theme: :maps.get("base_theme", raw, nil)
     }
   end
 end

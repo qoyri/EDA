@@ -46,10 +46,12 @@ defmodule EDA.AutoMod.Action do
 
   @doc "Converts a raw Discord action map into this struct."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      type: EDA.Enum.name(@types, raw["type"]),
-      metadata: ActionMetadata.from_raw(raw["metadata"])
+      type: EDA.Enum.name(@types, :maps.get("type", raw, nil)),
+      metadata: ActionMetadata.from_raw(:maps.get("metadata", raw, nil))
     }
   end
 

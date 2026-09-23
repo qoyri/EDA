@@ -24,16 +24,18 @@ defmodule EDA.Component.Button do
 
   @doc false
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      style: Component.button_style(raw["style"]),
-      label: raw["label"],
-      emoji: Component.parse_emoji(raw["emoji"]),
-      custom_id: raw["custom_id"],
-      sku_id: raw["sku_id"],
-      url: raw["url"],
-      disabled: raw["disabled"] == true
+      id: :maps.get("id", raw, nil),
+      style: Component.button_style(:maps.get("style", raw, nil)),
+      label: :maps.get("label", raw, nil),
+      emoji: Component.parse_emoji(:maps.get("emoji", raw, nil)),
+      custom_id: :maps.get("custom_id", raw, nil),
+      sku_id: :maps.get("sku_id", raw, nil),
+      url: :maps.get("url", raw, nil),
+      disabled: :maps.get("disabled", raw, nil) == true
     }
   end
 end
