@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `EDA.User.Flags` names the badges on a profile, and `EDA.Member.Flags` what a member has done
+  in a guild — both with the `to_list/1`, `has?/2`, `to_bit/1` and `to_bitset/1` of
+  `EDA.Permission`. `EDA.User.badges/1`, `badge?/2`, `EDA.Member.flags/1` and `flag?/2` read them
+  straight off a user or member, struct or raw map. Undocumented bits are skipped rather than
+  guessed at, except `:active_developer`, whose badge exists and whose bit is stable.
+- `EDA.User.avatar_decoration_url/2` and `EDA.User.nameplate_url/2`, beside `avatar_url/1` and
+  `guild_tag_badge_url/2`. A decoration is PNG only, animated ones included; a nameplate has an
+  animation (`.webm`, the default) and a still (`format: :static`), neither of which Discord
+  lists in its CDN endpoints — both were checked against a live profile.
+- `EDA.Member` carries `flags`, `avatar_decoration_data` and `collectibles`; `GUILD_MEMBER_ADD`
+  carries `flags`, `premium_since`, `communication_disabled_until` and `banner`, with
+  `EDA.Event.GuildMemberAdd.member/1` to get an `EDA.Member` from it; `GUILD_MEMBER_UPDATE`
+  carries `flags`, `communication_disabled_until`, `banner`, `deaf` and `mute`.
+
+### Changed
+
+- `avatar_decoration_data` and `collectibles` on a user or member are `EDA.User.AvatarDecoration`
+  and `EDA.User.Collectibles` (holding an `EDA.User.Nameplate`) instead of raw maps. The
+  decoration carries `expires_at`, which Discord sends but does not document. Code that read them
+  with string keys keeps working, as on every other nested object.
+
 ## [0.5.0-beta.2] - 2026-09-22
 
 The second beta of 0.5 fixes what live testing of the first found in voice. Received audio that

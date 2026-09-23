@@ -15,7 +15,10 @@ defmodule EDA.Member do
     :mute,
     :pending,
     :permissions,
-    :communication_disabled_until
+    :communication_disabled_until,
+    :flags,
+    :avatar_decoration_data,
+    :collectibles
   ]
 
   @type t :: %__MODULE__{
@@ -31,7 +34,10 @@ defmodule EDA.Member do
           mute: boolean() | nil,
           pending: boolean() | nil,
           permissions: String.t() | nil,
-          communication_disabled_until: String.t() | nil
+          communication_disabled_until: String.t() | nil,
+          flags: integer() | nil,
+          avatar_decoration_data: EDA.User.AvatarDecoration.t() | nil,
+          collectibles: EDA.User.Collectibles.t() | nil
         }
 
   @spec from_raw(map()) :: t()
@@ -49,9 +55,45 @@ defmodule EDA.Member do
       mute: raw["mute"],
       pending: raw["pending"],
       permissions: raw["permissions"],
-      communication_disabled_until: raw["communication_disabled_until"]
+      communication_disabled_until: raw["communication_disabled_until"],
+      flags: raw["flags"],
+      avatar_decoration_data: EDA.User.AvatarDecoration.from_raw(raw["avatar_decoration_data"]),
+      collectibles: EDA.User.Collectibles.from_raw(raw["collectibles"])
     }
   end
+
+  @doc """
+  What the member has done in this guild, from `flags`.
+
+  `EDA.Member.Flags` has the whole table, and `flag?/2` asks about one. Accepts a struct or a raw
+  member map, and gives `[]` for a member Discord sent without flags.
+
+  ## Examples
+
+      iex> EDA.Member.flags(%EDA.Member{flags: 3})
+      [:did_rejoin, :completed_onboarding]
+
+      iex> EDA.Member.flags(%EDA.Member{})
+      []
+  """
+  @spec flags(t() | map()) :: [EDA.Member.Flags.flag()]
+  def flags(%__MODULE__{flags: flags}), do: EDA.Member.Flags.to_list(flags)
+  def flags(%{"flags" => flags}), do: EDA.Member.Flags.to_list(flags)
+  def flags(_member), do: []
+
+  @doc """
+  Whether the member carries a flag.
+
+      iex> EDA.Member.flag?(%EDA.Member{flags: 4}, :bypasses_verification)
+      true
+
+      iex> EDA.Member.flag?(%EDA.Member{flags: 4}, :is_guest)
+      false
+  """
+  @spec flag?(t() | map(), EDA.Member.Flags.flag()) :: boolean()
+  def flag?(%__MODULE__{flags: flags}, flag), do: EDA.Member.Flags.has?(flags, flag)
+  def flag?(%{"flags" => flags}, flag), do: EDA.Member.Flags.has?(flags, flag)
+  def flag?(_member, _flag), do: false
 
   defp parse_user(nil), do: nil
   defp parse_user(raw) when is_map(raw), do: EDA.User.from_raw(raw)

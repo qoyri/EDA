@@ -106,11 +106,14 @@ defmodule EDA.UserPremiumTest do
       assert user.collectibles == nil
     end
 
-    test "nested maps stay string-keyed, per the struct contract" do
+    # These are structs since the badges work, and the string-key reads that code written
+    # against the raw maps uses still resolve, through EDA.Event.Access.
+    test "the nested objects answer to string keys, per the struct contract" do
       user = User.from_raw(%{"id" => "u1", "collectibles" => %{"nameplate" => %{"asset" => "x"}}})
 
       assert user.collectibles["nameplate"]["asset"] == "x"
       assert user["collectibles"]["nameplate"]["asset"] == "x"
+      assert %EDA.User.Nameplate{asset: "x"} = user.collectibles.nameplate
     end
   end
 end

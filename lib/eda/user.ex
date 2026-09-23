@@ -44,8 +44,8 @@ defmodule EDA.User do
           locale: String.t() | nil,
           verified: boolean() | nil,
           email: String.t() | nil,
-          avatar_decoration_data: map() | nil,
-          collectibles: map() | nil
+          avatar_decoration_data: EDA.User.AvatarDecoration.t() | nil,
+          collectibles: EDA.User.Collectibles.t() | nil
         }
 
   @spec from_raw(map()) :: t()
@@ -68,8 +68,8 @@ defmodule EDA.User do
       locale: raw["locale"],
       verified: raw["verified"],
       email: raw["email"],
-      avatar_decoration_data: raw["avatar_decoration_data"],
-      collectibles: raw["collectibles"]
+      avatar_decoration_data: EDA.User.AvatarDecoration.from_raw(raw["avatar_decoration_data"]),
+      collectibles: EDA.User.Collectibles.from_raw(raw["collectibles"])
     }
   end
 
@@ -180,6 +180,94 @@ defmodule EDA.User do
     do: raw |> EDA.User.PrimaryGuild.from_raw() |> EDA.User.PrimaryGuild.badge_url(opts)
 
   def guild_tag_badge_url(_user, _opts), do: nil
+
+  @doc """
+  The badges on the user's profile, from `public_flags`.
+
+  `EDA.User.Flags` has the whole table, and `badge?/2` asks about one badge. Accepts a struct or
+  a raw user map, and gives `[]` for a user Discord sent without flags.
+
+  ## Examples
+
+      iex> EDA.User.badges(%EDA.User{public_flags: 64})
+      [:hypesquad_online_house_1]
+
+      iex> EDA.User.badges(%EDA.User{})
+      []
+  """
+  @spec badges(t() | map()) :: [EDA.User.Flags.flag()]
+  def badges(%__MODULE__{public_flags: flags}), do: EDA.User.Flags.to_list(flags)
+  def badges(%{"public_flags" => flags}), do: EDA.User.Flags.to_list(flags)
+  def badges(_user), do: []
+
+  @doc """
+  Whether the user has a badge.
+
+      iex> EDA.User.badge?(%EDA.User{public_flags: 64}, :hypesquad_online_house_1)
+      true
+
+      iex> EDA.User.badge?(%EDA.User{public_flags: 64}, :staff)
+      false
+  """
+  @spec badge?(t() | map(), EDA.User.Flags.flag()) :: boolean()
+  def badge?(%__MODULE__{public_flags: flags}, badge), do: EDA.User.Flags.has?(flags, badge)
+  def badge?(%{"public_flags" => flags}, badge), do: EDA.User.Flags.has?(flags, badge)
+  def badge?(_user, _badge), do: false
+
+  @doc """
+  URL of the frame around the user's avatar, or `nil`.
+
+  PNG only, animated ones included — see `EDA.User.AvatarDecoration`. Accepts a struct or a raw
+  user map, like `avatar_url/1`.
+
+  ## Options
+
+  - `:size` — power of two between 16 and 4096
+
+  ## Examples
+
+      iex> EDA.User.avatar_decoration_url(%EDA.User{avatar_decoration_data: %EDA.User.AvatarDecoration{asset: "a_abc"}})
+      "https://cdn.discordapp.com/avatar-decoration-presets/a_abc.png"
+
+      iex> EDA.User.avatar_decoration_url(%EDA.User{})
+      nil
+  """
+  @spec avatar_decoration_url(t() | map(), keyword()) :: String.t() | nil
+  def avatar_decoration_url(user, opts \\ [])
+
+  def avatar_decoration_url(%__MODULE__{avatar_decoration_data: decoration}, opts),
+    do: EDA.User.AvatarDecoration.url(decoration, opts)
+
+  def avatar_decoration_url(%{"avatar_decoration_data" => raw}, opts),
+    do: raw |> EDA.User.AvatarDecoration.from_raw() |> EDA.User.AvatarDecoration.url(opts)
+
+  def avatar_decoration_url(_user, _opts), do: nil
+
+  @doc """
+  URL of the plate behind the user's name, or `nil`.
+
+  ## Options
+
+  - `:format` — `:animated` (default, `.webm`) or `:static` (`.png`), see `EDA.User.Nameplate`
+
+  ## Examples
+
+      iex> EDA.User.nameplate_url(%EDA.User{collectibles: %EDA.User.Collectibles{nameplate: %EDA.User.Nameplate{asset: "nameplates/zodiac/virgo/"}}}, format: :static)
+      "https://cdn.discordapp.com/assets/collectibles/nameplates/zodiac/virgo/static.png"
+
+      iex> EDA.User.nameplate_url(%EDA.User{})
+      nil
+  """
+  @spec nameplate_url(t() | map(), keyword()) :: String.t() | nil
+  def nameplate_url(user, opts \\ [])
+
+  def nameplate_url(%__MODULE__{collectibles: %EDA.User.Collectibles{nameplate: plate}}, opts),
+    do: EDA.User.Nameplate.url(plate, opts)
+
+  def nameplate_url(%{"collectibles" => raw}, opts) when is_map(raw),
+    do: raw["nameplate"] |> EDA.User.Nameplate.from_raw() |> EDA.User.Nameplate.url(opts)
+
+  def nameplate_url(_user, _opts), do: nil
 
   @doc """
   The server tag the user is currently displaying, or `nil`.
