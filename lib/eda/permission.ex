@@ -383,6 +383,28 @@ defmodule EDA.Permission do
     (bitset &&& bit) == bit
   end
 
+  @doc """
+  The flags of `required` that the bitset lacks, in the order given — what to name in a "missing
+  permissions" reply.
+
+      iex> perms = EDA.Permission.to_bitset([:send_messages])
+      iex> EDA.Permission.missing(perms, [:send_messages, :embed_links, :attach_files])
+      [:embed_links, :attach_files]
+  """
+  @spec missing(bitset(), [flag()]) :: [flag()]
+  def missing(bitset, required) when is_integer(bitset) and is_list(required),
+    do: Enum.reject(required, &has?(bitset, &1))
+
+  @doc """
+  Whether the bitset holds any of the flags.
+
+      iex> EDA.Permission.any?(EDA.Permission.to_bitset([:kick_members]), [:ban_members, :kick_members])
+      true
+  """
+  @spec any?(bitset(), [flag()]) :: boolean()
+  def any?(bitset, flags) when is_integer(bitset) and is_list(flags),
+    do: Enum.any?(flags, &has?(bitset, &1))
+
   # ── Permission Calculator ─────────────────────────────────────────
 
   @doc """

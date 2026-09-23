@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `EDA.Permission.missing/2`, the required flags a bitset lacks, and `any?/2`;
+  `EDA.Team.member?/2`.
+
 - Smaller helpers: `EDA.Channel.text?/1`, `voice?/1`, `category?/1`, `dm?/1`, `archived?/1`,
   `locked?/1`, `url/1` and `children/1` (a category's channels, from the cache);
   `EDA.Attachment.image?/1`, `video?/1`, `audio?/1` and `extension/1`;

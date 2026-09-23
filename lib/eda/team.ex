@@ -42,4 +42,21 @@ defmodule EDA.Team do
 
   def icon_url(%__MODULE__{id: id, icon: icon}, opts),
     do: EDA.CDN.url("team-icons/#{id}/#{icon}", false, opts)
+
+  @doc """
+  Whether a user is on the team, having accepted its invitation. Takes an `EDA.User` or an id.
+
+      iex> team = %EDA.Team{members: [%EDA.Team.Member{user: %EDA.User{id: "4"}, membership_state: :accepted}]}
+      iex> EDA.Team.member?(team, "4")
+      true
+  """
+  @spec member?(t(), EDA.User.t() | String.t()) :: boolean()
+  def member?(team, %EDA.User{id: id}), do: member?(team, id)
+
+  def member?(%__MODULE__{members: members}, user_id) do
+    Enum.any?(
+      members || [],
+      &(&1.membership_state == :accepted and &1.user && &1.user.id == user_id)
+    )
+  end
 end
