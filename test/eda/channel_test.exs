@@ -62,7 +62,7 @@ defmodule EDA.ChannelTest do
       assert channel.last_message_id == "msg1"
       assert channel.default_auto_archive_duration == 1440
       assert channel.flags == 0
-      assert channel.forum.default_reaction_emoji == %{"emoji_id" => nil, "emoji_name" => "👍"}
+      assert channel.forum.default_reaction_emoji == %EDA.Channel.DefaultReaction{emoji_name: "👍"}
       assert channel.default_thread_rate_limit_per_user == 60
       assert channel.forum.default_sort_order == :latest_activity
       assert channel.forum.default_forum_layout == :list_view

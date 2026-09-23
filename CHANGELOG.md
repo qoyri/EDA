@@ -59,6 +59,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **What a guild nests is structs**: `welcome_screen` an `EDA.Guild.WelcomeScreen` of
+  `EDA.Guild.WelcomeScreen.Channel`s (both encode as Discord takes them), `incidents_data` an
+  `EDA.Guild.IncidentsData` of `DateTime`s, and `GUILD_CREATE`'s `presences`,
+  `stage_instances` and `guild_scheduled_events` lists of `EDA.Event.PresenceUpdate`,
+  `EDA.StageInstance` and `EDA.ScheduledEvent`. `GUILD_MEMBERS_CHUNK`'s `presences` are
+  `EDA.Event.PresenceUpdate` structs too, and its members and presences carry the `guild_id`.
+  A forum's `default_reaction_emoji` is an `EDA.Channel.DefaultReaction`.
+
 - **The partial objects other objects nest are their structs**: an invite's `guild`,
   `channel`, `target_application` and `guild_scheduled_event`; a webhook's `source_guild` and
   `source_channel`; an integration's `application` and `account`

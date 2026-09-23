@@ -70,7 +70,7 @@ defmodule EDA.GuildCompleteTest do
       assert guild.rules_channel_id == "7700000000000001011"
       assert guild.mfa_level == :elevated
       assert guild.max_members == 500_000
-      assert guild.incidents_data == %{"invites_disabled_until" => nil}
+      assert guild.incidents_data == %EDA.Guild.IncidentsData{}
       assert [%EDA.Emoji{name: "blob"}] = guild.emojis
     end
 

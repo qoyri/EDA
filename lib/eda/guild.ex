@@ -136,8 +136,8 @@ defmodule EDA.Guild do
           max_stage_video_channel_users: non_neg_integer() | nil,
           approximate_member_count: non_neg_integer() | nil,
           approximate_presence_count: non_neg_integer() | nil,
-          welcome_screen: map() | nil,
-          incidents_data: map() | nil,
+          welcome_screen: EDA.Guild.WelcomeScreen.t() | nil,
+          incidents_data: EDA.Guild.IncidentsData.t() | nil,
           roles: [EDA.Role.t()] | nil,
           emojis: [EDA.Emoji.t()] | nil,
           stickers: [EDA.Sticker.t()] | nil,
@@ -149,9 +149,9 @@ defmodule EDA.Guild do
           threads: [EDA.Channel.t()] | nil,
           members: [EDA.Member.t()] | nil,
           voice_states: [EDA.VoiceState.t()] | nil,
-          presences: [map()] | nil,
-          stage_instances: [map()] | nil,
-          guild_scheduled_events: [map()] | nil,
+          presences: [EDA.Event.PresenceUpdate.t()] | nil,
+          stage_instances: [EDA.StageInstance.t()] | nil,
+          guild_scheduled_events: [EDA.ScheduledEvent.t()] | nil,
           soundboard_sounds: [EDA.SoundboardSound.t()] | nil
         }
 
@@ -198,8 +198,8 @@ defmodule EDA.Guild do
       max_stage_video_channel_users: raw["max_stage_video_channel_users"],
       approximate_member_count: raw["approximate_member_count"],
       approximate_presence_count: raw["approximate_presence_count"],
-      welcome_screen: raw["welcome_screen"],
-      incidents_data: raw["incidents_data"],
+      welcome_screen: EDA.Guild.WelcomeScreen.from_raw(raw["welcome_screen"]),
+      incidents_data: EDA.Guild.IncidentsData.from_raw(raw["incidents_data"]),
       roles: parse_list(raw["roles"], &EDA.Role.from_raw/1),
       emojis: parse_list(raw["emojis"], &EDA.Emoji.from_raw/1),
       stickers: parse_list(raw["stickers"], &EDA.Sticker.from_raw/1),
@@ -211,9 +211,10 @@ defmodule EDA.Guild do
       threads: parse_list(raw["threads"], &EDA.Channel.from_raw/1),
       members: parse_list(raw["members"], &EDA.Member.from_raw/1),
       voice_states: parse_list(raw["voice_states"], &EDA.VoiceState.from_raw/1),
-      presences: raw["presences"],
-      stage_instances: raw["stage_instances"],
-      guild_scheduled_events: raw["guild_scheduled_events"],
+      presences: parse_list(raw["presences"], &parse_presence(&1, raw["id"])),
+      stage_instances: parse_list(raw["stage_instances"], &EDA.StageInstance.from_raw/1),
+      guild_scheduled_events:
+        parse_list(raw["guild_scheduled_events"], &EDA.ScheduledEvent.from_raw/1),
       soundboard_sounds: parse_list(raw["soundboard_sounds"], &EDA.SoundboardSound.from_raw/1)
     }
   end
@@ -232,6 +233,10 @@ defmodule EDA.Guild do
       roles -> Map.put(raw, "roles", roles)
     end
   end
+
+  # A guild's presences leave out the guild_id every PRESENCE_UPDATE carries.
+  defp parse_presence(raw, guild_id),
+    do: EDA.Event.PresenceUpdate.from_raw(Map.put_new(raw, "guild_id", guild_id))
 
   defp parse_list(nil, _parse), do: nil
   defp parse_list(list, parse) when is_list(list), do: Enum.map(list, parse)

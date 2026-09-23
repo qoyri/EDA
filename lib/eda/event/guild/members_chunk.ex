@@ -1,5 +1,10 @@
 defmodule EDA.Event.GuildMembersChunk do
-  @moduledoc "Dispatched in response to a guild members request."
+  @moduledoc """
+  Dispatched in response to a guild members request.
+
+  `members` are `EDA.Member` structs and `presences`, sent when the request asked for them,
+  `EDA.Event.PresenceUpdate` structs; both carry the chunk's `guild_id`.
+  """
   use EDA.Event.Access
   defstruct [:guild_id, :members, :chunk_index, :chunk_count, :not_found, :presences, :nonce]
 
@@ -9,7 +14,7 @@ defmodule EDA.Event.GuildMembersChunk do
           chunk_index: integer() | nil,
           chunk_count: integer() | nil,
           not_found: [String.t()] | nil,
-          presences: [map()] | nil,
+          presences: [EDA.Event.PresenceUpdate.t()] | nil,
           nonce: String.t() | nil
         }
   @doc "Converts a raw Discord payload into this event struct."
@@ -17,15 +22,19 @@ defmodule EDA.Event.GuildMembersChunk do
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
       guild_id: raw["guild_id"],
-      members: parse_members(raw["members"]),
+      members: parse(raw["members"], &%{EDA.Member.from_raw(&1) | guild_id: raw["guild_id"]}),
       chunk_index: raw["chunk_index"],
       chunk_count: raw["chunk_count"],
       not_found: raw["not_found"],
-      presences: raw["presences"],
+      presences:
+        parse(
+          raw["presences"],
+          &EDA.Event.PresenceUpdate.from_raw(Map.put(&1, "guild_id", raw["guild_id"]))
+        ),
       nonce: raw["nonce"]
     }
   end
 
-  defp parse_members(nil), do: nil
-  defp parse_members(list) when is_list(list), do: Enum.map(list, &EDA.Member.from_raw/1)
+  defp parse(nil, _from_raw), do: nil
+  defp parse(list, from_raw) when is_list(list), do: Enum.map(list, from_raw)
 end

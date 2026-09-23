@@ -4,8 +4,8 @@ defmodule EDA.Channel.Forum do
   other channel.
 
   - `available_tags` — the tags a post can be given, as `EDA.ForumTag` structs (at most 20)
-  - `default_reaction_emoji` — the emoji shown on each post's reaction button, as
-    `%{"emoji_id" => ..., "emoji_name" => ...}`
+  - `default_reaction_emoji` — the emoji shown on each post's reaction button, as an
+    `EDA.Channel.DefaultReaction`
   - `default_sort_order` — `:latest_activity` or `:creation_date`
   - `default_forum_layout` — `:not_set`, `:list_view` or `:gallery_view`
   """
@@ -19,7 +19,7 @@ defmodule EDA.Channel.Forum do
 
   @type t :: %__MODULE__{
           available_tags: [EDA.ForumTag.t()] | nil,
-          default_reaction_emoji: map() | nil,
+          default_reaction_emoji: EDA.Channel.DefaultReaction.t() | nil,
           default_sort_order: :latest_activity | :creation_date | integer() | nil,
           default_forum_layout: :not_set | :list_view | :gallery_view | integer() | nil
         }
@@ -33,7 +33,7 @@ defmodule EDA.Channel.Forum do
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
       available_tags: parse_tags(raw["available_tags"]),
-      default_reaction_emoji: raw["default_reaction_emoji"],
+      default_reaction_emoji: EDA.Channel.DefaultReaction.from_raw(raw["default_reaction_emoji"]),
       default_sort_order: EDA.Enum.name(@sort_orders, raw["default_sort_order"]),
       default_forum_layout: EDA.Enum.name(@layouts, raw["default_forum_layout"])
     }
