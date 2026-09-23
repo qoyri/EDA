@@ -119,4 +119,56 @@ defmodule EDA.Activity do
   def flag?(%__MODULE__{flags: flags}, flag), do: EDA.Activity.Flags.has?(flags, flag)
   def flag?(%{"flags" => flags}, flag), do: EDA.Activity.Flags.has?(flags, flag)
   def flag?(_, _flag), do: false
+
+  @doc """
+  How long the activity has been going on, in seconds, from `timestamps.start`; `nil` when
+  Discord sent no start.
+  """
+  @spec elapsed(t(), DateTime.t()) :: non_neg_integer() | nil
+  def elapsed(activity, now \\ DateTime.utc_now())
+
+  def elapsed(%__MODULE__{timestamps: %{start: %DateTime{} = start}}, now),
+    do: max(DateTime.diff(now, start), 0)
+
+  def elapsed(%__MODULE__{}, _now), do: nil
+
+  @doc "How long until the activity ends, in seconds, from `timestamps.end`; `nil` without one."
+  @spec remaining(t(), DateTime.t()) :: non_neg_integer() | nil
+  def remaining(activity, now \\ DateTime.utc_now())
+
+  def remaining(%__MODULE__{timestamps: %{end: %DateTime{} = finish}}, now),
+    do: max(DateTime.diff(finish, now), 0)
+
+  def remaining(%__MODULE__{}, _now), do: nil
+
+  @doc """
+  The URL of the activity's large image, or `nil`. Resolves the forms Discord uses: an
+  application asset id, a proxied `mp:` image, and Spotify's `spotify:` covers.
+
+      iex> EDA.Activity.large_image_url(%EDA.Activity{assets: %EDA.Activity.Assets{large_image: "spotify:ab67"}})
+      "https://i.scdn.co/image/ab67"
+      iex> EDA.Activity.large_image_url(%EDA.Activity{application_id: "9", assets: %EDA.Activity.Assets{large_image: "123"}})
+      "https://cdn.discordapp.com/app-assets/9/123.png"
+  """
+  @spec large_image_url(t()) :: String.t() | nil
+  def large_image_url(%__MODULE__{assets: %{large_image: image}} = activity),
+    do: asset_url(image, activity.application_id)
+
+  def large_image_url(%__MODULE__{}), do: nil
+
+  @doc "The URL of the activity's small image, or `nil`. See `large_image_url/1`."
+  @spec small_image_url(t()) :: String.t() | nil
+  def small_image_url(%__MODULE__{assets: %{small_image: image}} = activity),
+    do: asset_url(image, activity.application_id)
+
+  def small_image_url(%__MODULE__{}), do: nil
+
+  defp asset_url(nil, _app_id), do: nil
+  defp asset_url("mp:" <> path, _app_id), do: "https://media.discordapp.net/" <> path
+  defp asset_url("spotify:" <> id, _app_id), do: "https://i.scdn.co/image/" <> id
+
+  defp asset_url(id, app_id) when is_binary(app_id),
+    do: "#{EDA.CDN.base()}/app-assets/#{app_id}/#{id}.png"
+
+  defp asset_url(_id, nil), do: nil
 end

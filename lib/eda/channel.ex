@@ -406,6 +406,63 @@ defmodule EDA.Channel do
     do: type in [:announcement_thread, :public_thread, :private_thread]
 
   @doc """
+  Whether messages can be sent in the channel's own chat: a text, announcement or DM channel,
+  or a thread. Voice and stage channels also have a chat; see `voice?/1`.
+
+      iex> EDA.Channel.text?(%EDA.Channel{type: :guild_announcement})
+      true
+  """
+  @spec text?(t()) :: boolean()
+  def text?(%__MODULE__{type: type} = channel),
+    do: type in [:guild_text, :guild_announcement, :dm, :group_dm] or thread?(channel)
+
+  @doc "Whether the channel is a voice or stage channel."
+  @spec voice?(t()) :: boolean()
+  def voice?(%__MODULE__{type: type}), do: type in [:guild_voice, :guild_stage_voice]
+
+  @doc "Whether the channel is a category."
+  @spec category?(t()) :: boolean()
+  def category?(%__MODULE__{type: type}), do: type == :guild_category
+
+  @doc "Whether the channel is a DM or a group DM."
+  @spec dm?(t()) :: boolean()
+  def dm?(%__MODULE__{type: type}), do: type in [:dm, :group_dm]
+
+  @doc "Whether the thread is archived; `false` for a channel that is not a thread."
+  @spec archived?(t()) :: boolean()
+  def archived?(%__MODULE__{thread: %{archived: archived}}), do: archived == true
+  def archived?(%__MODULE__{}), do: false
+
+  @doc "Whether the thread is locked: only moderators can unarchive it."
+  @spec locked?(t()) :: boolean()
+  def locked?(%__MODULE__{thread: %{locked: locked}}), do: locked == true
+  def locked?(%__MODULE__{}), do: false
+
+  @doc """
+  The channel's link.
+
+      iex> EDA.Channel.url(%EDA.Channel{id: "2", guild_id: "1"})
+      "https://discord.com/channels/1/2"
+  """
+  @spec url(t()) :: String.t()
+  def url(%__MODULE__{id: id, guild_id: guild_id}),
+    do: "https://discord.com/channels/#{guild_id || "@me"}/#{id}"
+
+  @doc """
+  The channels in a category, from the cache, by position.
+  """
+  @spec children(t()) :: [t()]
+  def children(%__MODULE__{id: id, guild_id: guild_id}) when is_binary(guild_id) do
+    guild_id
+    |> EDA.Cache.channels_for_guild()
+    |> Enum.filter(&(&1["parent_id"] == id))
+    |> Enum.map(&from_raw/1)
+    |> Enum.sort_by(&{&1.position || 0, &1.id})
+  end
+
+  def children(%__MODULE__{}), do: []
+
+  @doc """
   The integer Discord uses for a channel type, from its atom or the integer itself.
 
       iex> EDA.Channel.type_value(:guild_forum)

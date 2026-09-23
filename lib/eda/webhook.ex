@@ -120,4 +120,17 @@ defmodule EDA.Webhook do
 
   defp parse_list({:ok, list}) when is_list(list), do: {:ok, Enum.map(list, &from_raw/1)}
   defp parse_list({:error, _} = err), do: err
+
+  @doc """
+  The webhook's URL, with its token, to post to it from anywhere; `nil` for a webhook without
+  a token (a channel follower, or one fetched without MANAGE_WEBHOOKS).
+
+      iex> EDA.Webhook.url(%EDA.Webhook{id: "1", token: "t"})
+      "https://discord.com/api/webhooks/1/t"
+  """
+  @spec url(t()) :: String.t() | nil
+  def url(%__MODULE__{token: nil}), do: nil
+
+  def url(%__MODULE__{id: id, token: token}),
+    do: "https://discord.com/api/webhooks/#{id}/#{token}"
 end

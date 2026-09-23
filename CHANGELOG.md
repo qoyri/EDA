@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Smaller helpers: `EDA.Channel.text?/1`, `voice?/1`, `category?/1`, `dm?/1`, `archived?/1`,
+  `locked?/1`, `url/1` and `children/1` (a category's channels, from the cache);
+  `EDA.Attachment.image?/1`, `video?/1`, `audio?/1` and `extension/1`;
+  `EDA.VoiceState.muted?/1` and `deafened?/1`; `EDA.Activity.elapsed/2`, `remaining/2`,
+  `large_image_url/1` and `small_image_url/1` (application assets, `mp:` and `spotify:`
+  images); `EDA.Emoji.parse/1`; `EDA.Webhook.url/1`; `EDA.AuditLog.Entry.change/2`.
+
 - `EDA.Markdown`: `escape/1` for user text, `bold/1`, `italic/1`, `underline/1`,
   `strikethrough/1`, `spoiler/1`, `code/1`, `code_block/2`, `quote_text/1`, `block_quote/1`,
   `header/2`, `subtext/1`, `masked_link/3` and `list/2`, and `split/2`, which cuts a long text

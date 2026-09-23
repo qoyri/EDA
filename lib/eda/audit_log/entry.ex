@@ -40,4 +40,15 @@ defmodule EDA.AuditLog.Entry do
       options: EDA.AuditLog.Entry.Options.from_raw(raw["options"])
     }
   end
+
+  @doc """
+  The change of one key in the entry, as an `EDA.AuditLog.Change`, or `nil`.
+
+      iex> entry = EDA.AuditLog.Entry.from_raw(%{"changes" => [%{"key" => "nick", "old_value" => "a", "new_value" => "b"}]})
+      iex> EDA.AuditLog.Entry.change(entry, "nick").new_value
+      "b"
+  """
+  @spec change(t(), String.t() | atom()) :: EDA.AuditLog.Change.t() | nil
+  def change(%__MODULE__{changes: changes}, key),
+    do: Enum.find(changes || [], &(&1.key == to_string(key)))
 end

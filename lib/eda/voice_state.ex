@@ -73,4 +73,17 @@ defmodule EDA.VoiceState do
         err
     end
   end
+
+  @doc """
+  Whether the user cannot be heard: muted by themselves or by the guild, or suppressed on a
+  stage.
+  """
+  @spec muted?(t()) :: boolean()
+  def muted?(%__MODULE__{mute: mute, self_mute: self_mute, suppress: suppress}),
+    do: mute == true or self_mute == true or suppress == true
+
+  @doc "Whether the user cannot hear: deafened by themselves or by the guild."
+  @spec deafened?(t()) :: boolean()
+  def deafened?(%__MODULE__{deaf: deaf, self_deaf: self_deaf}),
+    do: deaf == true or self_deaf == true
 end
