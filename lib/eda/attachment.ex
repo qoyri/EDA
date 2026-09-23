@@ -71,7 +71,7 @@ defmodule EDA.Attachment do
           flags: integer() | nil,
           clip_participants: [EDA.User.t()] | nil,
           clip_created_at: DateTime.t() | nil,
-          application: map() | nil
+          application: EDA.App.t() | nil
         }
 
   @max_description_length 1024
@@ -97,7 +97,7 @@ defmodule EDA.Attachment do
       flags: raw["flags"],
       clip_participants: parse_users(raw["clip_participants"]),
       clip_created_at: EDA.Timestamp.parse(raw["clip_created_at"]),
-      application: raw["application"]
+      application: raw["application"] && EDA.App.from_raw(raw["application"])
     }
   end
 

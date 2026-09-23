@@ -42,11 +42,11 @@ defmodule EDA.Integration do
           expire_behavior: :remove_role | :kick | integer() | nil,
           expire_grace_period: integer() | nil,
           user: EDA.User.t() | nil,
-          account: map() | nil,
+          account: EDA.Integration.Account.t() | nil,
           synced_at: DateTime.t() | nil,
           subscriber_count: integer() | nil,
           revoked: boolean() | nil,
-          application: map() | nil,
+          application: EDA.App.t() | nil,
           scopes: [String.t()] | nil
         }
 
@@ -67,11 +67,11 @@ defmodule EDA.Integration do
       expire_behavior: Map.get(@expire_behaviors, raw["expire_behavior"], raw["expire_behavior"]),
       expire_grace_period: raw["expire_grace_period"],
       user: if(is_map(raw["user"]), do: EDA.User.from_raw(raw["user"])),
-      account: raw["account"],
+      account: EDA.Integration.Account.from_raw(raw["account"]),
       synced_at: EDA.Timestamp.parse(raw["synced_at"]),
       subscriber_count: raw["subscriber_count"],
       revoked: raw["revoked"],
-      application: raw["application"],
+      application: raw["application"] && EDA.App.from_raw(raw["application"]),
       scopes: raw["scopes"]
     }
   end

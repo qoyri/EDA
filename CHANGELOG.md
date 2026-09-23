@@ -59,6 +59,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The partial objects other objects nest are their structs**: an invite's `guild`,
+  `channel`, `target_application` and `guild_scheduled_event`; a webhook's `source_guild` and
+  `source_channel`; an integration's `application` and `account`
+  (`EDA.Integration.Account`); an attachment's `application`; an application's `guild` and
+  `team`, the new `EDA.Team` with its `EDA.Team.Member`s; and `READY`'s `guilds` and
+  `application`.
+
 - **An interaction's `data` is a struct**, one per shape: `EDA.Interaction.CommandData` for a
   command or its autocomplete (`type` `:slash`, `:user`, `:message` or `:primary_entry_point`,
   `options` as `EDA.Interaction.Option`s with their `type` an atom), `ComponentData` for a

@@ -29,8 +29,8 @@ defmodule EDA.Webhook do
           avatar: String.t() | nil,
           token: String.t() | nil,
           application_id: String.t() | nil,
-          source_guild: map() | nil,
-          source_channel: map() | nil,
+          source_guild: EDA.Guild.t() | nil,
+          source_channel: EDA.Channel.t() | nil,
           url: String.t() | nil
         }
 
@@ -46,8 +46,8 @@ defmodule EDA.Webhook do
       avatar: raw["avatar"],
       token: raw["token"],
       application_id: raw["application_id"],
-      source_guild: raw["source_guild"],
-      source_channel: raw["source_channel"],
+      source_guild: raw["source_guild"] && EDA.Guild.from_raw(raw["source_guild"]),
+      source_channel: raw["source_channel"] && EDA.Channel.from_raw(raw["source_channel"]),
       url: raw["url"]
     }
   end
