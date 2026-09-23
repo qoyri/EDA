@@ -59,6 +59,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A scheduled event's `recurrence_rule` and `entity_metadata` are structs.**
+  `EDA.ScheduledEvent.RecurrenceRule` names the frequency (`:weekly`…), weekdays (`:friday`)
+  and months (`:july`), holds "the n-th weekday" as `{1, :friday}`, and its `start` and `end`
+  are `DateTime`s. Both it and `EDA.ScheduledEvent.EntityMetadata` encode as Discord takes
+  them, so they can be sent to `EDA.API.ScheduledEvent.create/2` and `modify/3`.
+
 - **What a guild nests is structs**: `welcome_screen` an `EDA.Guild.WelcomeScreen` of
   `EDA.Guild.WelcomeScreen.Channel`s (both encode as Discord takes them), `incidents_data` an
   `EDA.Guild.IncidentsData` of `DateTime`s, and `GUILD_CREATE`'s `presences`,

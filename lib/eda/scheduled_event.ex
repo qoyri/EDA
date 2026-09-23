@@ -5,11 +5,12 @@ defmodule EDA.ScheduledEvent do
   Delivered by `GUILD_SCHEDULED_EVENT_CREATE`, `_UPDATE` and `_DELETE`; `EDA.API.ScheduledEvent`
   manages them over REST.
 
-  - `entity_type` — 1 for a stage instance, 2 for a voice channel, 3 for an external place, whose
-    location is in `entity_metadata["location"]`
-  - `status` — 1 scheduled, 2 active, 3 completed, 4 canceled
+  - `entity_type` — `:stage_instance`, `:voice`, or `:external` for a place outside Discord,
+    whose location is in `entity_metadata.location` (an `EDA.ScheduledEvent.EntityMetadata`)
+  - `status` — `:scheduled`, `:active`, `:completed` or `:canceled`
   - `image` — the cover image hash
-  - `recurrence_rule` — how often it repeats, as the map Discord sent, `nil` for a one-off
+  - `recurrence_rule` — how often it repeats, an `EDA.ScheduledEvent.RecurrenceRule`, `nil` for
+    a one-off
   - `creator` — an `EDA.User`, absent for events created before October 2021
   """
 
@@ -54,11 +55,11 @@ defmodule EDA.ScheduledEvent do
           status: :scheduled | :active | :completed | :canceled | integer() | nil,
           entity_type: :stage_instance | :voice | :external | integer() | nil,
           entity_id: String.t() | nil,
-          entity_metadata: map() | nil,
+          entity_metadata: EDA.ScheduledEvent.EntityMetadata.t() | nil,
           creator: EDA.User.t() | nil,
           user_count: non_neg_integer() | nil,
           image: String.t() | nil,
-          recurrence_rule: map() | nil
+          recurrence_rule: EDA.ScheduledEvent.RecurrenceRule.t() | nil
         }
 
   @doc "Parses a raw scheduled event object."
@@ -77,11 +78,11 @@ defmodule EDA.ScheduledEvent do
       status: EDA.Enum.name(@statuses, raw["status"]),
       entity_type: EDA.Enum.name(@entity_types, raw["entity_type"]),
       entity_id: raw["entity_id"],
-      entity_metadata: raw["entity_metadata"],
+      entity_metadata: EDA.ScheduledEvent.EntityMetadata.from_raw(raw["entity_metadata"]),
       creator: parse_user(raw["creator"]),
       user_count: raw["user_count"],
       image: raw["image"],
-      recurrence_rule: raw["recurrence_rule"]
+      recurrence_rule: EDA.ScheduledEvent.RecurrenceRule.from_raw(raw["recurrence_rule"])
     }
   end
 

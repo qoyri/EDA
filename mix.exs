@@ -197,6 +197,8 @@ defmodule EDA.MixProject do
           EDA.Role.Flags,
           EDA.Role.Tags,
           EDA.ScheduledEvent,
+          EDA.ScheduledEvent.EntityMetadata,
+          EDA.ScheduledEvent.RecurrenceRule,
           EDA.SoundboardSound,
           EDA.StageInstance,
           EDA.Sticker,
