@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `EDA.ScheduledEvent`, the guild scheduled event as a struct, with its cover `image` and
+  `recurrence_rule`.
+
 - `EDA.Presence.platforms/1` says which platforms a user is connected from, off the
   `client_status` EDA already received and never exposed, with `status_on/2`, `on?/2` and the
   `desktop?/1`, `mobile?/1`, `web?/1` shorthands. They read a `PRESENCE_UPDATE` event, a cached
@@ -38,6 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or strings, and are integers in `EDA.User.DisplayNameStyles`.
 
 ### Changed
+
+- **`GUILD_SCHEDULED_EVENT_CREATE`, `_UPDATE` and `_DELETE` deliver an `EDA.ScheduledEvent`**,
+  instead of structs of their own that dropped the cover image and the recurrence rule and kept
+  the creator as a raw map; it is an `EDA.User` now.
 
 - **`GUILD_MEMBER_ADD` and `GUILD_MEMBER_UPDATE` deliver an `EDA.Member`**, with `guild_id` set,
   instead of structs of their own that dropped `flags`, `premium_since` (on a join), the member's
@@ -104,6 +111,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with string keys keeps working, as on every other nested object.
 
 ### Fixed
+
+- `EDA.API.Guild.audit_log/2` returned the entries with their `users` and `webhooks` only. It
+  now also returns the `application_commands`, `auto_moderation_rules`,
+  `guild_scheduled_events`, `integrations` and `threads` Discord sends alongside, so an entry's
+  target can be named without another request.
 
 - `INTERACTION_CREATE` dropped what a user-installed command needs to know where it runs and who
   installed it. It now keeps `context` (`:guild`, `:bot_dm`, `:private_channel`),
