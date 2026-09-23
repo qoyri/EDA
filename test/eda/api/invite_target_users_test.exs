@@ -227,7 +227,36 @@ defmodule EDA.API.InviteTargetUsersTest do
       assert body["max_uses"] == 1
     end
 
-    test "target_users turns the request into multipart with payload_json alongside",
+    test "a short list of target users rides in the JSON body, applied at once",
+         %{bypass: bypass} do
+      test_pid = self()
+
+      Bypass.expect_once(bypass, "POST", "/channels/111/invites", fn conn ->
+        {:ok, raw, conn} = Plug.Conn.read_body(conn)
+
+        send(
+          test_pid,
+          {:body, Jason.decode!(raw), Plug.Conn.get_req_header(conn, "content-type")}
+        )
+
+        json(conn, %{"code" => "abc"})
+      end)
+
+      assert {:ok, _} =
+               Invite.create("111",
+                 max_uses: 1,
+                 role_ids: ["41771983423143936"],
+                 target_users: ["80351110224678912", 82_198_898_841_029_460]
+               )
+
+      assert_receive {:body, body, [content_type]}
+      assert content_type =~ "application/json"
+      assert body["target_user_ids"] == ["80351110224678912", "82198898841029460"]
+      assert body["max_uses"] == 1
+      refute Map.has_key?(body, "target_users")
+    end
+
+    test "a CSV binary still uploads as multipart with payload_json alongside",
          %{bypass: bypass} do
       test_pid = self()
 
@@ -241,7 +270,7 @@ defmodule EDA.API.InviteTargetUsersTest do
                Invite.create("111",
                  max_uses: 1,
                  role_ids: ["41771983423143936"],
-                 target_users: ["80351110224678912"]
+                 target_users: "user_id\n80351110224678912\n"
                )
 
       assert_receive {:body, body, [content_type]}
@@ -259,7 +288,38 @@ defmodule EDA.API.InviteTargetUsersTest do
       refute Map.has_key?(payload, "target_users")
     end
 
+    test "a list past Discord's 1000 goes back to the upload", %{bypass: bypass} do
+      test_pid = self()
+
+      Bypass.expect_once(bypass, "POST", "/channels/111/invites", fn conn ->
+        {:ok, raw, conn} = Plug.Conn.read_body(conn)
+        send(test_pid, {:body, raw, Plug.Conn.get_req_header(conn, "content-type")})
+        json(conn, %{"code" => "abc"})
+      end)
+
+      assert {:ok, _} = Invite.create("111", target_users: Enum.to_list(1..1001))
+
+      assert_receive {:body, body, [content_type]}
+      assert content_type =~ "multipart/form-data"
+      assert body =~ ~s(name="target_users_file")
+    end
+
     test "the reason becomes a header on the multipart request too", %{bypass: bypass} do
+      test_pid = self()
+
+      Bypass.expect_once(bypass, "POST", "/channels/111/invites", fn conn ->
+        send(test_pid, {:reason, Plug.Conn.get_req_header(conn, "x-audit-log-reason")})
+        json(conn, %{"code" => "abc"})
+      end)
+
+      assert {:ok, _} =
+               Invite.create("111", target_users: "user_id\n1\n", reason: "guest list")
+
+      assert_receive {:reason, [reason]}
+      assert reason == URI.encode("guest list")
+    end
+
+    test "the reason rides along the JSON body too", %{bypass: bypass} do
       test_pid = self()
 
       Bypass.expect_once(bypass, "POST", "/channels/111/invites", fn conn ->
@@ -297,10 +357,25 @@ defmodule EDA.API.InviteTargetUsersTest do
         json(conn, %{"code" => "abc"})
       end)
 
-      assert {:ok, _} = Invite.create("111", %{max_uses: 1, target_users: ["7"]})
+      assert {:ok, _} = Invite.create("111", %{max_uses: 1, target_users: "user_id\n7\n"})
 
       assert_receive {:body, body}
       assert body =~ ~s(name="target_users_file")
+    end
+
+    test "the map form sends a short list as JSON too", %{bypass: bypass} do
+      test_pid = self()
+
+      Bypass.expect_once(bypass, "POST", "/channels/111/invites", fn conn ->
+        {:ok, raw, conn} = Plug.Conn.read_body(conn)
+        send(test_pid, {:body, Jason.decode!(raw)})
+        json(conn, %{"code" => "abc"})
+      end)
+
+      assert {:ok, _} = Invite.create("111", %{max_uses: 1, target_users: ["7"]})
+
+      assert_receive {:body, body}
+      assert body["target_user_ids"] == ["7"]
     end
   end
 
@@ -397,6 +472,65 @@ defmodule EDA.API.InviteTargetUsersTest do
 
       assert_receive {:reason, [reason]}
       assert reason == "revoked"
+    end
+  end
+
+  describe "changing a target user list in place" do
+    setup %{bypass: bypass} do
+      test_pid = self()
+
+      Bypass.stub(bypass, :any, :any, fn conn ->
+        {:ok, raw, conn} = Plug.Conn.read_body(conn)
+        body = if raw == "", do: nil, else: Jason.decode!(raw)
+        send(test_pid, {:req, conn.method, conn.request_path, body})
+        Plug.Conn.resp(conn, 204, "")
+      end)
+
+      :ok
+    end
+
+    test "one user in, one user out" do
+      assert :ok = Invite.add_target_user("abc123", "80351110224678912")
+      assert_receive {:req, "PUT", "/invites/abc123/target-users/80351110224678912", nil}
+
+      assert :ok = Invite.remove_target_user("abc123", 82_198_898_841_029_460)
+      assert_receive {:req, "DELETE", "/invites/abc123/target-users/82198898841029460", nil}
+    end
+
+    test "in bulk, with ids sent as strings" do
+      assert :ok = Invite.add_target_users("abc123", ["1", 2])
+      assert_receive {:req, "POST", "/invites/abc123/target-users/bulk-add", body}
+      assert body == %{"user_ids" => ["1", "2"]}
+
+      assert :ok = Invite.remove_target_users("abc123", ["1"])
+      assert_receive {:req, "POST", "/invites/abc123/target-users/bulk-delete", %{}}
+    end
+
+    test "an empty list is not a request" do
+      assert :ok = Invite.add_target_users("abc123", [])
+      refute_receive {:req, _, _, _}, 100
+    end
+
+    test "past 1000 ids, the call is refused before it is sent" do
+      assert_raise ArgumentError, ~r/at most 1000 target users/, fn ->
+        Invite.add_target_users("abc123", Enum.to_list(1..1001))
+      end
+    end
+
+    test "EDA.Invite takes the invite and the user as structs" do
+      invite = %EDA.Invite{code: "abc123"}
+      user = %EDA.User{id: "80351110224678912"}
+      member = %EDA.Member{user: %EDA.User{id: "82198898841029460"}}
+
+      assert :ok = EDA.Invite.add_target_user(invite, user)
+      assert_receive {:req, "PUT", "/invites/abc123/target-users/80351110224678912", nil}
+
+      assert :ok = EDA.Invite.remove_target_user(invite, member)
+      assert_receive {:req, "DELETE", "/invites/abc123/target-users/82198898841029460", nil}
+
+      assert :ok = EDA.Invite.add_target_users(invite, [user, member])
+      assert_receive {:req, "POST", "/invites/abc123/target-users/bulk-add", body}
+      assert body == %{"user_ids" => ["80351110224678912", "82198898841029460"]}
     end
   end
 end

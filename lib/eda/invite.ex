@@ -113,10 +113,11 @@ defmodule EDA.Invite do
   @doc """
   This invite is restricted to a list of target users (`1 <<< 4`).
 
-  **Discord does not document this bit.** It was observed on 2026-09-19: creating an invite
-  with `target_users` returns `flags: 16`, and an invite without them carries no `flags` key
-  at all. Treat it as a hint rather than a contract — `EDA.API.Invite.target_users/1` is the
-  authoritative answer.
+  **Discord does not document this bit**, and it does not always set it. Observed on
+  2026-09-19 and again on 2026-09-23: an invite whose list was uploaded as a CSV returns
+  `flags: 16`, one created with a JSON list of ids carries **no `flags` key at all** although
+  it does restrict who may accept it, and so does an invite with no list. Treat it as a hint
+  rather than a contract — `EDA.API.Invite.target_users/1` is the authoritative answer.
   """
   @spec flag_has_target_users() :: integer()
   def flag_has_target_users, do: @flag_has_target_users
@@ -183,7 +184,8 @@ defmodule EDA.Invite do
   Returns `true` if this invite is restricted to a list of target users.
 
   Reads the undocumented bit described on `flag_has_target_users/0`, so a `false` here is
-  weaker than a `{:ok, []}` from `EDA.API.Invite.target_users/1`.
+  weaker than a `{:ok, []}` from `EDA.API.Invite.target_users/1` — an invite restricted
+  through a JSON list of ids answers `false` here and still has target users.
 
   ## Examples
 
@@ -311,4 +313,57 @@ defmodule EDA.Invite do
 
   def set_target_users(invite_code, users) when is_binary(invite_code),
     do: EDA.API.Invite.update_target_users(invite_code, users)
+
+  @typedoc "A user to add to or remove from a target list: a struct, a raw map, or an id."
+  @type user :: EDA.User.t() | EDA.Member.t() | map() | String.t() | integer()
+
+  @doc """
+  Lets one more user accept this invite, leaving the rest of the list alone.
+
+  Applies at once, unlike `set_target_users/2`. See `EDA.API.Invite.add_target_user/2`.
+  """
+  @spec add_target_user(t() | String.t(), user()) :: :ok | {:error, term()}
+  def add_target_user(%__MODULE__{code: code}, user), do: add_target_user(code, user)
+
+  def add_target_user(invite_code, user) when is_binary(invite_code),
+    do: EDA.API.Invite.add_target_user(invite_code, user_id(user))
+
+  @doc """
+  Stops one user from accepting this invite, leaving the rest of the list alone.
+
+  See `EDA.API.Invite.remove_target_user/2`.
+  """
+  @spec remove_target_user(t() | String.t(), user()) :: :ok | {:error, term()}
+  def remove_target_user(%__MODULE__{code: code}, user), do: remove_target_user(code, user)
+
+  def remove_target_user(invite_code, user) when is_binary(invite_code),
+    do: EDA.API.Invite.remove_target_user(invite_code, user_id(user))
+
+  @doc """
+  Adds up to 1000 users to this invite's list at once, leaving the rest of it alone.
+
+  See `EDA.API.Invite.add_target_users/2`.
+  """
+  @spec add_target_users(t() | String.t(), [user()]) :: :ok | {:error, term()}
+  def add_target_users(%__MODULE__{code: code}, users), do: add_target_users(code, users)
+
+  def add_target_users(invite_code, users) when is_binary(invite_code) and is_list(users),
+    do: EDA.API.Invite.add_target_users(invite_code, Enum.map(users, &user_id/1))
+
+  @doc """
+  Removes up to 1000 users from this invite's list at once, leaving the rest of it alone.
+
+  See `EDA.API.Invite.remove_target_users/2`.
+  """
+  @spec remove_target_users(t() | String.t(), [user()]) :: :ok | {:error, term()}
+  def remove_target_users(%__MODULE__{code: code}, users), do: remove_target_users(code, users)
+
+  def remove_target_users(invite_code, users) when is_binary(invite_code) and is_list(users),
+    do: EDA.API.Invite.remove_target_users(invite_code, Enum.map(users, &user_id/1))
+
+  # Takes a user the way the caller has them: a struct, a raw map, or an id.
+  defp user_id(%EDA.User{id: id}), do: id
+  defp user_id(%EDA.Member{user: %{id: id}}), do: id
+  defp user_id(%{"id" => id}), do: id
+  defp user_id(id) when is_binary(id) or is_integer(id), do: id
 end
