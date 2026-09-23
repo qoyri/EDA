@@ -101,6 +101,59 @@ defmodule EDA.GuildTemplate do
 
   defp parse_creator(nil), do: nil
   defp parse_creator(raw) when is_map(raw), do: EDA.User.from_raw(raw)
+
+  # ── Entity Manager ──
+
+  use EDA.Entity
+
+  @doc "Fetches a template by its code. Needs no permission."
+  @spec fetch(String.t()) :: {:ok, t()} | {:error, term()}
+  def fetch(code), do: EDA.API.GuildTemplate.get(code) |> parse_response()
+
+  @doc "Lists a guild's templates. Needs `MANAGE_GUILD`."
+  @spec list(String.t() | integer()) :: {:ok, [t()]} | {:error, term()}
+  def list(guild_id), do: EDA.API.GuildTemplate.list(guild_id) |> parse_list()
+
+  @doc "Creates a template of the guild, with a `name` and an optional `description`."
+  @spec create(String.t() | integer(), map()) :: {:ok, t()} | {:error, term()}
+  def create(guild_id, params),
+    do: EDA.API.GuildTemplate.create(guild_id, params) |> parse_response()
+
+  @doc "Changes a template's `name` or `description`."
+  @spec modify(String.t() | integer(), t() | String.t(), map()) :: {:ok, t()} | {:error, term()}
+  def modify(guild_id, %__MODULE__{code: code}, params), do: modify(guild_id, code, params)
+
+  def modify(guild_id, code, params),
+    do: EDA.API.GuildTemplate.modify(guild_id, code, params) |> parse_response()
+
+  @doc "Syncs a template with the guild as it is now."
+  @spec sync(String.t() | integer(), t() | String.t()) :: {:ok, t()} | {:error, term()}
+  def sync(guild_id, %__MODULE__{code: code}), do: sync(guild_id, code)
+  def sync(guild_id, code), do: EDA.API.GuildTemplate.sync(guild_id, code) |> parse_response()
+
+  @doc "Deletes a template, returning it."
+  @spec delete(String.t() | integer(), t() | String.t()) :: {:ok, t()} | {:error, term()}
+  def delete(guild_id, %__MODULE__{code: code}), do: delete(guild_id, code)
+
+  def delete(guild_id, code),
+    do: EDA.API.GuildTemplate.delete(guild_id, code) |> parse_response()
+
+  @doc """
+  Creates a guild from a template, returning it as an `EDA.Guild`. The bot must be in fewer than
+  10 guilds.
+  """
+  @spec create_guild(t() | String.t(), map()) :: {:ok, EDA.Guild.t()} | {:error, term()}
+  def create_guild(%__MODULE__{code: code}, params), do: create_guild(code, params)
+
+  def create_guild(code, params) do
+    case EDA.API.GuildTemplate.create_guild(code, params) do
+      {:ok, raw} when is_map(raw) -> {:ok, EDA.Guild.from_raw(raw)}
+      {:error, _} = err -> err
+    end
+  end
+
+  defp parse_list({:ok, list}) when is_list(list), do: {:ok, Enum.map(list, &from_raw/1)}
+  defp parse_list({:error, _} = err), do: err
 end
 
 defmodule EDA.GuildTemplate.SourceGuild do

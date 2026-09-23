@@ -9,29 +9,21 @@ defmodule EDA.API.AutoMod do
 
   @doc """
   Lists all Auto Moderation rules for a guild.
-
-  Returns a list of `EDA.AutoMod` structs.
   """
-  @spec list(String.t() | integer()) :: {:ok, [EDA.AutoMod.t()]} | {:error, term()}
+  @spec list(String.t() | integer()) :: {:ok, [map()]} | {:error, term()}
   def list(guild_id) do
-    case get("/guilds/#{guild_id}/auto-moderation/rules") do
-      {:ok, rules} -> {:ok, Enum.map(rules, &EDA.AutoMod.from_raw/1)}
-      error -> error
-    end
+    get("/guilds/#{guild_id}/auto-moderation/rules")
   end
 
   @doc """
   Gets a single Auto Moderation rule by ID.
 
-  Returns an `EDA.AutoMod` struct.
+
   """
   @spec get_rule(String.t() | integer(), String.t() | integer()) ::
-          {:ok, EDA.AutoMod.t()} | {:error, term()}
+          {:ok, map()} | {:error, term()}
   def get_rule(guild_id, rule_id) do
-    case get("/guilds/#{guild_id}/auto-moderation/rules/#{rule_id}") do
-      {:ok, data} -> {:ok, EDA.AutoMod.from_raw(data)}
-      error -> error
-    end
+    get("/guilds/#{guild_id}/auto-moderation/rules/#{rule_id}")
   end
 
   @doc """
@@ -50,29 +42,23 @@ defmodule EDA.API.AutoMod do
     - `:exempt_roles` - List of exempt role IDs (optional, max 20)
     - `:exempt_channels` - List of exempt channel IDs (optional, max 50)
 
-  Returns an `EDA.AutoMod` struct.
+
   """
-  @spec create(String.t() | integer(), map()) :: {:ok, EDA.AutoMod.t()} | {:error, term()}
+  @spec create(String.t() | integer(), map()) :: {:ok, map()} | {:error, term()}
   def create(guild_id, params) do
-    case post("/guilds/#{guild_id}/auto-moderation/rules", encode_rule(params)) do
-      {:ok, data} -> {:ok, EDA.AutoMod.from_raw(data)}
-      error -> error
-    end
+    post("/guilds/#{guild_id}/auto-moderation/rules", encode_rule(params))
   end
 
   @doc """
   Modifies an Auto Moderation rule.
 
   Accepts the same parameters as `create/2` (all optional).
-  Returns an `EDA.AutoMod` struct.
+
   """
   @spec modify(String.t() | integer(), String.t() | integer(), map()) ::
-          {:ok, EDA.AutoMod.t()} | {:error, term()}
+          {:ok, map()} | {:error, term()}
   def modify(guild_id, rule_id, params) do
-    case patch("/guilds/#{guild_id}/auto-moderation/rules/#{rule_id}", encode_rule(params)) do
-      {:ok, data} -> {:ok, EDA.AutoMod.from_raw(data)}
-      error -> error
-    end
+    patch("/guilds/#{guild_id}/auto-moderation/rules/#{rule_id}", encode_rule(params))
   end
 
   @doc "Deletes an Auto Moderation rule."

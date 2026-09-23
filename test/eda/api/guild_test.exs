@@ -129,8 +129,28 @@ defmodule EDA.API.GuildTest do
         })
       end)
 
-      assert {:ok, %{entries: [entry], users: [_], webhooks: []}} =
-               Guild.audit_log("111", limit: 10)
+      assert {:ok, %{"audit_log_entries" => [_]}} = Guild.audit_log("111", limit: 10)
+    end
+
+    test "EDA.AuditLog.fetch_log/2 parses the entries", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "GET", "/guilds/111/audit-logs", fn conn ->
+        json(conn, %{
+          "audit_log_entries" => [
+            %{
+              "id" => "entry1",
+              "action_type" => 22,
+              "user_id" => "mod1",
+              "target_id" => "user1",
+              "changes" => [%{"key" => "name", "old_value" => "a", "new_value" => "b"}]
+            }
+          ],
+          "users" => [%{"id" => "mod1"}],
+          "webhooks" => []
+        })
+      end)
+
+      assert {:ok, %EDA.AuditLog{entries: [entry], users: [%EDA.User{}], webhooks: []}} =
+               EDA.AuditLog.fetch_log("111", limit: 10)
 
       assert %EDA.AuditLog.Entry{} = entry
       assert entry.id == "entry1"
@@ -145,11 +165,11 @@ defmodule EDA.API.GuildTest do
         json(conn, %{"audit_log_entries" => [], "users" => [], "webhooks" => []})
       end)
 
-      assert {:ok, %{entries: []}} =
+      assert {:ok, %{"audit_log_entries" => []}} =
                Guild.audit_log("111", action_type: :member_ban_add)
     end
 
-    test "returns what the entries point at, not only users and webhooks", %{bypass: bypass} do
+    test "fetch_log/2 parses what the entries point at", %{bypass: bypass} do
       Bypass.expect_once(bypass, "GET", "/guilds/111/audit-logs", fn conn ->
         json(conn, %{
           "audit_log_entries" => [],
@@ -163,12 +183,12 @@ defmodule EDA.API.GuildTest do
         })
       end)
 
-      assert {:ok, log} = Guild.audit_log("111")
+      assert {:ok, log} = EDA.AuditLog.fetch_log("111")
       assert [%{"name" => "ban"}] = log.application_commands
-      assert [%{"name" => "no links"}] = log.auto_moderation_rules
-      assert [%{"name" => "raid"}] = log.guild_scheduled_events
-      assert [%{"name" => "bot"}] = log.integrations
-      assert [%{"name" => "appeal"}] = log.threads
+      assert [%EDA.AutoMod{name: "no links"}] = log.auto_moderation_rules
+      assert [%EDA.ScheduledEvent{name: "raid"}] = log.guild_scheduled_events
+      assert [%EDA.Integration{name: "bot"}] = log.integrations
+      assert [%EDA.Channel{name: "appeal"}] = log.threads
     end
   end
 end

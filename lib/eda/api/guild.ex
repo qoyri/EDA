@@ -88,59 +88,33 @@ defmodule EDA.API.Guild do
   end
 
   # What an audit log response carries besides its entries: the objects they point at.
-  @audit_log_lists ~w(users webhooks application_commands auto_moderation_rules
-                      guild_scheduled_events integrations threads)
-
   @doc """
-  Gets the audit log for a guild.
+  Gets the audit log for a guild, as Discord sends it: `audit_log_entries`, and what they point
+  at — `users`, `webhooks`, `application_commands`, `auto_moderation_rules`,
+  `guild_scheduled_events`, `integrations` and `threads`. `EDA.AuditLog.fetch_log/2` returns it as
+  structs.
 
   ## Options
   - `:user_id` - Filter by user who performed the action
-  - `:action_type` - Filter by action type (integer or atom via `EDA.AuditLog.action_type/1`)
+  - `:action_type` - Filter by action type (integer or atom, as `EDA.AuditLog.action_type/1`
+    names them)
   - `:before` - Get entries before this entry ID
   - `:after` - Get entries after this entry ID
   - `:limit` - Number of entries (1-100, default 50)
-
-  Besides the entries, the result holds what they point at, as Discord sends it: `users`,
-  `webhooks`, `application_commands`, `auto_moderation_rules`, `guild_scheduled_events`,
-  `integrations` and `threads` — so an entry's target can be named without another request.
   """
-  @spec audit_log(String.t() | integer(), keyword()) ::
-          {:ok,
-           %{
-             entries: [EDA.AuditLog.Entry.t()],
-             users: [map()],
-             webhooks: [map()],
-             application_commands: [map()],
-             auto_moderation_rules: [map()],
-             guild_scheduled_events: [map()],
-             integrations: [map()],
-             threads: [map()]
-           }}
-          | {:error, term()}
+  @spec audit_log(String.t() | integer(), keyword()) :: {:ok, map()} | {:error, term()}
   def audit_log(guild_id, opts \\ []) do
     opts = resolve_action_type(opts)
 
-    case EDA.HTTP.Client.get(
-           with_query("/guilds/#{guild_id}/audit-logs", opts, [
-             :user_id,
-             :action_type,
-             :before,
-             :after,
-             :limit
-           ])
-         ) do
-      {:ok, data} ->
-        entries =
-          (data["audit_log_entries"] || [])
-          |> Enum.map(&EDA.AuditLog.Entry.from_raw/1)
-
-        referenced = Map.new(@audit_log_lists, &{String.to_atom(&1), data[&1] || []})
-        {:ok, Map.put(referenced, :entries, entries)}
-
-      error ->
-        error
-    end
+    EDA.HTTP.Client.get(
+      with_query("/guilds/#{guild_id}/audit-logs", opts, [
+        :user_id,
+        :action_type,
+        :before,
+        :after,
+        :limit
+      ])
+    )
   end
 
   # ── Onboarding ─────────────────────────────────────────────────────

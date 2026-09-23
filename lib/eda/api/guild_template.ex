@@ -16,12 +16,9 @@ defmodule EDA.API.GuildTemplate do
 
   - `code` - The template code (e.g. `"hgM48av5Q69A"`)
   """
-  @spec get(String.t()) :: {:ok, EDA.GuildTemplate.t()} | {:error, term()}
+  @spec get(String.t()) :: {:ok, map()} | {:error, term()}
   def get(code) do
-    case EDA.HTTP.Client.get("/guilds/templates/#{code}") do
-      {:ok, data} -> {:ok, EDA.GuildTemplate.from_raw(data)}
-      error -> error
-    end
+    EDA.HTTP.Client.get("/guilds/templates/#{code}")
   end
 
   @doc """
@@ -33,12 +30,9 @@ defmodule EDA.API.GuildTemplate do
 
   - `guild_id` - The guild ID
   """
-  @spec list(String.t() | integer()) :: {:ok, [EDA.GuildTemplate.t()]} | {:error, term()}
+  @spec list(String.t() | integer()) :: {:ok, [map()]} | {:error, term()}
   def list(guild_id) do
-    case EDA.HTTP.Client.get("/guilds/#{guild_id}/templates") do
-      {:ok, templates} -> {:ok, Enum.map(templates, &EDA.GuildTemplate.from_raw/1)}
-      error -> error
-    end
+    EDA.HTTP.Client.get("/guilds/#{guild_id}/templates")
   end
 
   @doc """
@@ -53,12 +47,9 @@ defmodule EDA.API.GuildTemplate do
     - `:name` - Template name (required, 1-100 chars)
     - `:description` - Template description (optional, 0-120 chars)
   """
-  @spec create(String.t() | integer(), map()) :: {:ok, EDA.GuildTemplate.t()} | {:error, term()}
+  @spec create(String.t() | integer(), map()) :: {:ok, map()} | {:error, term()}
   def create(guild_id, params) do
-    case post("/guilds/#{guild_id}/templates", params) do
-      {:ok, data} -> {:ok, EDA.GuildTemplate.from_raw(data)}
-      error -> error
-    end
+    post("/guilds/#{guild_id}/templates", params)
   end
 
   @doc """
@@ -75,12 +66,9 @@ defmodule EDA.API.GuildTemplate do
     - `:description` - Template description (optional, 0-120 chars)
   """
   @spec modify(String.t() | integer(), String.t(), map()) ::
-          {:ok, EDA.GuildTemplate.t()} | {:error, term()}
+          {:ok, map()} | {:error, term()}
   def modify(guild_id, code, params) do
-    case patch("/guilds/#{guild_id}/templates/#{code}", params) do
-      {:ok, data} -> {:ok, EDA.GuildTemplate.from_raw(data)}
-      error -> error
-    end
+    patch("/guilds/#{guild_id}/templates/#{code}", params)
   end
 
   @doc """
@@ -94,12 +82,9 @@ defmodule EDA.API.GuildTemplate do
   - `code` - The template code
   """
   @spec sync(String.t() | integer(), String.t()) ::
-          {:ok, EDA.GuildTemplate.t()} | {:error, term()}
+          {:ok, map()} | {:error, term()}
   def sync(guild_id, code) do
-    case put("/guilds/#{guild_id}/templates/#{code}", %{}) do
-      {:ok, data} -> {:ok, EDA.GuildTemplate.from_raw(data)}
-      error -> error
-    end
+    put("/guilds/#{guild_id}/templates/#{code}", %{})
   end
 
   @doc """
@@ -113,12 +98,9 @@ defmodule EDA.API.GuildTemplate do
   - `code` - The template code
   """
   @spec delete(String.t() | integer(), String.t()) ::
-          {:ok, EDA.GuildTemplate.t()} | {:error, term()}
+          {:ok, map()} | {:error, term()}
   def delete(guild_id, code) do
-    case EDA.HTTP.Client.delete("/guilds/#{guild_id}/templates/#{code}") do
-      {:ok, data} -> {:ok, EDA.GuildTemplate.from_raw(data)}
-      error -> error
-    end
+    EDA.HTTP.Client.delete("/guilds/#{guild_id}/templates/#{code}")
   end
 
   @doc """

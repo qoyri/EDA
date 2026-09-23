@@ -66,6 +66,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`EDA.API.*` returns Discord's maps everywhere**, as its moduledocs said; the typed surface
+  is the entity modules. `EDA.API.Emoji`, `Sticker`, `AutoMod` and `GuildTemplate` used to
+  parse into structs, and `EDA.API.Guild.audit_log/2` into a hybrid map. Their typed
+  equivalents are new: `EDA.Emoji` (`list/1`, `fetch_emoji/2`, `create/2`, `modify/3`,
+  `delete/2`, and `list_application/0`, `fetch_application/1`, `create_application/2`,
+  `rename_application/2`, `delete_application/1`), `EDA.Sticker` (`list/1`, `fetch/1`,
+  `fetch_sticker/2`, `create/2`, `modify/3`, `delete/2`, `list_packs/0`, `fetch_pack/1`),
+  `EDA.AutoMod` (`list/1`, `fetch_rule/2`, `create/2`, `modify/3`, `delete/2`),
+  `EDA.GuildTemplate` (`fetch/1`, `list/1`, `create/2`, `modify/3`, `sync/2`, `delete/2`,
+  `create_guild/2` returning an `EDA.Guild`), and `EDA.AuditLog`, now a struct, with
+  `fetch_log/2` returning every list it references as structs.
+
 - **Every event whose payload is an entity delivers the entity**, not a struct wrapping it:
   `GUILD_ROLE_CREATE` and `_UPDATE` an `EDA.Role` (which gained `guild_id`, also set by a
   guild's `roles`, `fetch_role/2`, `create/3`, `modify/4` and `set_colors/4`),

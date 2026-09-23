@@ -1,7 +1,8 @@
 defmodule EDA.API.StickerTest do
   use ExUnit.Case
 
-  alias EDA.API.Sticker
+  # The API layer returns Discord's maps; these tests go through the entity, which parses them.
+  alias EDA.Sticker
 
   setup do
     bypass = Bypass.open()
@@ -52,7 +53,7 @@ defmodule EDA.API.StickerTest do
       end)
 
       assert {:ok, %EDA.Sticker{id: "s1", name: "wave"}} =
-               Sticker.get_guild("111", "s1")
+               Sticker.fetch_sticker("111", "s1")
     end
   end
 
@@ -101,7 +102,7 @@ defmodule EDA.API.StickerTest do
         Plug.Conn.resp(conn, 204, "")
       end)
 
-      assert :ok = Sticker.delete_guild("111", "s1")
+      assert :ok = Sticker.delete("111", "s1")
     end
   end
 
@@ -114,7 +115,7 @@ defmodule EDA.API.StickerTest do
       end)
 
       assert {:ok, %EDA.Sticker{id: "s1", type: :standard, format_type: :lottie}} =
-               Sticker.get("s1")
+               Sticker.fetch("s1")
     end
   end
 
@@ -151,7 +152,7 @@ defmodule EDA.API.StickerTest do
         })
       end)
 
-      assert {:ok, %EDA.Sticker.Pack{id: "p1"}} = Sticker.get_pack("p1")
+      assert {:ok, %EDA.Sticker.Pack{id: "p1"}} = Sticker.fetch_pack("p1")
     end
   end
 end
