@@ -66,6 +66,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A presence's `status` is an atom** (`:online`, `:idle`, `:dnd`, `:offline`), like the
+  statuses `EDA.Presence` sends, and `client_status` names its platforms and statuses:
+  `%{desktop: :idle, mobile: :online}`. A platform or status Discord adds later stays its
+  string. The `EDA.Presence` helpers read both this and the raw maps the cache holds.
+
 - **The `EDA.Component` and `EDA.Modal` builders return the component structs**, the same a
   received message's components are read into: `button/2` an `EDA.Component.Button` with
   `style: :primary`, `separator/1` an `EDA.Component.Separator` with `spacing: :large`,

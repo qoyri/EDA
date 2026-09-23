@@ -137,7 +137,7 @@ defmodule EDA.Presence do
       iex> EDA.Presence.platforms(%{"client_status" => %{"mobile" => "online", "desktop" => "idle"}})
       [:desktop, :mobile]
 
-      iex> EDA.Presence.platforms(%EDA.Event.PresenceUpdate{client_status: %{"web" => "dnd"}})
+      iex> EDA.Presence.platforms(%EDA.Event.PresenceUpdate{client_status: %{web: :dnd}})
       [:web]
 
       iex> EDA.Presence.platforms(%{"status" => "offline"})
@@ -150,8 +150,8 @@ defmodule EDA.Presence do
         []
 
       status ->
-        known = for p <- @platform_order, Map.has_key?(status, to_string(p)), do: p
-        known ++ Enum.sort(Map.keys(status) -- Enum.map(@platform_order, &to_string/1))
+        known = for p <- @platform_order, Map.has_key?(status, p), do: p
+        known ++ Enum.sort(Map.keys(status) -- @platform_order)
     end
   end
 
@@ -169,10 +169,8 @@ defmodule EDA.Presence do
   @spec status_on(map() | EDA.Event.PresenceUpdate.t() | nil, platform()) ::
           session_status() | nil
   def status_on(presence, platform) do
-    with status when is_map(status) <- client_status(presence),
-         value when is_binary(value) <- Map.get(status, to_string(platform)) do
-      session_status(value)
-    else
+    case client_status(presence) do
+      %{^platform => value} when value in [:online, :idle, :dnd] -> value
       _ -> nil
     end
   end
@@ -217,21 +215,50 @@ defmodule EDA.Presence do
   @spec platform(String.t()) :: platform()
   def platform(name) when is_binary(name), do: Map.get(@platform_names, name, name)
 
+  @doc false
+  # A presence's `status` as an atom; a value Discord adds later stays its string.
+  def status_name(nil), do: nil
+  def status_name(status) when is_atom(status), do: status
+
+  def status_name(status) when is_binary(status),
+    do:
+      Map.get(
+        %{"online" => :online, "idle" => :idle, "dnd" => :dnd, "offline" => :offline},
+        status,
+        status
+      )
+
+  @doc false
+  # `client_status` with its platforms and statuses named.
+  def parse_client_status(nil), do: nil
+
+  def parse_client_status(status) when is_map(status) do
+    Map.new(status, fn {platform, value} ->
+      {if(is_binary(platform), do: platform(platform), else: platform), session_status(value)}
+    end)
+  end
+
   defp client_status(%EDA.Event.PresenceUpdate{client_status: status}), do: status
-  defp client_status(%{"client_status" => status}) when is_map(status), do: status
+
+  defp client_status(%{"client_status" => status}) when is_map(status),
+    do: parse_client_status(status)
 
   # A presence without client_status: the user is offline or invisible. Anything else is taken
   # for the client_status map itself, so a platform Discord adds later still reads.
   defp client_status(%{"status" => _}), do: nil
   defp client_status(%{"activities" => _}), do: nil
   defp client_status(%{"user" => _}), do: nil
-  defp client_status(status) when is_map(status) and not is_struct(status), do: status
+
+  defp client_status(status) when is_map(status) and not is_struct(status),
+    do: parse_client_status(status)
+
   defp client_status(_presence), do: nil
 
+  defp session_status(status) when status in [:online, :idle, :dnd], do: status
   defp session_status("online"), do: :online
   defp session_status("idle"), do: :idle
   defp session_status("dnd"), do: :dnd
-  defp session_status(_other), do: nil
+  defp session_status(other), do: other
 
   @doc false
   def activity_type_value(type), do: Map.fetch!(@activity_type_map, type)
