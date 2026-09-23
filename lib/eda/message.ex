@@ -6,10 +6,15 @@ defmodule EDA.Message do
   straight to `reply/2`, `edit/2`, `react/2` or `delete/2`. They add `guild_id`, `member` and
   `channel_type`, which a message fetched over REST does not carry.
 
-  Every field Discord documents is kept. Nested objects that have no struct of their own yet —
-  `activity`, `application`, `call`, `interaction_metadata`, `message_snapshots`, `resolved`,
-  `role_subscription_data`, `shared_client_theme`, `mention_channels` — are the maps Discord
-  sent.
+  Every field Discord documents is kept, each nested object as its struct: embeds are
+  `EDA.Embed`, components `EDA.Component` structs, `message_reference` an
+  `EDA.Message.Reference`, `sticker_items` `EDA.Sticker.Item`s, `interaction_metadata`,
+  `call`, `activity`, `role_subscription_data`, `shared_client_theme` and `mention_channels`
+  their `EDA.Message.*` structs, `application` an `EDA.App` and `resolved` an `EDA.Resolved`.
+
+  A forwarded message has `message_reference.type == :forward` and the message it forwards in
+  `message_snapshots`, as a partial `EDA.Message`: Discord wraps each in a `message` key, which
+  EDA leaves out.
 
   Without the `MESSAGE_CONTENT` intent, `content`, `embeds`, `attachments` and `components`
   arrive empty and `poll` is absent, for messages the bot is neither mentioned in nor the
@@ -121,26 +126,26 @@ defmodule EDA.Message do
           type: atom() | integer() | nil,
           member: EDA.Member.t() | nil,
           referenced_message: t() | nil,
-          message_reference: map() | nil,
+          message_reference: EDA.Message.Reference.t() | nil,
           components: [EDA.Component.t()] | nil,
-          sticker_items: [map()] | nil,
+          sticker_items: [EDA.Sticker.Item.t()] | nil,
           poll: EDA.Poll.t() | nil,
           webhook_id: String.t() | nil,
           application_id: String.t() | nil,
           flags: non_neg_integer() | nil,
-          interaction_metadata: map() | nil,
-          message_snapshots: [map()] | nil,
+          interaction_metadata: EDA.Message.InteractionMetadata.t() | nil,
+          message_snapshots: [t()] | nil,
           thread: EDA.Channel.t() | nil,
-          mention_channels: [map()] | nil,
+          mention_channels: [EDA.Message.ChannelMention.t()] | nil,
           nonce: String.t() | integer() | nil,
           position: integer() | nil,
-          activity: map() | nil,
-          application: map() | nil,
-          call: map() | nil,
-          role_subscription_data: map() | nil,
-          resolved: map() | nil,
-          shared_client_theme: map() | nil,
-          channel_type: integer() | nil
+          activity: EDA.Message.Activity.t() | nil,
+          application: EDA.App.t() | nil,
+          call: EDA.Message.Call.t() | nil,
+          role_subscription_data: EDA.Message.RoleSubscriptionData.t() | nil,
+          resolved: EDA.Resolved.t() | nil,
+          shared_client_theme: EDA.Message.SharedClientTheme.t() | nil,
+          channel_type: EDA.Channel.channel_type() | nil
         }
 
   @spec from_raw(map()) :: t()
@@ -164,28 +169,38 @@ defmodule EDA.Message do
       type: EDA.Enum.name(@types, raw["type"]),
       member: parse_member(raw["member"]),
       referenced_message: parse_message(raw["referenced_message"]),
-      message_reference: raw["message_reference"],
+      message_reference: EDA.Message.Reference.from_raw(raw["message_reference"]),
       components: parse_list(raw["components"], &EDA.Component.from_raw/1),
-      sticker_items: raw["sticker_items"],
+      sticker_items: parse_list(raw["sticker_items"], &EDA.Sticker.Item.from_raw/1),
       poll: parse_poll(raw["poll"]),
       webhook_id: raw["webhook_id"],
       application_id: raw["application_id"],
       flags: raw["flags"],
-      interaction_metadata: raw["interaction_metadata"],
-      message_snapshots: raw["message_snapshots"],
+      interaction_metadata: EDA.Message.InteractionMetadata.from_raw(raw["interaction_metadata"]),
+      message_snapshots: parse_list(raw["message_snapshots"], &parse_snapshot/1),
       thread: parse_thread(raw["thread"]),
-      mention_channels: raw["mention_channels"],
+      mention_channels:
+        parse_list(raw["mention_channels"], &EDA.Message.ChannelMention.from_raw/1),
       nonce: raw["nonce"],
       position: raw["position"],
-      activity: raw["activity"],
-      application: raw["application"],
-      call: raw["call"],
-      role_subscription_data: raw["role_subscription_data"],
-      resolved: raw["resolved"],
-      shared_client_theme: raw["shared_client_theme"],
-      channel_type: raw["channel_type"]
+      activity: EDA.Message.Activity.from_raw(raw["activity"]),
+      application: parse_application(raw["application"]),
+      call: EDA.Message.Call.from_raw(raw["call"]),
+      role_subscription_data:
+        EDA.Message.RoleSubscriptionData.from_raw(raw["role_subscription_data"]),
+      resolved: EDA.Resolved.from_raw(raw["resolved"]),
+      shared_client_theme: EDA.Message.SharedClientTheme.from_raw(raw["shared_client_theme"]),
+      channel_type: EDA.Channel.type_name(raw["channel_type"])
     }
   end
+
+  # A forwarded message's snapshot wraps the partial message in `message`; the list holds the
+  # messages themselves.
+  defp parse_snapshot(%{"message" => message}), do: from_raw(message)
+  defp parse_snapshot(raw), do: from_raw(raw)
+
+  defp parse_application(nil), do: nil
+  defp parse_application(raw), do: EDA.App.from_raw(raw)
 
   defp parse_list(nil, _parse), do: nil
   defp parse_list(list, parse) when is_list(list), do: Enum.map(list, parse)

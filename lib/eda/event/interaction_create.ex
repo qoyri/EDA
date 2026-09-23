@@ -95,10 +95,15 @@ defmodule EDA.Event.InteractionCreate do
   defp parse_context(nil), do: nil
   defp parse_context(value), do: Map.get(@contexts, value, value)
 
-  # Keyed by integration type; a type EDA does not know keeps its string key.
-  defp parse_owners(nil), do: nil
+  @doc false
+  # The interaction type as EDA names it, shared with EDA.Message.InteractionMetadata.
+  def type_name(type), do: EDA.Enum.name(@types, type)
 
-  defp parse_owners(owners) when is_map(owners),
+  @doc false
+  # Keyed by integration type; a type EDA does not know keeps its string key.
+  def parse_owners(nil), do: nil
+
+  def parse_owners(owners) when is_map(owners),
     do: Map.new(owners, fn {type, id} -> {Map.get(@integration_types, type, type), id} end)
 
   defp parse_one(nil, _parse), do: nil

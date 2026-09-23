@@ -59,6 +59,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Every object a message nests is a struct.** `message_reference` is an
+  `EDA.Message.Reference` (`type` `:default` for a reply, `:forward` for a forward; it encodes
+  as Discord takes it), `sticker_items` `EDA.Sticker.Item`s, `interaction_metadata` an
+  `EDA.Message.InteractionMetadata` (named interaction type, users, nested triggering
+  interaction), `call`, `activity`, `role_subscription_data`, `shared_client_theme` and
+  `mention_channels` their `EDA.Message.*` structs, `application` an `EDA.App`, and
+  `resolved` an `EDA.Resolved`, maps from id to struct with each member's user put back.
+  `message_snapshots` is a list of partial `EDA.Message` structs, without Discord's `message`
+  wrapper, and `channel_type` an atom.
+
 - **A message's components are structs**, one per kind: `EDA.Component.ActionRow`, `Button`,
   `SelectMenu` (with its `SelectOption`s), `Section`, `TextDisplay`, `Thumbnail`,
   `MediaGallery`, `File`, `Separator` and `Container`, their images an `EDA.Component.Media`.

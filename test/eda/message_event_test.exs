@@ -75,13 +75,16 @@ defmodule EDA.MessageEventTest do
     assert msg.flags == 1 <<< 14
     assert msg.nonce == "42"
     assert msg.position == 7
-    assert msg.channel_type == 0
-    assert [%{"message" => %{"content" => "forwarded text"}}] = msg.message_snapshots
-    assert %{"user" => %{"id" => "11"}} = msg.interaction_metadata
+    assert msg.channel_type == :guild_text
+    assert [%EDA.Message{content: "forwarded text"}] = msg.message_snapshots
+
+    assert %EDA.Message.InteractionMetadata{user: %EDA.User{id: "11"}} =
+             msg.interaction_metadata
+
     assert %EDA.Channel{name: "discussion"} = msg.thread
-    assert [%{"name" => "news"}] = msg.mention_channels
-    assert %{"participants" => ["11"]} = msg.call
-    assert %{"tier_name" => "Gold"} = msg.role_subscription_data
+    assert [%EDA.Message.ChannelMention{name: "news"}] = msg.mention_channels
+    assert %EDA.Message.Call{participants: ["11"]} = msg.call
+    assert %EDA.Message.RoleSubscriptionData{tier_name: "Gold"} = msg.role_subscription_data
   end
 
   test "a message fetched over REST parses the same way" do
