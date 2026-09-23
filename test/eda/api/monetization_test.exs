@@ -46,6 +46,15 @@ defmodule EDA.API.MonetizationTest do
 
       assert {:ok, [%{"id" => "sku1", "name" => "Premium"}]} = SKU.list()
     end
+
+    test "EDA.SKU.list/0 returns structs", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "GET", "/applications/app123/skus", fn conn ->
+        json(conn, [%{"id" => "sku1", "name" => "Premium", "type" => 5, "flags" => 4}])
+      end)
+
+      assert {:ok, [%EDA.SKU{id: "sku1", type: :subscription} = sku]} = EDA.SKU.list()
+      assert EDA.SKU.flag?(sku, :available)
+    end
   end
 
   # ── Entitlement ──────────────────────────────────────────────────────

@@ -12,6 +12,8 @@ defmodule EDA.FlagsTest do
   doctest EDA.Role.Flags
   doctest EDA.Guild.SystemChannelFlags
   doctest EDA.Activity.Flags
+  doctest EDA.SKU.Flags
+  doctest EDA.SKU
   doctest EDA.Message, only: [flags: 1, flag?: 2]
   doctest EDA.Role, only: [flags: 1, flag?: 2]
   doctest EDA.Guild, only: [system_channel_flags: 1, system_channel_flag?: 2]
@@ -23,7 +25,8 @@ defmodule EDA.FlagsTest do
     EDA.Message.Flags,
     EDA.Role.Flags,
     EDA.Guild.SystemChannelFlags,
-    EDA.Activity.Flags
+    EDA.Activity.Flags,
+    EDA.SKU.Flags
   ]
 
   for mod <- @modules do

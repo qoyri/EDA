@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `EDA.SKU`, what an app sells, with `list/0` returning structs, `type` as an atom and
+  `EDA.SKU.Flags` read by `flags/1` and `flag?/2`.
+
 - `EDA.StageInstance`, a live stage as a struct, which `STAGE_INSTANCE_CREATE`, `_UPDATE` and
   `_DELETE` now deliver instead of structs of their own.
 

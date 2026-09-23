@@ -242,8 +242,9 @@ defmodule EDA.Guild do
   defp parse_list(list, parse) when is_list(list), do: Enum.map(list, parse)
 
   @doc """
-  Which notices the system channel leaves out, from `system_channel_flags`, as `EDA.Guild.SystemChannelFlags` names them. Accepts a struct or a raw map, and gives `[]`
-  when Discord sent none.
+  Which notices the system channel leaves out, from `system_channel_flags`, as
+  `EDA.Guild.SystemChannelFlags` names them. Accepts a struct or a raw map, and gives `[]` when
+  Discord sent none.
 
       iex> EDA.Guild.system_channel_flags(%EDA.Guild{system_channel_flags: 3})
       [:suppress_join_notifications, :suppress_premium_subscriptions]

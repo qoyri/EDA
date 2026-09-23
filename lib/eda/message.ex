@@ -230,8 +230,9 @@ defmodule EDA.Message do
   defp parse_poll(raw) when is_map(raw), do: EDA.Poll.from_raw(raw)
 
   @doc """
-  What the message is — ephemeral, a voice message, a forward…, from `flags`, as `EDA.Message.Flags` names them. Accepts a struct or a raw map, and gives `[]`
-  when Discord sent none.
+  What the message is — ephemeral, a voice message, a forward… — from `flags`, as
+  `EDA.Message.Flags` names them. Accepts a struct or a raw map, and gives `[]` when Discord sent
+  none.
 
       iex> EDA.Message.flags(%EDA.Message{flags: 8256})
       [:ephemeral, :is_voice_message]

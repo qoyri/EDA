@@ -176,8 +176,8 @@ defmodule EDA.Role do
   def mention(%__MODULE__{id: id}), do: "<@&#{id}>"
 
   @doc """
-  The role's flags, from `flags`, as `EDA.Role.Flags` names them. Accepts a struct or a raw map, and gives `[]`
-  when Discord sent none.
+  The role's flags, from `flags`, as `EDA.Role.Flags` names them. Accepts a struct or a raw map,
+  and gives `[]` when Discord sent none.
 
       iex> EDA.Role.flags(%EDA.Role{flags: 1})
       [:in_prompt]
