@@ -298,4 +298,60 @@ defmodule EDA.Attachment do
 
   defp parse_users(nil), do: nil
   defp parse_users(list) when is_list(list), do: Enum.map(list, &EDA.User.from_raw/1)
+
+  @doc """
+  Whether the attachment is an image, from its content type, or its extension when Discord
+  sent none.
+
+      iex> EDA.Attachment.image?(%EDA.Attachment{filename: "cat.PNG"})
+      true
+  """
+  @spec image?(t()) :: boolean()
+  def image?(%__MODULE__{} = attachment), do: kind(attachment) == "image"
+
+  @doc "Whether the attachment is a video. See `image?/1`."
+  @spec video?(t()) :: boolean()
+  def video?(%__MODULE__{} = attachment), do: kind(attachment) == "video"
+
+  @doc "Whether the attachment is audio, a voice message included. See `image?/1`."
+  @spec audio?(t()) :: boolean()
+  def audio?(%__MODULE__{} = attachment), do: kind(attachment) == "audio"
+
+  @doc """
+  The file's extension, lowercased and without the dot, or `nil`.
+
+      iex> EDA.Attachment.extension(%EDA.Attachment{filename: "Report.Final.PDF"})
+      "pdf"
+  """
+  @spec extension(t()) :: String.t() | nil
+  def extension(%__MODULE__{filename: name}) when is_binary(name) do
+    case Path.extname(name) do
+      "" -> nil
+      ext -> ext |> String.trim_leading(".") |> String.downcase()
+    end
+  end
+
+  def extension(%__MODULE__{}), do: nil
+
+  @kinds %{
+    "png" => "image",
+    "jpg" => "image",
+    "jpeg" => "image",
+    "gif" => "image",
+    "webp" => "image",
+    "avif" => "image",
+    "mp4" => "video",
+    "webm" => "video",
+    "mov" => "video",
+    "mp3" => "audio",
+    "ogg" => "audio",
+    "wav" => "audio",
+    "flac" => "audio",
+    "m4a" => "audio"
+  }
+
+  defp kind(%__MODULE__{content_type: type}) when is_binary(type),
+    do: type |> String.split("/") |> hd()
+
+  defp kind(%__MODULE__{} = attachment), do: Map.get(@kinds, extension(attachment))
 end

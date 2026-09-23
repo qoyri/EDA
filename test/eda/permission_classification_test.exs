@@ -4,7 +4,15 @@ defmodule EDA.PermissionClassificationTest do
   alias EDA.Permission
 
   doctest EDA.Permission,
-    only: [channel_types: 1, guild_only?: 1, channel?: 1, applies_to?: 2, inapplicable: 2]
+    only: [
+      channel_types: 1,
+      guild_only?: 1,
+      channel?: 1,
+      applies_to?: 2,
+      inapplicable: 2,
+      missing: 2,
+      any?: 2
+    ]
 
   describe "coverage" do
     test "every permission flag is classified" do

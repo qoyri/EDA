@@ -90,6 +90,19 @@ defmodule EDA.ScheduledEvent do
   defp parse_user(raw) when is_map(raw), do: EDA.User.from_raw(raw)
 
   @doc """
+  The URL of the event's cover image, or `nil`. Takes `:format` and `:size`.
+
+      iex> EDA.ScheduledEvent.cover_url(%EDA.ScheduledEvent{id: "9", image: "c"})
+      "https://cdn.discordapp.com/guild-events/9/c.png"
+  """
+  @spec cover_url(t(), keyword()) :: String.t() | nil
+  def cover_url(event, opts \\ [])
+  def cover_url(%__MODULE__{image: nil}, _opts), do: nil
+
+  def cover_url(%__MODULE__{id: id, image: image}, opts),
+    do: EDA.CDN.url("guild-events/#{id}/#{image}", false, opts)
+
+  @doc """
   The integer Discord uses for a privacy level, from its atom or the integer itself.
   """
   @spec privacy_level_value(atom() | integer()) :: integer()

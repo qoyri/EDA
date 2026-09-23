@@ -224,4 +224,28 @@ defmodule EDA.Emoji do
   defimpl String.Chars do
     def to_string(emoji), do: EDA.Emoji.mention(emoji)
   end
+
+  @doc """
+  Reads an emoji as it appears in a message: a custom one (`<:name:id>`, `<a:name:id>` when
+  animated) or a Unicode one, returned as is in `name`.
+
+      iex> EDA.Emoji.parse("<a:party:123>")
+      {:ok, %EDA.Emoji{id: "123", name: "party", animated: true}}
+      iex> EDA.Emoji.parse("👍")
+      {:ok, %EDA.Emoji{name: "👍"}}
+      iex> EDA.Emoji.parse("<:broken>")
+      :error
+  """
+  @spec parse(String.t()) :: {:ok, t()} | :error
+  def parse(text) when is_binary(text) do
+    case Regex.run(~r/^<(a?):(\w{2,32}):(\d+)>$/, text, capture: :all_but_first) do
+      [animated, name, id] ->
+        {:ok, %__MODULE__{id: id, name: name, animated: animated == "a"}}
+
+      nil ->
+        if String.starts_with?(text, "<") or text == "",
+          do: :error,
+          else: {:ok, %__MODULE__{name: text}}
+    end
+  end
 end

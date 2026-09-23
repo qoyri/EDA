@@ -30,6 +30,44 @@ defmodule EDA.Mention do
   }
 
   @doc """
+  Mentions a slash command, which Discord renders as a clickable command: its name, and its id
+  from `EDA.Command`. A subcommand, or a subcommand in a group, is named after it.
+
+      iex> EDA.Mention.slash_command("ping", "123")
+      "</ping:123>"
+      iex> EDA.Mention.slash_command(%EDA.Command{name: "role", id: "9"}, "add")
+      "</role add:9>"
+      iex> EDA.Mention.slash_command("config", "log", "set", "9")
+      "</config log set:9>"
+  """
+  @spec slash_command(EDA.Command.t() | String.t(), String.t() | integer()) :: String.t()
+  def slash_command(%EDA.Command{name: name, id: id}, sub), do: "</#{name} #{sub}:#{id}>"
+  def slash_command(name, id), do: "</#{name}:#{id}>"
+
+  @doc "Mentions a subcommand of a group. See `slash_command/2`."
+  @spec slash_command(EDA.Command.t() | String.t(), String.t(), String.t() | integer()) ::
+          String.t()
+  def slash_command(%EDA.Command{name: name, id: id}, group, sub),
+    do: "</#{name} #{group} #{sub}:#{id}>"
+
+  def slash_command(name, sub, id), do: "</#{name} #{sub}:#{id}>"
+
+  @doc "Mentions a subcommand in a group of a slash command, by names and id."
+  @spec slash_command(String.t(), String.t(), String.t(), String.t() | integer()) :: String.t()
+  def slash_command(name, group, sub, id), do: "</#{name} #{group} #{sub}:#{id}>"
+
+  @doc """
+  A link to a message, which Discord renders as a jump link. `guild_id` is `nil` for a DM.
+
+      iex> EDA.Mention.message_link("1", "2", "3")
+      "https://discord.com/channels/1/2/3"
+  """
+  @spec message_link(String.t() | nil, String.t() | integer(), String.t() | integer()) ::
+          String.t()
+  def message_link(guild_id, channel_id, message_id),
+    do: "https://discord.com/channels/#{guild_id || "@me"}/#{channel_id}/#{message_id}"
+
+  @doc """
   Formats a user mention.
 
   ## Examples

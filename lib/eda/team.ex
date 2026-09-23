@@ -29,4 +29,34 @@ defmodule EDA.Team do
       members: raw["members"] && Enum.map(raw["members"], &EDA.Team.Member.from_raw/1)
     }
   end
+
+  @doc """
+  The URL of the team's icon, or `nil`. Takes `:format` and `:size`.
+
+      iex> EDA.Team.icon_url(%EDA.Team{id: "2", icon: "t"})
+      "https://cdn.discordapp.com/team-icons/2/t.png"
+  """
+  @spec icon_url(t(), keyword()) :: String.t() | nil
+  def icon_url(team, opts \\ [])
+  def icon_url(%__MODULE__{icon: nil}, _opts), do: nil
+
+  def icon_url(%__MODULE__{id: id, icon: icon}, opts),
+    do: EDA.CDN.url("team-icons/#{id}/#{icon}", false, opts)
+
+  @doc """
+  Whether a user is on the team, having accepted its invitation. Takes an `EDA.User` or an id.
+
+      iex> team = %EDA.Team{members: [%EDA.Team.Member{user: %EDA.User{id: "4"}, membership_state: :accepted}]}
+      iex> EDA.Team.member?(team, "4")
+      true
+  """
+  @spec member?(t(), EDA.User.t() | String.t()) :: boolean()
+  def member?(team, %EDA.User{id: id}), do: member?(team, id)
+
+  def member?(%__MODULE__{members: members}, user_id) do
+    Enum.any?(
+      members || [],
+      &(&1.membership_state == :accepted and &1.user && &1.user.id == user_id)
+    )
+  end
 end

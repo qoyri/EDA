@@ -187,6 +187,58 @@ defmodule EDA.User do
     do: EDA.CDN.url("avatars/#{id}/#{a}", EDA.CDN.animated_hash?(a), opts)
 
   @doc """
+  The URL of the avatar Discord shows a user who has not set one: one of six images, picked
+  from the id (or, for an account that still has a discriminator, from it). Always a PNG.
+
+      iex> EDA.User.default_avatar_url(%EDA.User{id: "80351110224678912", discriminator: "0"})
+      "https://cdn.discordapp.com/embed/avatars/5.png"
+  """
+  @spec default_avatar_url(t() | map()) :: String.t()
+  def default_avatar_url(%__MODULE__{id: id, discriminator: discriminator}),
+    do: default_avatar(id, discriminator)
+
+  def default_avatar_url(%{"id" => id} = raw), do: default_avatar(id, raw["discriminator"])
+
+  defp default_avatar(id, discriminator) do
+    index =
+      case discriminator do
+        d when d in [nil, "0", "0000"] -> Bitwise.bsr(String.to_integer(id), 22) |> rem(6)
+        d -> d |> String.to_integer() |> rem(5)
+      end
+
+    "#{EDA.CDN.base()}/embed/avatars/#{index}.png"
+  end
+
+  @doc """
+  The avatar Discord shows: the user's own, or the default one. Takes the options of
+  `avatar_url/2`, which apply only to the user's own avatar.
+
+      iex> EDA.User.display_avatar_url(%EDA.User{id: "1", avatar: nil, discriminator: "0"})
+      "https://cdn.discordapp.com/embed/avatars/0.png"
+  """
+  @spec display_avatar_url(t() | map(), keyword()) :: String.t()
+  def display_avatar_url(user, opts \\ []), do: avatar_url(user, opts) || default_avatar_url(user)
+
+  @doc """
+  The URL of the user's profile banner, or `nil`. Discord sends `banner` only on a user fetched
+  over REST. Takes the options of `avatar_url/2`.
+
+      iex> EDA.User.banner_url(%EDA.User{id: "1", banner: "a_b"}, format: :webp)
+      "https://cdn.discordapp.com/banners/1/a_b.webp?animated=true"
+  """
+  @spec banner_url(t() | map(), keyword()) :: String.t() | nil
+  def banner_url(user, opts \\ [])
+  def banner_url(%__MODULE__{banner: nil}, _opts), do: nil
+
+  def banner_url(%__MODULE__{id: id, banner: banner}, opts),
+    do: EDA.CDN.url("banners/#{id}/#{banner}", EDA.CDN.animated_hash?(banner), opts)
+
+  def banner_url(%{"banner" => b, "id" => id}, opts) when is_binary(b),
+    do: EDA.CDN.url("banners/#{id}/#{b}", EDA.CDN.animated_hash?(b), opts)
+
+  def banner_url(_user, _opts), do: nil
+
+  @doc """
   URL of the user's server tag badge, or `nil`.
 
   discord.js exposes the same helper on the user (`guildTagBadgeURL()`) rather than

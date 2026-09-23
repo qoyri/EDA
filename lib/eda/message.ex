@@ -265,6 +265,149 @@ defmodule EDA.Message do
   def flag?(%{"flags" => flags}, flag), do: EDA.Message.Flags.has?(flags, flag)
   def flag?(_, _flag), do: false
 
+  # ── Reading a message ──
+
+  @doc """
+  The message's link, as Discord's "Copy Message Link" gives it.
+
+      iex> EDA.Message.url(%EDA.Message{guild_id: "1", channel_id: "2", id: "3"})
+      "https://discord.com/channels/1/2/3"
+      iex> EDA.Message.url(%EDA.Message{channel_id: "2", id: "3"})
+      "https://discord.com/channels/@me/2/3"
+  """
+  @spec url(t()) :: String.t()
+  def url(%__MODULE__{guild_id: guild_id, channel_id: channel_id, id: id}),
+    do: "https://discord.com/channels/#{guild_id || "@me"}/#{channel_id}/#{id}"
+
+  @link ~r"https?://(?:(?:ptb|canary)\.)?discord(?:app)?\.com/channels/(\d+|@me)/(\d+)/(\d+)"
+
+  @doc """
+  Reads a message link, as `url/1` writes it, in any of Discord's domains. `guild_id` is `nil`
+  for a DM.
+
+      iex> EDA.Message.parse_link("see https://canary.discord.com/channels/1/2/3 there")
+      {:ok, %{guild_id: "1", channel_id: "2", message_id: "3"}}
+      iex> EDA.Message.parse_link("https://discord.com/channels/@me/2/3")
+      {:ok, %{guild_id: nil, channel_id: "2", message_id: "3"}}
+      iex> EDA.Message.parse_link("nothing here")
+      :error
+  """
+  @spec parse_link(String.t()) ::
+          {:ok, %{guild_id: String.t() | nil, channel_id: String.t(), message_id: String.t()}}
+          | :error
+  def parse_link(text) when is_binary(text) do
+    case Regex.run(@link, text, capture: :all_but_first) do
+      [guild, channel, message] ->
+        {:ok,
+         %{guild_id: if(guild != "@me", do: guild), channel_id: channel, message_id: message}}
+
+      nil ->
+        :error
+    end
+  end
+
+  @doc """
+  Whether the message mentions a user, a role, or everyone (`:everyone`, which covers `@here`
+  too). Takes an `EDA.User`, an `EDA.Member`, an `EDA.Role` or `:everyone`.
+  """
+  @spec mentions?(t(), EDA.User.t() | EDA.Member.t() | EDA.Role.t() | :everyone) :: boolean()
+  def mentions?(%__MODULE__{mention_everyone: everyone}, :everyone), do: everyone == true
+
+  def mentions?(%__MODULE__{mention_roles: roles}, %EDA.Role{id: id}), do: id in (roles || [])
+
+  def mentions?(%__MODULE__{} = message, %EDA.Member{user: %EDA.User{} = user}),
+    do: mentions?(message, user)
+
+  def mentions?(%__MODULE__{mentions: users}, %EDA.User{id: id}),
+    do: Enum.any?(users || [], &(&1.id == id))
+
+  @invite ~r"(?:https?://)?(?:www\.)?(?:discord\.gg|discord(?:app)?\.com/invite)/([\w-]{2,})"i
+
+  @doc """
+  The invite codes the message's content links to, for an anti-advertising filter.
+
+      iex> EDA.Message.invites(%EDA.Message{content: "join discord.gg/abc or https://discord.com/invite/xyz-1"})
+      ["abc", "xyz-1"]
+  """
+  @spec invites(t()) :: [String.t()]
+  def invites(%__MODULE__{content: content}) when is_binary(content),
+    do: @invite |> Regex.scan(content, capture: :all_but_first) |> List.flatten()
+
+  def invites(%__MODULE__{}), do: []
+
+  @doc "Whether a webhook sent the message."
+  @spec webhook?(t()) :: boolean()
+  def webhook?(%__MODULE__{webhook_id: id}), do: id != nil
+
+  @doc """
+  Whether the message is one Discord wrote — a join, a boost, a pin, a thread created… — rather
+  than one a user or an app sent.
+  """
+  @spec system?(t()) :: boolean()
+  def system?(%__MODULE__{type: type}),
+    do: type not in [:default, :reply, :chat_input_command, :context_menu_command, nil]
+
+  @undeletable [
+    :recipient_add,
+    :recipient_remove,
+    :call,
+    :channel_name_change,
+    :channel_icon_change,
+    :thread_starter_message
+  ]
+
+  @doc """
+  Whether Discord lets a message of this type be deleted. Six system types cannot be; an
+  `:auto_moderation_action` needs `MANAGE_MESSAGES`, like another user's message.
+
+      iex> EDA.Message.deletable?(%EDA.Message{type: :thread_starter_message})
+      false
+  """
+  @spec deletable?(t()) :: boolean()
+  def deletable?(%__MODULE__{type: type}), do: type not in @undeletable
+
+  @doc """
+  The content with its mentions written out as Discord shows them: `@name` for users (their
+  nickname in a guild), `@role` for roles and `#channel` for channels, read from the message
+  and the cache. A mention EDA cannot name stays as it is.
+  """
+  @spec clean_content(t()) :: String.t()
+  def clean_content(%__MODULE__{content: nil}), do: ""
+
+  def clean_content(%__MODULE__{content: content} = message) do
+    Regex.replace(~r/<(@!?|@&|#)(\d+)>/, content, fn whole, kind, id ->
+      case mention_name(message, kind, id) do
+        nil -> whole
+        name -> name
+      end
+    end)
+  end
+
+  defp mention_name(message, kind, id) when kind in ["@", "@!"] do
+    case Enum.find(message.mentions || [], &(&1.id == id)) do
+      %EDA.User{member: %EDA.Member{nick: nick}} when is_binary(nick) -> "@" <> nick
+      %EDA.User{} = user -> "@" <> EDA.User.display_name(user)
+      nil -> nil
+    end
+  end
+
+  defp mention_name(%__MODULE__{guild_id: guild_id}, "@&", id) when is_binary(guild_id) do
+    case EDA.Cache.Role.get(guild_id, id) do
+      %{"name" => name} -> "@" <> name
+      _ -> nil
+    end
+  end
+
+  defp mention_name(message, "#", id) do
+    case Enum.find(message.mention_channels || [], &(&1.id == id)) || EDA.Cache.get_channel(id) do
+      %{name: name} when is_binary(name) -> "#" <> name
+      %{"name" => name} when is_binary(name) -> "#" <> name
+      _ -> nil
+    end
+  end
+
+  defp mention_name(_message, _kind, _id), do: nil
+
   # ── Entity Manager ──
 
   use EDA.Entity

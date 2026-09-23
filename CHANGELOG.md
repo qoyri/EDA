@@ -9,6 +9,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `EDA.Permission.missing/2`, the required flags a bitset lacks, and `any?/2`;
+  `EDA.Team.member?/2`.
+
+- Smaller helpers: `EDA.Channel.text?/1`, `voice?/1`, `category?/1`, `dm?/1`, `archived?/1`,
+  `locked?/1`, `url/1` and `children/1` (a category's channels, from the cache);
+  `EDA.Attachment.image?/1`, `video?/1`, `audio?/1` and `extension/1`;
+  `EDA.VoiceState.muted?/1` and `deafened?/1`; `EDA.Activity.elapsed/2`, `remaining/2`,
+  `large_image_url/1` and `small_image_url/1` (application assets, `mp:` and `spotify:`
+  images); `EDA.Emoji.parse/1`; `EDA.Webhook.url/1`; `EDA.AuditLog.Entry.change/2`.
+
+- `EDA.Markdown`: `escape/1` for user text, `bold/1`, `italic/1`, `underline/1`,
+  `strikethrough/1`, `spoiler/1`, `code/1`, `code_block/2`, `quote_text/1`, `block_quote/1`,
+  `header/2`, `subtext/1`, `masked_link/3` and `list/2`, and `split/2`, which cuts a long text
+  into messages of at most 2000 characters at line breaks, then words.
+- `EDA.Mention.slash_command/2..4`, a clickable command mention (`</name sub:id>`), and
+  `message_link/3`.
+
+- A guild's features and limits: `EDA.Guild.feature?/2` (`:community` or `"COMMUNITY"`),
+  `max_file_size/1`, `max_bitrate/1`, `max_emojis/1` and `max_stickers/1`, from the boost level
+  and the features that raise them (`VIP_REGIONS`, `MORE_EMOJI`, `MORE_STICKERS`);
+  `everyone_role/1`, `sorted_roles/1` (highest first) and `me/1`, the bot's member.
+
+- Reading a message: `EDA.Message.url/1` and `parse_link/1` (any of Discord's domains, `@me`
+  for a DM), `mentions?/2` (a user, member, role or `:everyone`), `invites/1` (the invite codes
+  it links to), `webhook?/1`, `system?/1`, `deletable?/1` (six system types cannot be deleted,
+  per Discord's table) and `clean_content/1` (mentions written as names).
+
+- How a member shows, and what the bot may do to them: `EDA.Member.display_name/1` (nickname,
+  display name, username), `boosting?/1`, `roles/2` (their roles as structs, highest first) and
+  `color/2`; `owner?/2`, `can_interact?/3` (Discord's hierarchy: the owner above all, then the
+  highest role, against a member or a role), and the bot's `manageable?/2`, `kickable?/2`,
+  `bannable?/2` and `moderatable?/2`, which add its permissions (an administrator is never
+  moderatable). `EDA.Role.compare/2`, `above?/2`, `hex_color/1` and `editable?/1`. They read
+  the guild, roles and members from the cache, and answer `false` when what they need is not
+  there.
+
+- Image URLs for everything that has one, with the `:format`, `:size` and `:animated` options
+  of `EDA.User.avatar_url/2`: `EDA.User.default_avatar_url/1`, `display_avatar_url/2` and
+  `banner_url/2`; `EDA.Member.avatar_url/2` and `banner_url/2` (the guild's own) and
+  `display_avatar_url/2` (guild avatar, then account, then default); `EDA.Guild.banner_url/2`,
+  `splash_url/2` and `discovery_splash_url/2`; `EDA.Role.icon_url/2`;
+  `EDA.ScheduledEvent.cover_url/2`; `EDA.Team.icon_url/2`.
+
 - `EDA.Ban`, a banned user and the reason, with `list/2`, `stream/2`, `fetch_ban/2`,
   `create/3`, `remove/2` and `bulk/3`.
 - More typed calls: `EDA.Channel.create/3`, `start_thread/2` (from a message or not),
@@ -334,6 +377,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with string keys keeps working, as on every other nested object.
 
 ### Fixed
+
+- A message activity of type 6, `STREAM_REQUEST`, was left as the integer; it is
+  `:stream_request`.
 
 - `EDA.User.avatar_url/1` returned `.png` for every avatar, animated ones included, and neither
   it, `EDA.Guild.icon_url/1` nor `EDA.Emoji.image_url/1` took a size. All three now take options:
