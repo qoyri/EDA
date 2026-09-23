@@ -77,19 +77,21 @@ defmodule EDA.GuildTemplate do
       %EDA.GuildTemplate{code: "abc", name: "My Template", usage_count: 3}
   """
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      code: raw["code"],
-      name: raw["name"],
-      description: raw["description"],
-      usage_count: raw["usage_count"],
-      creator_id: raw["creator_id"],
-      creator: parse_creator(raw["creator"]),
-      created_at: EDA.Timestamp.parse(raw["created_at"]),
-      updated_at: EDA.Timestamp.parse(raw["updated_at"]),
-      source_guild_id: raw["source_guild_id"],
-      serialized_source_guild: parse_source_guild(raw["serialized_source_guild"]),
-      is_dirty: raw["is_dirty"]
+      code: :maps.get("code", raw, nil),
+      name: :maps.get("name", raw, nil),
+      description: :maps.get("description", raw, nil),
+      usage_count: :maps.get("usage_count", raw, nil),
+      creator_id: :maps.get("creator_id", raw, nil),
+      creator: parse_creator(:maps.get("creator", raw, nil)),
+      created_at: EDA.Timestamp.parse(:maps.get("created_at", raw, nil)),
+      updated_at: EDA.Timestamp.parse(:maps.get("updated_at", raw, nil)),
+      source_guild_id: :maps.get("source_guild_id", raw, nil),
+      serialized_source_guild: parse_source_guild(:maps.get("serialized_source_guild", raw, nil)),
+      is_dirty: :maps.get("is_dirty", raw, nil)
     }
   end
 
@@ -213,25 +215,31 @@ defmodule EDA.GuildTemplate.SourceGuild do
       %EDA.GuildTemplate.SourceGuild{name: "My Guild", roles: [], channels: []}
   """
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     # The levels are read by EDA.Guild, whose tables they share.
     guild = EDA.Guild.from_raw(raw)
 
     %__MODULE__{
-      name: raw["name"],
-      description: raw["description"],
-      region: raw["region"],
+      name: :maps.get("name", raw, nil),
+      description: :maps.get("description", raw, nil),
+      region: :maps.get("region", raw, nil),
       verification_level: guild.verification_level,
       default_message_notifications: guild.default_message_notifications,
       explicit_content_filter: guild.explicit_content_filter,
-      preferred_locale: raw["preferred_locale"],
-      afk_timeout: raw["afk_timeout"],
-      afk_channel_id: raw["afk_channel_id"],
-      system_channel_id: raw["system_channel_id"],
-      system_channel_flags: raw["system_channel_flags"],
-      icon_hash: raw["icon_hash"],
-      roles: raw["roles"] && Enum.map(raw["roles"], &EDA.Role.from_raw/1),
-      channels: raw["channels"] && Enum.map(raw["channels"], &EDA.Channel.from_raw/1)
+      preferred_locale: :maps.get("preferred_locale", raw, nil),
+      afk_timeout: :maps.get("afk_timeout", raw, nil),
+      afk_channel_id: :maps.get("afk_channel_id", raw, nil),
+      system_channel_id: :maps.get("system_channel_id", raw, nil),
+      system_channel_flags: :maps.get("system_channel_flags", raw, nil),
+      icon_hash: :maps.get("icon_hash", raw, nil),
+      roles:
+        :maps.get("roles", raw, nil) &&
+          Enum.map(:maps.get("roles", raw, nil), &EDA.Role.from_raw/1),
+      channels:
+        :maps.get("channels", raw, nil) &&
+          Enum.map(:maps.get("channels", raw, nil), &EDA.Channel.from_raw/1)
     }
   end
 end

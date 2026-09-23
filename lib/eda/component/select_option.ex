@@ -19,13 +19,15 @@ defmodule EDA.Component.SelectOption do
 
   @doc false
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      label: raw["label"],
-      value: raw["value"],
-      description: raw["description"],
-      emoji: Component.parse_emoji(raw["emoji"]),
-      default: raw["default"] == true
+      label: :maps.get("label", raw, nil),
+      value: :maps.get("value", raw, nil),
+      description: :maps.get("description", raw, nil),
+      emoji: Component.parse_emoji(:maps.get("emoji", raw, nil)),
+      default: :maps.get("default", raw, nil) == true
     }
   end
 end

@@ -19,11 +19,13 @@ defmodule EDA.Embed.Footer do
   @spec from_raw(map() | nil) :: t() | nil
   def from_raw(nil), do: nil
 
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      text: raw["text"],
-      icon_url: raw["icon_url"],
-      proxy_icon_url: raw["proxy_icon_url"]
+      text: :maps.get("text", raw, nil),
+      icon_url: :maps.get("icon_url", raw, nil),
+      proxy_icon_url: :maps.get("proxy_icon_url", raw, nil)
     }
   end
 end

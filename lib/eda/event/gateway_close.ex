@@ -14,13 +14,15 @@ defmodule EDA.Event.GatewayClose do
 
   @doc "Converts a raw payload into this event struct."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      shard_id: raw["shard_id"],
-      code: raw["code"],
-      reason: raw["reason"],
-      action: raw["action"],
-      will_reconnect: raw["will_reconnect"]
+      shard_id: :maps.get("shard_id", raw, nil),
+      code: :maps.get("code", raw, nil),
+      reason: :maps.get("reason", raw, nil),
+      action: :maps.get("action", raw, nil),
+      will_reconnect: :maps.get("will_reconnect", raw, nil)
     }
   end
 end

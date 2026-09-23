@@ -21,15 +21,20 @@ defmodule EDA.Event.Ready do
 
   @doc "Converts a raw Discord payload into this event struct."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      v: raw["v"],
-      user: parse_user(raw["user"]),
-      guilds: raw["guilds"] && Enum.map(raw["guilds"], &EDA.Guild.from_raw/1),
-      session_id: raw["session_id"],
-      resume_gateway_url: raw["resume_gateway_url"],
-      shard: raw["shard"],
-      application: raw["application"] && EDA.App.from_raw(raw["application"])
+      v: :maps.get("v", raw, nil),
+      user: parse_user(:maps.get("user", raw, nil)),
+      guilds:
+        :maps.get("guilds", raw, nil) &&
+          Enum.map(:maps.get("guilds", raw, nil), &EDA.Guild.from_raw/1),
+      session_id: :maps.get("session_id", raw, nil),
+      resume_gateway_url: :maps.get("resume_gateway_url", raw, nil),
+      shard: :maps.get("shard", raw, nil),
+      application:
+        :maps.get("application", raw, nil) && EDA.App.from_raw(:maps.get("application", raw, nil))
     }
   end
 

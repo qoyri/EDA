@@ -37,12 +37,14 @@ defmodule EDA.User.PrimaryGuild do
   @spec from_raw(map() | nil) :: t() | nil
   def from_raw(nil), do: nil
 
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      identity_guild_id: raw["identity_guild_id"],
-      identity_enabled: raw["identity_enabled"],
-      tag: raw["tag"],
-      badge: raw["badge"]
+      identity_guild_id: :maps.get("identity_guild_id", raw, nil),
+      identity_enabled: :maps.get("identity_enabled", raw, nil),
+      tag: :maps.get("tag", raw, nil),
+      badge: :maps.get("badge", raw, nil)
     }
   end
 

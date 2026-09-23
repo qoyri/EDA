@@ -101,23 +101,25 @@ defmodule EDA.Command do
       {:slash, [:guild, :bot_dm], [:guild_install], []}
   """
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      application_id: raw["application_id"],
-      guild_id: raw["guild_id"],
-      version: raw["version"],
-      name: raw["name"],
-      description: raw["description"],
-      handler: EDA.Enum.name(@handlers, raw["handler"]),
-      type: EDA.Enum.name(@types, raw["type"] || 1),
-      options: Enum.map(raw["options"] || [], &Option.from_raw/1),
-      default_member_permissions: raw["default_member_permissions"],
-      nsfw: raw["nsfw"],
-      contexts: names(raw["contexts"], @contexts),
-      integration_types: names(raw["integration_types"], @integration_types),
-      name_localizations: raw["name_localizations"],
-      description_localizations: raw["description_localizations"]
+      id: :maps.get("id", raw, nil),
+      application_id: :maps.get("application_id", raw, nil),
+      guild_id: :maps.get("guild_id", raw, nil),
+      version: :maps.get("version", raw, nil),
+      name: :maps.get("name", raw, nil),
+      description: :maps.get("description", raw, nil),
+      handler: EDA.Enum.name(@handlers, :maps.get("handler", raw, nil)),
+      type: EDA.Enum.name(@types, :maps.get("type", raw, nil) || 1),
+      options: Enum.map(:maps.get("options", raw, nil) || [], &Option.from_raw/1),
+      default_member_permissions: :maps.get("default_member_permissions", raw, nil),
+      nsfw: :maps.get("nsfw", raw, nil),
+      contexts: names(:maps.get("contexts", raw, nil), @contexts),
+      integration_types: names(:maps.get("integration_types", raw, nil), @integration_types),
+      name_localizations: :maps.get("name_localizations", raw, nil),
+      description_localizations: :maps.get("description_localizations", raw, nil)
     }
   end
 

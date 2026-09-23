@@ -16,11 +16,13 @@ defmodule EDA.Sticker.Item do
 
   @doc false
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      name: raw["name"],
-      format_type: EDA.Sticker.resolve_format(raw["format_type"])
+      id: :maps.get("id", raw, nil),
+      name: :maps.get("name", raw, nil),
+      format_type: EDA.Sticker.resolve_format(:maps.get("format_type", raw, nil))
     }
   end
 

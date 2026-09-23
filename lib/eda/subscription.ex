@@ -48,18 +48,20 @@ defmodule EDA.Subscription do
         }
 
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      user_id: raw["user_id"],
-      sku_ids: raw["sku_ids"],
-      entitlement_ids: raw["entitlement_ids"],
-      renewal_sku_ids: raw["renewal_sku_ids"],
-      current_period_start: EDA.Timestamp.parse(raw["current_period_start"]),
-      current_period_end: EDA.Timestamp.parse(raw["current_period_end"]),
-      status: EDA.Enum.name(@statuses, raw["status"]),
-      canceled_at: EDA.Timestamp.parse(raw["canceled_at"]),
-      country: raw["country"]
+      id: :maps.get("id", raw, nil),
+      user_id: :maps.get("user_id", raw, nil),
+      sku_ids: :maps.get("sku_ids", raw, nil),
+      entitlement_ids: :maps.get("entitlement_ids", raw, nil),
+      renewal_sku_ids: :maps.get("renewal_sku_ids", raw, nil),
+      current_period_start: EDA.Timestamp.parse(:maps.get("current_period_start", raw, nil)),
+      current_period_end: EDA.Timestamp.parse(:maps.get("current_period_end", raw, nil)),
+      status: EDA.Enum.name(@statuses, :maps.get("status", raw, nil)),
+      canceled_at: EDA.Timestamp.parse(:maps.get("canceled_at", raw, nil)),
+      country: :maps.get("country", raw, nil)
     }
   end
 

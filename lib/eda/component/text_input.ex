@@ -36,17 +36,19 @@ defmodule EDA.Component.TextInput do
 
   @doc false
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      custom_id: raw["custom_id"],
-      style: Component.text_input_style(raw["style"]),
-      label: raw["label"],
-      min_length: raw["min_length"],
-      max_length: raw["max_length"],
-      required: raw["required"],
-      value: raw["value"],
-      placeholder: raw["placeholder"]
+      id: :maps.get("id", raw, nil),
+      custom_id: :maps.get("custom_id", raw, nil),
+      style: Component.text_input_style(:maps.get("style", raw, nil)),
+      label: :maps.get("label", raw, nil),
+      min_length: :maps.get("min_length", raw, nil),
+      max_length: :maps.get("max_length", raw, nil),
+      required: :maps.get("required", raw, nil),
+      value: :maps.get("value", raw, nil),
+      placeholder: :maps.get("placeholder", raw, nil)
     }
   end
 end

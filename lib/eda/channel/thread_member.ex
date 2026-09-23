@@ -27,13 +27,15 @@ defmodule EDA.Channel.ThreadMember do
   @spec from_raw(map() | nil) :: t() | nil
   def from_raw(nil), do: nil
 
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      user_id: raw["user_id"],
-      join_timestamp: EDA.Timestamp.parse(raw["join_timestamp"]),
-      flags: raw["flags"],
-      member: parse_member(raw["member"])
+      id: :maps.get("id", raw, nil),
+      user_id: :maps.get("user_id", raw, nil),
+      join_timestamp: EDA.Timestamp.parse(:maps.get("join_timestamp", raw, nil)),
+      flags: :maps.get("flags", raw, nil),
+      member: parse_member(:maps.get("member", raw, nil))
     }
   end
 

@@ -12,11 +12,13 @@ defmodule EDA.AuditLog.Change do
 
   @doc "Converts a raw change map into this struct."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      key: raw["key"],
-      old_value: raw["old_value"],
-      new_value: raw["new_value"]
+      key: :maps.get("key", raw, nil),
+      old_value: :maps.get("old_value", raw, nil),
+      new_value: :maps.get("new_value", raw, nil)
     }
   end
 end

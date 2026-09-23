@@ -39,18 +39,23 @@ defmodule EDA.Message.InteractionMetadata do
   @spec from_raw(map() | nil) :: t() | nil
   def from_raw(nil), do: nil
 
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      type: EDA.Event.InteractionCreate.type_name(raw["type"]),
-      user: parse_user(raw["user"]),
+      id: :maps.get("id", raw, nil),
+      type: EDA.Event.InteractionCreate.type_name(:maps.get("type", raw, nil)),
+      user: parse_user(:maps.get("user", raw, nil)),
       authorizing_integration_owners:
-        EDA.Event.InteractionCreate.parse_owners(raw["authorizing_integration_owners"]),
-      original_response_message_id: raw["original_response_message_id"],
-      target_user: parse_user(raw["target_user"]),
-      target_message_id: raw["target_message_id"],
-      interacted_message_id: raw["interacted_message_id"],
-      triggering_interaction_metadata: from_raw(raw["triggering_interaction_metadata"])
+        EDA.Event.InteractionCreate.parse_owners(
+          :maps.get("authorizing_integration_owners", raw, nil)
+        ),
+      original_response_message_id: :maps.get("original_response_message_id", raw, nil),
+      target_user: parse_user(:maps.get("target_user", raw, nil)),
+      target_message_id: :maps.get("target_message_id", raw, nil),
+      interacted_message_id: :maps.get("interacted_message_id", raw, nil),
+      triggering_interaction_metadata:
+        from_raw(:maps.get("triggering_interaction_metadata", raw, nil))
     }
   end
 

@@ -138,40 +138,48 @@ defmodule EDA.App do
       {"Bot", 8192}
   """
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      name: raw["name"],
-      icon: raw["icon"],
-      description: raw["description"],
-      bot_public: raw["bot_public"],
-      bot_require_code_grant: raw["bot_require_code_grant"],
-      bot: user(raw["bot"]),
-      terms_of_service_url: raw["terms_of_service_url"],
-      privacy_policy_url: raw["privacy_policy_url"],
-      owner: user(raw["owner"]),
-      verify_key: raw["verify_key"],
-      team: EDA.Team.from_raw(raw["team"]),
-      guild_id: raw["guild_id"],
-      guild: raw["guild"] && EDA.Guild.from_raw(raw["guild"]),
-      primary_sku_id: raw["primary_sku_id"],
-      slug: raw["slug"],
-      cover_image: raw["cover_image"],
-      flags: parse_flags(raw["flags_new"], raw["flags"]),
-      approximate_guild_count: raw["approximate_guild_count"],
-      approximate_user_install_count: raw["approximate_user_install_count"],
-      approximate_user_authorization_count: raw["approximate_user_authorization_count"],
-      redirect_uris: raw["redirect_uris"],
-      interactions_endpoint_url: raw["interactions_endpoint_url"],
-      role_connections_verification_url: raw["role_connections_verification_url"],
-      event_webhooks_url: raw["event_webhooks_url"],
+      id: :maps.get("id", raw, nil),
+      name: :maps.get("name", raw, nil),
+      icon: :maps.get("icon", raw, nil),
+      description: :maps.get("description", raw, nil),
+      bot_public: :maps.get("bot_public", raw, nil),
+      bot_require_code_grant: :maps.get("bot_require_code_grant", raw, nil),
+      bot: user(:maps.get("bot", raw, nil)),
+      terms_of_service_url: :maps.get("terms_of_service_url", raw, nil),
+      privacy_policy_url: :maps.get("privacy_policy_url", raw, nil),
+      owner: user(:maps.get("owner", raw, nil)),
+      verify_key: :maps.get("verify_key", raw, nil),
+      team: EDA.Team.from_raw(:maps.get("team", raw, nil)),
+      guild_id: :maps.get("guild_id", raw, nil),
+      guild: :maps.get("guild", raw, nil) && EDA.Guild.from_raw(:maps.get("guild", raw, nil)),
+      primary_sku_id: :maps.get("primary_sku_id", raw, nil),
+      slug: :maps.get("slug", raw, nil),
+      cover_image: :maps.get("cover_image", raw, nil),
+      flags: parse_flags(:maps.get("flags_new", raw, nil), :maps.get("flags", raw, nil)),
+      approximate_guild_count: :maps.get("approximate_guild_count", raw, nil),
+      approximate_user_install_count: :maps.get("approximate_user_install_count", raw, nil),
+      approximate_user_authorization_count:
+        :maps.get("approximate_user_authorization_count", raw, nil),
+      redirect_uris: :maps.get("redirect_uris", raw, nil),
+      interactions_endpoint_url: :maps.get("interactions_endpoint_url", raw, nil),
+      role_connections_verification_url: :maps.get("role_connections_verification_url", raw, nil),
+      event_webhooks_url: :maps.get("event_webhooks_url", raw, nil),
       event_webhooks_status:
-        Map.get(@webhook_statuses, raw["event_webhooks_status"], raw["event_webhooks_status"]),
-      event_webhooks_types: raw["event_webhooks_types"],
-      tags: raw["tags"],
-      install_params: parse_install_params(raw["install_params"]),
-      integration_types_config: parse_integration_types(raw["integration_types_config"]),
-      custom_install_url: raw["custom_install_url"]
+        Map.get(
+          @webhook_statuses,
+          :maps.get("event_webhooks_status", raw, nil),
+          :maps.get("event_webhooks_status", raw, nil)
+        ),
+      event_webhooks_types: :maps.get("event_webhooks_types", raw, nil),
+      tags: :maps.get("tags", raw, nil),
+      install_params: parse_install_params(:maps.get("install_params", raw, nil)),
+      integration_types_config:
+        parse_integration_types(:maps.get("integration_types_config", raw, nil)),
+      custom_install_url: :maps.get("custom_install_url", raw, nil)
     }
   end
 

@@ -34,14 +34,16 @@ defmodule EDA.AutoMod.TriggerMetadata do
   @spec from_raw(map() | nil) :: t() | nil
   def from_raw(nil), do: nil
 
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      keyword_filter: raw["keyword_filter"],
-      regex_patterns: raw["regex_patterns"],
-      presets: parse_presets(raw["presets"]),
-      allow_list: raw["allow_list"],
-      mention_total_limit: raw["mention_total_limit"],
-      mention_raid_protection_enabled: raw["mention_raid_protection_enabled"]
+      keyword_filter: :maps.get("keyword_filter", raw, nil),
+      regex_patterns: :maps.get("regex_patterns", raw, nil),
+      presets: parse_presets(:maps.get("presets", raw, nil)),
+      allow_list: :maps.get("allow_list", raw, nil),
+      mention_total_limit: :maps.get("mention_total_limit", raw, nil),
+      mention_raid_protection_enabled: :maps.get("mention_raid_protection_enabled", raw, nil)
     }
   end
 

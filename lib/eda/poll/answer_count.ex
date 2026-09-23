@@ -32,11 +32,13 @@ defmodule EDA.Poll.AnswerCount do
       %EDA.Poll.AnswerCount{id: 1, count: 42, me_voted: false}
   """
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      count: raw["count"],
-      me_voted: raw["me_voted"]
+      id: :maps.get("id", raw, nil),
+      count: :maps.get("count", raw, nil),
+      me_voted: :maps.get("me_voted", raw, nil)
     }
   end
 end

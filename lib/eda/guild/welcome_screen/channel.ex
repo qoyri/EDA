@@ -20,12 +20,14 @@ defmodule EDA.Guild.WelcomeScreen.Channel do
 
   @doc false
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      channel_id: raw["channel_id"],
-      description: raw["description"],
-      emoji_id: raw["emoji_id"],
-      emoji_name: raw["emoji_name"]
+      channel_id: :maps.get("channel_id", raw, nil),
+      description: :maps.get("description", raw, nil),
+      emoji_id: :maps.get("emoji_id", raw, nil),
+      emoji_name: :maps.get("emoji_name", raw, nil)
     }
   end
 end

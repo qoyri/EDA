@@ -22,11 +22,13 @@ defmodule EDA.AutoMod.ActionMetadata do
   @spec from_raw(map() | nil) :: t() | nil
   def from_raw(nil), do: nil
 
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      channel_id: raw["channel_id"],
-      duration_seconds: raw["duration_seconds"],
-      custom_message: raw["custom_message"]
+      channel_id: :maps.get("channel_id", raw, nil),
+      duration_seconds: :maps.get("duration_seconds", raw, nil),
+      custom_message: :maps.get("custom_message", raw, nil)
     }
   end
 

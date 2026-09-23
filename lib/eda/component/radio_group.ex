@@ -20,13 +20,15 @@ defmodule EDA.Component.RadioGroup do
 
   @doc false
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      custom_id: raw["custom_id"],
-      options: Component.parse_options(raw["options"]),
-      required: raw["required"],
-      value: raw["value"]
+      id: :maps.get("id", raw, nil),
+      custom_id: :maps.get("custom_id", raw, nil),
+      options: Component.parse_options(:maps.get("options", raw, nil)),
+      required: :maps.get("required", raw, nil),
+      value: :maps.get("value", raw, nil)
     }
   end
 end

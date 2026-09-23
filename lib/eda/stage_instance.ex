@@ -37,15 +37,17 @@ defmodule EDA.StageInstance do
 
   @doc "Parses a raw stage instance object."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      guild_id: raw["guild_id"],
-      channel_id: raw["channel_id"],
-      topic: raw["topic"],
-      privacy_level: EDA.Enum.name(@privacy_levels, raw["privacy_level"]),
-      discoverable_disabled: raw["discoverable_disabled"],
-      guild_scheduled_event_id: raw["guild_scheduled_event_id"]
+      id: :maps.get("id", raw, nil),
+      guild_id: :maps.get("guild_id", raw, nil),
+      channel_id: :maps.get("channel_id", raw, nil),
+      topic: :maps.get("topic", raw, nil),
+      privacy_level: EDA.Enum.name(@privacy_levels, :maps.get("privacy_level", raw, nil)),
+      discoverable_disabled: :maps.get("discoverable_disabled", raw, nil),
+      guild_scheduled_event_id: :maps.get("guild_scheduled_event_id", raw, nil)
     }
   end
 

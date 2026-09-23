@@ -19,19 +19,27 @@ defmodule EDA.Event.GuildMembersChunk do
         }
   @doc "Converts a raw Discord payload into this event struct."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      guild_id: raw["guild_id"],
-      members: parse(raw["members"], &%{EDA.Member.from_raw(&1) | guild_id: raw["guild_id"]}),
-      chunk_index: raw["chunk_index"],
-      chunk_count: raw["chunk_count"],
-      not_found: raw["not_found"],
+      guild_id: :maps.get("guild_id", raw, nil),
+      members:
+        parse(
+          :maps.get("members", raw, nil),
+          &%{EDA.Member.from_raw(&1) | guild_id: :maps.get("guild_id", raw, nil)}
+        ),
+      chunk_index: :maps.get("chunk_index", raw, nil),
+      chunk_count: :maps.get("chunk_count", raw, nil),
+      not_found: :maps.get("not_found", raw, nil),
       presences:
         parse(
-          raw["presences"],
-          &EDA.Event.PresenceUpdate.from_raw(Map.put(&1, "guild_id", raw["guild_id"]))
+          :maps.get("presences", raw, nil),
+          &EDA.Event.PresenceUpdate.from_raw(
+            Map.put(&1, "guild_id", :maps.get("guild_id", raw, nil))
+          )
         ),
-      nonce: raw["nonce"]
+      nonce: :maps.get("nonce", raw, nil)
     }
   end
 

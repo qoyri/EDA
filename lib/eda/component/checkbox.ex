@@ -17,12 +17,14 @@ defmodule EDA.Component.Checkbox do
 
   @doc false
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      custom_id: raw["custom_id"],
-      default: raw["default"],
-      value: raw["value"]
+      id: :maps.get("id", raw, nil),
+      custom_id: :maps.get("custom_id", raw, nil),
+      default: :maps.get("default", raw, nil),
+      value: :maps.get("value", raw, nil)
     }
   end
 end

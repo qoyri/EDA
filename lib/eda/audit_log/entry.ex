@@ -22,22 +22,24 @@ defmodule EDA.AuditLog.Entry do
 
   @doc "Converts a raw audit log entry map into this struct. Parses changes into Change structs."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     changes =
-      case raw["changes"] do
+      case :maps.get("changes", raw, nil) do
         nil -> nil
         list when is_list(list) -> Enum.map(list, &EDA.AuditLog.Change.from_raw/1)
       end
 
     %__MODULE__{
-      id: raw["id"],
-      guild_id: raw["guild_id"],
-      target_id: raw["target_id"],
-      user_id: raw["user_id"],
-      action_type: EDA.Enum.name(EDA.AuditLog.action_types(), raw["action_type"]),
+      id: :maps.get("id", raw, nil),
+      guild_id: :maps.get("guild_id", raw, nil),
+      target_id: :maps.get("target_id", raw, nil),
+      user_id: :maps.get("user_id", raw, nil),
+      action_type: EDA.Enum.name(EDA.AuditLog.action_types(), :maps.get("action_type", raw, nil)),
       changes: changes,
-      reason: raw["reason"],
-      options: EDA.AuditLog.Entry.Options.from_raw(raw["options"])
+      reason: :maps.get("reason", raw, nil),
+      options: EDA.AuditLog.Entry.Options.from_raw(:maps.get("options", raw, nil))
     }
   end
 

@@ -18,11 +18,13 @@ defmodule EDA.Component.Section do
 
   @doc false
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      components: Component.parse_list(raw["components"]),
-      accessory: Component.parse(raw["accessory"])
+      id: :maps.get("id", raw, nil),
+      components: Component.parse_list(:maps.get("components", raw, nil)),
+      accessory: Component.parse(:maps.get("accessory", raw, nil))
     }
   end
 end

@@ -19,12 +19,14 @@ defmodule EDA.Component.Label do
 
   @doc false
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      label: raw["label"],
-      description: raw["description"],
-      component: Component.parse(raw["component"])
+      id: :maps.get("id", raw, nil),
+      label: :maps.get("label", raw, nil),
+      description: :maps.get("description", raw, nil),
+      component: Component.parse(:maps.get("component", raw, nil))
     }
   end
 end

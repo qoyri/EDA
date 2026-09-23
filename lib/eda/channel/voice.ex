@@ -27,13 +27,16 @@ defmodule EDA.Channel.Voice do
 
   @doc "Takes the voice fields out of a raw channel object."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      bitrate: raw["bitrate"],
-      user_limit: raw["user_limit"],
-      rtc_region: raw["rtc_region"],
-      video_quality_mode: EDA.Enum.name(%{1 => :auto, 2 => :full}, raw["video_quality_mode"]),
-      status: raw["status"]
+      bitrate: :maps.get("bitrate", raw, nil),
+      user_limit: :maps.get("user_limit", raw, nil),
+      rtc_region: :maps.get("rtc_region", raw, nil),
+      video_quality_mode:
+        EDA.Enum.name(%{1 => :auto, 2 => :full}, :maps.get("video_quality_mode", raw, nil)),
+      status: :maps.get("status", raw, nil)
     }
   end
 end

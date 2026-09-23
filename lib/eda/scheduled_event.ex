@@ -64,25 +64,29 @@ defmodule EDA.ScheduledEvent do
 
   @doc "Parses a raw scheduled event object."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      guild_id: raw["guild_id"],
-      channel_id: raw["channel_id"],
-      creator_id: raw["creator_id"],
-      name: raw["name"],
-      description: raw["description"],
-      scheduled_start_time: EDA.Timestamp.parse(raw["scheduled_start_time"]),
-      scheduled_end_time: EDA.Timestamp.parse(raw["scheduled_end_time"]),
-      privacy_level: EDA.Enum.name(@privacy_levels, raw["privacy_level"]),
-      status: EDA.Enum.name(@statuses, raw["status"]),
-      entity_type: EDA.Enum.name(@entity_types, raw["entity_type"]),
-      entity_id: raw["entity_id"],
-      entity_metadata: EDA.ScheduledEvent.EntityMetadata.from_raw(raw["entity_metadata"]),
-      creator: parse_user(raw["creator"]),
-      user_count: raw["user_count"],
-      image: raw["image"],
-      recurrence_rule: EDA.ScheduledEvent.RecurrenceRule.from_raw(raw["recurrence_rule"])
+      id: :maps.get("id", raw, nil),
+      guild_id: :maps.get("guild_id", raw, nil),
+      channel_id: :maps.get("channel_id", raw, nil),
+      creator_id: :maps.get("creator_id", raw, nil),
+      name: :maps.get("name", raw, nil),
+      description: :maps.get("description", raw, nil),
+      scheduled_start_time: EDA.Timestamp.parse(:maps.get("scheduled_start_time", raw, nil)),
+      scheduled_end_time: EDA.Timestamp.parse(:maps.get("scheduled_end_time", raw, nil)),
+      privacy_level: EDA.Enum.name(@privacy_levels, :maps.get("privacy_level", raw, nil)),
+      status: EDA.Enum.name(@statuses, :maps.get("status", raw, nil)),
+      entity_type: EDA.Enum.name(@entity_types, :maps.get("entity_type", raw, nil)),
+      entity_id: :maps.get("entity_id", raw, nil),
+      entity_metadata:
+        EDA.ScheduledEvent.EntityMetadata.from_raw(:maps.get("entity_metadata", raw, nil)),
+      creator: parse_user(:maps.get("creator", raw, nil)),
+      user_count: :maps.get("user_count", raw, nil),
+      image: :maps.get("image", raw, nil),
+      recurrence_rule:
+        EDA.ScheduledEvent.RecurrenceRule.from_raw(:maps.get("recurrence_rule", raw, nil))
     }
   end
 

@@ -17,11 +17,16 @@ defmodule EDA.Guild.WelcomeScreen do
   @spec from_raw(map() | nil) :: t() | nil
   def from_raw(nil), do: nil
 
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      description: raw["description"],
+      description: :maps.get("description", raw, nil),
       welcome_channels:
-        Enum.map(raw["welcome_channels"] || [], &EDA.Guild.WelcomeScreen.Channel.from_raw/1)
+        Enum.map(
+          :maps.get("welcome_channels", raw, nil) || [],
+          &EDA.Guild.WelcomeScreen.Channel.from_raw/1
+        )
     }
   end
 end

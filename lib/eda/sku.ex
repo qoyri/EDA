@@ -34,14 +34,16 @@ defmodule EDA.SKU do
       %EDA.SKU{id: "1", type: :subscription, name: "Premium", flags: 260}
   """
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      type: EDA.Enum.name(@types, raw["type"]),
-      application_id: raw["application_id"],
-      name: raw["name"],
-      slug: raw["slug"],
-      flags: raw["flags"]
+      id: :maps.get("id", raw, nil),
+      type: EDA.Enum.name(@types, :maps.get("type", raw, nil)),
+      application_id: :maps.get("application_id", raw, nil),
+      name: :maps.get("name", raw, nil),
+      slug: :maps.get("slug", raw, nil),
+      flags: :maps.get("flags", raw, nil)
     }
   end
 

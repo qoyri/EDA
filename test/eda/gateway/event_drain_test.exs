@@ -14,6 +14,12 @@ defmodule EDA.Gateway.EventDrainTest do
     end
   end
 
+  defmodule Lineage do
+    def handle_event({_type, %EDA.Event.Raw{data: pid}}) do
+      send(pid, {:lineage, Process.get(:"$callers"), Process.get(:"$ancestors")})
+    end
+  end
+
   setup do
     previous = Application.get_env(:eda, :consumer)
     on_exit(fn -> Application.put_env(:eda, :consumer, previous) end)
@@ -34,6 +40,15 @@ defmodule EDA.Gateway.EventDrainTest do
     assert_received :handled
     assert elapsed >= 50_000
     assert :counters.get(counter, 1) == before
+  end
+
+  test "a handler knows the process that dispatched its event, as a Task would" do
+    Application.put_env(:eda, :consumer, Lineage)
+    EDA.Gateway.Events.dispatch("EDA_LINEAGE_TEST", self())
+
+    assert_receive {:lineage, [caller | _], [ancestor | _]}
+    assert caller == self()
+    assert ancestor == self()
   end
 
   test "a handler that runs too long does not hold the stop beyond the limit" do

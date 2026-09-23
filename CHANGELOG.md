@@ -15,14 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   type; every event used to be copied to the collector process whether or not one did.
 - **The consumer receives each event sooner.** Its handler runs in a process spawned directly,
   where a call to `Task.Supervisor.start_child/2` on every event took 5 µs and made one
-  supervisor the queue of every shard. When the application stops, EDA still waits up to five
-  seconds for the handlers still running, as the supervisor did. Measured through the whole path on real events: a message dispatched in about
-  14 µs instead of 19, a presence in 7.5 instead of 12, a `GUILD_CREATE` in 0.63 ms instead of
-  1.24.
-- **Faster parsing.** The `from_raw/1` of the entities on the gateway path read the payload with
-  a direct map lookup instead of going through `Access`: measured on real payloads, a message
-  parses in 5.5 µs instead of 6.2, a member in 1.75 instead of 2.1, a role in 0.67 instead of
-  0.9, and the parse of a `GUILD_CREATE` takes 0.27 ms instead of 0.30.
+  supervisor the queue of every shard. The handler still gets `$callers` and `$ancestors`, and
+  when the application stops, EDA still waits up to five seconds for the handlers still running,
+  as the supervisor did.
+- **Faster parsing.** Every entity's `from_raw/1`, nested ones included, reads the payload with a
+  direct map lookup instead of going through `Access`: a message parses in 5.5 µs instead of 6.2,
+  a member in 1.75 instead of 2.1, a role in 0.67 instead of 0.9.
+
+Measured through the whole dispatch path on real events, these changes together bring a message
+to about 13 µs instead of 19, a presence to 6.9 instead of 12, a role update to 4.8 instead of
+8.5, and a `GUILD_CREATE` to 0.56 ms instead of 1.24.
 
 ### Fixed
 

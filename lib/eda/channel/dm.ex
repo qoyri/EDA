@@ -24,12 +24,14 @@ defmodule EDA.Channel.DM do
 
   @doc "Takes the direct message fields out of a raw channel object."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      recipients: parse_users(raw["recipients"]),
-      icon: raw["icon"],
-      application_id: raw["application_id"],
-      managed: raw["managed"]
+      recipients: parse_users(:maps.get("recipients", raw, nil)),
+      icon: :maps.get("icon", raw, nil),
+      application_id: :maps.get("application_id", raw, nil),
+      managed: :maps.get("managed", raw, nil)
     }
   end
 

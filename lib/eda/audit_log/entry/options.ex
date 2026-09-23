@@ -56,24 +56,26 @@ defmodule EDA.AuditLog.Entry.Options do
   @spec from_raw(map() | nil) :: t() | nil
   def from_raw(nil), do: nil
 
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      application_id: raw["application_id"],
-      auto_moderation_rule_name: raw["auto_moderation_rule_name"],
+      application_id: :maps.get("application_id", raw, nil),
+      auto_moderation_rule_name: :maps.get("auto_moderation_rule_name", raw, nil),
       auto_moderation_rule_trigger_type:
-        raw["auto_moderation_rule_trigger_type"]
+        :maps.get("auto_moderation_rule_trigger_type", raw, nil)
         |> integer()
         |> then(&EDA.Enum.name(EDA.AutoMod.trigger_types(), &1)),
-      channel_id: raw["channel_id"],
-      count: integer(raw["count"]),
-      delete_member_days: integer(raw["delete_member_days"]),
-      id: raw["id"],
-      members_removed: integer(raw["members_removed"]),
-      message_id: raw["message_id"],
-      role_name: raw["role_name"],
-      type: Map.get(@overwrite_types, raw["type"], raw["type"]),
-      integration_type: raw["integration_type"],
-      status: raw["status"]
+      channel_id: :maps.get("channel_id", raw, nil),
+      count: integer(:maps.get("count", raw, nil)),
+      delete_member_days: integer(:maps.get("delete_member_days", raw, nil)),
+      id: :maps.get("id", raw, nil),
+      members_removed: integer(:maps.get("members_removed", raw, nil)),
+      message_id: :maps.get("message_id", raw, nil),
+      role_name: :maps.get("role_name", raw, nil),
+      type: Map.get(@overwrite_types, :maps.get("type", raw, nil), :maps.get("type", raw, nil)),
+      integration_type: :maps.get("integration_type", raw, nil),
+      status: :maps.get("status", raw, nil)
     }
   end
 

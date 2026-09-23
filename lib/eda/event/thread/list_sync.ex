@@ -14,12 +14,14 @@ defmodule EDA.Event.ThreadListSync do
         }
   @doc "Converts a raw Discord payload into this event struct."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      guild_id: raw["guild_id"],
-      channel_ids: raw["channel_ids"],
-      threads: parse_list(raw["threads"], &EDA.Channel.from_raw/1),
-      members: parse_list(raw["members"], &EDA.Channel.ThreadMember.from_raw/1)
+      guild_id: :maps.get("guild_id", raw, nil),
+      channel_ids: :maps.get("channel_ids", raw, nil),
+      threads: parse_list(:maps.get("threads", raw, nil), &EDA.Channel.from_raw/1),
+      members: parse_list(:maps.get("members", raw, nil), &EDA.Channel.ThreadMember.from_raw/1)
     }
   end
 

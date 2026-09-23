@@ -20,13 +20,17 @@ defmodule EDA.Team do
   @spec from_raw(map() | nil) :: t() | nil
   def from_raw(nil), do: nil
 
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      name: raw["name"],
-      icon: raw["icon"],
-      owner_user_id: raw["owner_user_id"],
-      members: raw["members"] && Enum.map(raw["members"], &EDA.Team.Member.from_raw/1)
+      id: :maps.get("id", raw, nil),
+      name: :maps.get("name", raw, nil),
+      icon: :maps.get("icon", raw, nil),
+      owner_user_id: :maps.get("owner_user_id", raw, nil),
+      members:
+        :maps.get("members", raw, nil) &&
+          Enum.map(:maps.get("members", raw, nil), &EDA.Team.Member.from_raw/1)
     }
   end
 

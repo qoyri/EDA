@@ -20,11 +20,13 @@ defmodule EDA.Event.ChannelInfo do
 
   @doc "Converts a raw Discord payload into this event struct."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      guild_id: raw["guild_id"],
+      guild_id: :maps.get("guild_id", raw, nil),
       channels:
-        Enum.map(raw["channels"] || [], fn c ->
+        Enum.map(:maps.get("channels", raw, nil) || [], fn c ->
           %{id: c["id"], status: c["status"], voice_start_time: unix_time(c["voice_start_time"])}
         end)
     }

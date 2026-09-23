@@ -19,14 +19,16 @@ defmodule EDA.Onboarding.Option do
   (no id, no name) is read as no emoji.
   """
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      title: raw["title"],
-      description: raw["description"],
+      id: :maps.get("id", raw, nil),
+      title: :maps.get("title", raw, nil),
+      description: :maps.get("description", raw, nil),
       emoji: parse_emoji(raw),
-      channel_ids: raw["channel_ids"] || [],
-      role_ids: raw["role_ids"] || []
+      channel_ids: :maps.get("channel_ids", raw, nil) || [],
+      role_ids: :maps.get("role_ids", raw, nil) || []
     }
   end
 

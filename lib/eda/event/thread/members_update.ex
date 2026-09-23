@@ -15,13 +15,15 @@ defmodule EDA.Event.ThreadMembersUpdate do
         }
   @doc "Converts a raw Discord payload into this event struct."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      guild_id: raw["guild_id"],
-      member_count: raw["member_count"],
-      added_members: parse_members(raw["added_members"]),
-      removed_member_ids: raw["removed_member_ids"]
+      id: :maps.get("id", raw, nil),
+      guild_id: :maps.get("guild_id", raw, nil),
+      member_count: :maps.get("member_count", raw, nil),
+      added_members: parse_members(:maps.get("added_members", raw, nil)),
+      removed_member_ids: :maps.get("removed_member_ids", raw, nil)
     }
   end
 

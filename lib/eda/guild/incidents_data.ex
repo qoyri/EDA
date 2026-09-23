@@ -27,12 +27,14 @@ defmodule EDA.Guild.IncidentsData do
   @spec from_raw(map() | nil) :: t() | nil
   def from_raw(nil), do: nil
 
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      invites_disabled_until: EDA.Timestamp.parse(raw["invites_disabled_until"]),
-      dms_disabled_until: EDA.Timestamp.parse(raw["dms_disabled_until"]),
-      dm_spam_detected_at: EDA.Timestamp.parse(raw["dm_spam_detected_at"]),
-      raid_detected_at: EDA.Timestamp.parse(raw["raid_detected_at"])
+      invites_disabled_until: EDA.Timestamp.parse(:maps.get("invites_disabled_until", raw, nil)),
+      dms_disabled_until: EDA.Timestamp.parse(:maps.get("dms_disabled_until", raw, nil)),
+      dm_spam_detected_at: EDA.Timestamp.parse(:maps.get("dm_spam_detected_at", raw, nil)),
+      raid_detected_at: EDA.Timestamp.parse(:maps.get("raid_detected_at", raw, nil))
     }
   end
 end

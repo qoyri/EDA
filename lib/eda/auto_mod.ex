@@ -185,25 +185,27 @@ defmodule EDA.AutoMod do
 
   @doc "Converts a raw Discord Auto Moderation rule map into this struct."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     actions =
-      case raw["actions"] do
+      case :maps.get("actions", raw, nil) do
         list when is_list(list) -> Enum.map(list, &Action.from_raw/1)
         _ -> nil
       end
 
     %__MODULE__{
-      id: raw["id"],
-      guild_id: raw["guild_id"],
-      name: raw["name"],
-      creator_id: raw["creator_id"],
-      event_type: EDA.Enum.name(@event_types, raw["event_type"]),
-      trigger_type: EDA.Enum.name(@trigger_types, raw["trigger_type"]),
-      trigger_metadata: TriggerMetadata.from_raw(raw["trigger_metadata"]),
+      id: :maps.get("id", raw, nil),
+      guild_id: :maps.get("guild_id", raw, nil),
+      name: :maps.get("name", raw, nil),
+      creator_id: :maps.get("creator_id", raw, nil),
+      event_type: EDA.Enum.name(@event_types, :maps.get("event_type", raw, nil)),
+      trigger_type: EDA.Enum.name(@trigger_types, :maps.get("trigger_type", raw, nil)),
+      trigger_metadata: TriggerMetadata.from_raw(:maps.get("trigger_metadata", raw, nil)),
       actions: actions,
-      enabled: raw["enabled"],
-      exempt_roles: raw["exempt_roles"],
-      exempt_channels: raw["exempt_channels"]
+      enabled: :maps.get("enabled", raw, nil),
+      exempt_roles: :maps.get("exempt_roles", raw, nil),
+      exempt_channels: :maps.get("exempt_channels", raw, nil)
     }
   end
 

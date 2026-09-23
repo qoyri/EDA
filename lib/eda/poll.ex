@@ -112,15 +112,17 @@ defmodule EDA.Poll do
       {true, [%EDA.Poll.AnswerCount{id: 1, count: 10, me_voted: false}]}
   """
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
       question: get_in(raw, ["question", "text"]),
-      answers: parse_answers(raw["answers"]),
-      expiry: EDA.Timestamp.parse(raw["expiry"]),
-      duration: raw["duration"],
-      allow_multiselect: raw["allow_multiselect"] || false,
-      layout_type: EDA.Enum.name(@layout_types, raw["layout_type"]),
-      results: parse_results(raw["results"])
+      answers: parse_answers(:maps.get("answers", raw, nil)),
+      expiry: EDA.Timestamp.parse(:maps.get("expiry", raw, nil)),
+      duration: :maps.get("duration", raw, nil),
+      allow_multiselect: :maps.get("allow_multiselect", raw, nil) || false,
+      layout_type: EDA.Enum.name(@layout_types, :maps.get("layout_type", raw, nil)),
+      results: parse_results(:maps.get("results", raw, nil))
     }
   end
 

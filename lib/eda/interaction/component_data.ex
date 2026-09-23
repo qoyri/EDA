@@ -19,12 +19,14 @@ defmodule EDA.Interaction.ComponentData do
 
   @doc false
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      custom_id: raw["custom_id"],
-      component_type: EDA.Component.type_name(raw["component_type"]),
-      values: raw["values"],
-      resolved: EDA.Resolved.from_raw(raw["resolved"])
+      custom_id: :maps.get("custom_id", raw, nil),
+      component_type: EDA.Component.type_name(:maps.get("component_type", raw, nil)),
+      values: :maps.get("values", raw, nil),
+      resolved: EDA.Resolved.from_raw(:maps.get("resolved", raw, nil))
     }
   end
 end

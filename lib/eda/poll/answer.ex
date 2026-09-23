@@ -38,11 +38,13 @@ defmodule EDA.Poll.Answer do
       %EDA.Poll.Answer{answer_id: 2, text: "No", emoji: nil}
   """
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
-    media = raw["poll_media"] || %{}
+    media = :maps.get("poll_media", raw, nil) || %{}
 
     %__MODULE__{
-      answer_id: raw["answer_id"],
+      answer_id: :maps.get("answer_id", raw, nil),
       text: media["text"],
       emoji: parse_emoji(media["emoji"])
     }

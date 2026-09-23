@@ -30,12 +30,15 @@ defmodule EDA.Channel.Forum do
 
   @doc "Takes the forum fields out of a raw channel object."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      available_tags: parse_tags(raw["available_tags"]),
-      default_reaction_emoji: EDA.Channel.DefaultReaction.from_raw(raw["default_reaction_emoji"]),
-      default_sort_order: EDA.Enum.name(@sort_orders, raw["default_sort_order"]),
-      default_forum_layout: EDA.Enum.name(@layouts, raw["default_forum_layout"])
+      available_tags: parse_tags(:maps.get("available_tags", raw, nil)),
+      default_reaction_emoji:
+        EDA.Channel.DefaultReaction.from_raw(:maps.get("default_reaction_emoji", raw, nil)),
+      default_sort_order: EDA.Enum.name(@sort_orders, :maps.get("default_sort_order", raw, nil)),
+      default_forum_layout: EDA.Enum.name(@layouts, :maps.get("default_forum_layout", raw, nil))
     }
   end
 

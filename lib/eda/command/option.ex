@@ -116,24 +116,30 @@ defmodule EDA.Command.Option do
         choices: [%EDA.Command.Option.Choice{name: "Red", value: "red"}]}
   """
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      type: type_name(raw["type"]),
-      name: raw["name"],
-      description: raw["description"],
-      required: raw["required"],
-      choices: raw["choices"] && Enum.map(raw["choices"], &Choice.from_raw/1),
-      options: raw["options"] && Enum.map(raw["options"], &from_raw/1),
+      type: type_name(:maps.get("type", raw, nil)),
+      name: :maps.get("name", raw, nil),
+      description: :maps.get("description", raw, nil),
+      required: :maps.get("required", raw, nil),
+      choices:
+        :maps.get("choices", raw, nil) &&
+          Enum.map(:maps.get("choices", raw, nil), &Choice.from_raw/1),
+      options:
+        :maps.get("options", raw, nil) && Enum.map(:maps.get("options", raw, nil), &from_raw/1),
       channel_types:
-        raw["channel_types"] && Enum.map(raw["channel_types"], &EDA.Channel.type_name/1),
-      min_value: raw["min_value"],
-      max_value: raw["max_value"],
-      min_length: raw["min_length"],
-      max_length: raw["max_length"],
-      autocomplete: raw["autocomplete"],
-      file_types: raw["file_types"],
-      name_localizations: raw["name_localizations"],
-      description_localizations: raw["description_localizations"]
+        :maps.get("channel_types", raw, nil) &&
+          Enum.map(:maps.get("channel_types", raw, nil), &EDA.Channel.type_name/1),
+      min_value: :maps.get("min_value", raw, nil),
+      max_value: :maps.get("max_value", raw, nil),
+      min_length: :maps.get("min_length", raw, nil),
+      max_length: :maps.get("max_length", raw, nil),
+      autocomplete: :maps.get("autocomplete", raw, nil),
+      file_types: :maps.get("file_types", raw, nil),
+      name_localizations: :maps.get("name_localizations", raw, nil),
+      description_localizations: :maps.get("description_localizations", raw, nil)
     }
   end
 

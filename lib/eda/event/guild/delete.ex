@@ -10,10 +10,12 @@ defmodule EDA.Event.GuildDelete do
 
   @doc "Converts a raw Discord payload into this event struct."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      unavailable: raw["unavailable"]
+      id: :maps.get("id", raw, nil),
+      unavailable: :maps.get("unavailable", raw, nil)
     }
   end
 end

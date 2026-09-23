@@ -39,11 +39,13 @@ defmodule EDA.Role.Tags do
   @spec from_raw(map() | nil) :: t() | nil
   def from_raw(nil), do: nil
 
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      bot_id: raw["bot_id"],
-      integration_id: raw["integration_id"],
-      subscription_listing_id: raw["subscription_listing_id"],
+      bot_id: :maps.get("bot_id", raw, nil),
+      integration_id: :maps.get("integration_id", raw, nil),
+      subscription_listing_id: :maps.get("subscription_listing_id", raw, nil),
       premium_subscriber: Map.has_key?(raw, "premium_subscriber"),
       available_for_purchase: Map.has_key?(raw, "available_for_purchase"),
       guild_connections: Map.has_key?(raw, "guild_connections")

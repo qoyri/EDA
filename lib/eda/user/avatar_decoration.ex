@@ -32,11 +32,13 @@ defmodule EDA.User.AvatarDecoration do
   @spec from_raw(map() | nil) :: t() | nil
   def from_raw(nil), do: nil
 
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      asset: raw["asset"],
-      sku_id: raw["sku_id"],
-      expires_at: parse_expiry(raw["expires_at"])
+      asset: :maps.get("asset", raw, nil),
+      sku_id: :maps.get("sku_id", raw, nil),
+      expires_at: parse_expiry(:maps.get("expires_at", raw, nil))
     }
   end
 

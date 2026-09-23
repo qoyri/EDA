@@ -54,25 +54,36 @@ defmodule EDA.Integration do
 
   @doc "Converts a raw integration object into this struct."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      id: raw["id"],
-      guild_id: raw["guild_id"],
-      name: raw["name"],
-      type: raw["type"],
-      enabled: raw["enabled"],
-      syncing: raw["syncing"],
-      role_id: raw["role_id"],
-      enable_emoticons: raw["enable_emoticons"],
-      expire_behavior: Map.get(@expire_behaviors, raw["expire_behavior"], raw["expire_behavior"]),
-      expire_grace_period: raw["expire_grace_period"],
-      user: if(is_map(raw["user"]), do: EDA.User.from_raw(raw["user"])),
-      account: EDA.Integration.Account.from_raw(raw["account"]),
-      synced_at: EDA.Timestamp.parse(raw["synced_at"]),
-      subscriber_count: raw["subscriber_count"],
-      revoked: raw["revoked"],
-      application: raw["application"] && EDA.App.from_raw(raw["application"]),
-      scopes: raw["scopes"]
+      id: :maps.get("id", raw, nil),
+      guild_id: :maps.get("guild_id", raw, nil),
+      name: :maps.get("name", raw, nil),
+      type: :maps.get("type", raw, nil),
+      enabled: :maps.get("enabled", raw, nil),
+      syncing: :maps.get("syncing", raw, nil),
+      role_id: :maps.get("role_id", raw, nil),
+      enable_emoticons: :maps.get("enable_emoticons", raw, nil),
+      expire_behavior:
+        Map.get(
+          @expire_behaviors,
+          :maps.get("expire_behavior", raw, nil),
+          :maps.get("expire_behavior", raw, nil)
+        ),
+      expire_grace_period: :maps.get("expire_grace_period", raw, nil),
+      user:
+        if(is_map(:maps.get("user", raw, nil)),
+          do: EDA.User.from_raw(:maps.get("user", raw, nil))
+        ),
+      account: EDA.Integration.Account.from_raw(:maps.get("account", raw, nil)),
+      synced_at: EDA.Timestamp.parse(:maps.get("synced_at", raw, nil)),
+      subscriber_count: :maps.get("subscriber_count", raw, nil),
+      revoked: :maps.get("revoked", raw, nil),
+      application:
+        :maps.get("application", raw, nil) && EDA.App.from_raw(:maps.get("application", raw, nil)),
+      scopes: :maps.get("scopes", raw, nil)
     }
   end
 

@@ -67,35 +67,39 @@ defmodule EDA.Invite do
         }
 
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
-    guild = raw["guild"]
-    channel = raw["channel"]
+    guild = :maps.get("guild", raw, nil)
+    channel = :maps.get("channel", raw, nil)
 
     %__MODULE__{
-      code: raw["code"],
-      type: EDA.Enum.name(@invite_types, raw["type"]),
+      code: :maps.get("code", raw, nil),
+      type: EDA.Enum.name(@invite_types, :maps.get("type", raw, nil)),
       guild: guild && EDA.Guild.from_raw(guild),
-      guild_id: raw["guild_id"] || nested_id(guild),
+      guild_id: :maps.get("guild_id", raw, nil) || nested_id(guild),
       channel: channel && EDA.Channel.from_raw(channel),
-      channel_id: raw["channel_id"] || nested_id(channel),
-      inviter: parse_user(raw["inviter"]),
-      target_user: parse_user(raw["target_user"]),
-      target_type: EDA.Enum.name(@target_types, raw["target_type"]),
+      channel_id: :maps.get("channel_id", raw, nil) || nested_id(channel),
+      inviter: parse_user(:maps.get("inviter", raw, nil)),
+      target_user: parse_user(:maps.get("target_user", raw, nil)),
+      target_type: EDA.Enum.name(@target_types, :maps.get("target_type", raw, nil)),
       target_application:
-        raw["target_application"] && EDA.App.from_raw(raw["target_application"]),
-      roles: parse_roles(raw["roles"]),
-      role_ids: raw["role_ids"] || role_ids(raw["roles"]),
-      flags: raw["flags"],
-      expires_at: EDA.Timestamp.parse(raw["expires_at"]),
-      created_at: EDA.Timestamp.parse(raw["created_at"]),
-      approximate_member_count: raw["approximate_member_count"],
-      approximate_presence_count: raw["approximate_presence_count"],
+        :maps.get("target_application", raw, nil) &&
+          EDA.App.from_raw(:maps.get("target_application", raw, nil)),
+      roles: parse_roles(:maps.get("roles", raw, nil)),
+      role_ids: :maps.get("role_ids", raw, nil) || role_ids(:maps.get("roles", raw, nil)),
+      flags: :maps.get("flags", raw, nil),
+      expires_at: EDA.Timestamp.parse(:maps.get("expires_at", raw, nil)),
+      created_at: EDA.Timestamp.parse(:maps.get("created_at", raw, nil)),
+      approximate_member_count: :maps.get("approximate_member_count", raw, nil),
+      approximate_presence_count: :maps.get("approximate_presence_count", raw, nil),
       guild_scheduled_event:
-        raw["guild_scheduled_event"] && EDA.ScheduledEvent.from_raw(raw["guild_scheduled_event"]),
-      max_age: raw["max_age"],
-      max_uses: raw["max_uses"],
-      uses: raw["uses"],
-      temporary: raw["temporary"]
+        :maps.get("guild_scheduled_event", raw, nil) &&
+          EDA.ScheduledEvent.from_raw(:maps.get("guild_scheduled_event", raw, nil)),
+      max_age: :maps.get("max_age", raw, nil),
+      max_uses: :maps.get("max_uses", raw, nil),
+      uses: :maps.get("uses", raw, nil),
+      temporary: :maps.get("temporary", raw, nil)
     }
   end
 

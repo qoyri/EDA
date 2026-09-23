@@ -35,17 +35,28 @@ defmodule EDA.Event.VoiceChannelEffectSend do
 
   @doc "Converts a raw Discord payload into this event struct."
   @spec from_raw(map()) :: t()
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      channel_id: raw["channel_id"],
-      guild_id: raw["guild_id"],
-      user_id: raw["user_id"],
-      emoji: if(is_map(raw["emoji"]), do: EDA.Emoji.from_raw(raw["emoji"])),
-      animation_type: Map.get(@animation_types, raw["animation_type"], raw["animation_type"]),
-      animation_id: raw["animation_id"],
+      channel_id: :maps.get("channel_id", raw, nil),
+      guild_id: :maps.get("guild_id", raw, nil),
+      user_id: :maps.get("user_id", raw, nil),
+      emoji:
+        if(is_map(:maps.get("emoji", raw, nil)),
+          do: EDA.Emoji.from_raw(:maps.get("emoji", raw, nil))
+        ),
+      animation_type:
+        Map.get(
+          @animation_types,
+          :maps.get("animation_type", raw, nil),
+          :maps.get("animation_type", raw, nil)
+        ),
+      animation_id: :maps.get("animation_id", raw, nil),
       # A default sound's id is sent as an integer.
-      sound_id: if(raw["sound_id"], do: to_string(raw["sound_id"])),
-      sound_volume: raw["sound_volume"]
+      sound_id:
+        if(:maps.get("sound_id", raw, nil), do: to_string(:maps.get("sound_id", raw, nil))),
+      sound_volume: :maps.get("sound_volume", raw, nil)
     }
   end
 

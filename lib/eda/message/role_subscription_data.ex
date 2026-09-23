@@ -19,12 +19,14 @@ defmodule EDA.Message.RoleSubscriptionData do
   @spec from_raw(map() | nil) :: t() | nil
   def from_raw(nil), do: nil
 
+  def from_raw(%__MODULE__{} = parsed), do: parsed
+
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      role_subscription_listing_id: raw["role_subscription_listing_id"],
-      tier_name: raw["tier_name"],
-      total_months_subscribed: raw["total_months_subscribed"],
-      is_renewal: raw["is_renewal"]
+      role_subscription_listing_id: :maps.get("role_subscription_listing_id", raw, nil),
+      tier_name: :maps.get("tier_name", raw, nil),
+      total_months_subscribed: :maps.get("total_months_subscribed", raw, nil),
+      is_renewal: :maps.get("is_renewal", raw, nil)
     }
   end
 end
