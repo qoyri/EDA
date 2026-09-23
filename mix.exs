@@ -201,6 +201,7 @@ defmodule EDA.MixProject do
           EDA.ScheduledEvent,
           EDA.ScheduledEvent.EntityMetadata,
           EDA.ScheduledEvent.RecurrenceRule,
+          EDA.ScheduledEvent.Subscriber,
           EDA.SKU,
           EDA.SKU.Flags,
           EDA.SoundboardSound,

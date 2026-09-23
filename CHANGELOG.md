@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Typed calls for webhooks, scheduled events, stages, entitlements and soundboard sounds:
+  `EDA.Webhook` (`create/2`, `list_channel/1`, `list_guild/1`, `fetch/1`, `modify/2`,
+  `delete/1`, and `execute/2`, `fetch_message/2`, `edit_message/3`, `delete_message/2` with the
+  webhook's token), `EDA.ScheduledEvent` (`list/2`, `fetch_event/3`, `create/2`, `modify/3`,
+  `delete/2`, `subscribers/2` and `stream_subscribers/2` returning the new
+  `EDA.ScheduledEvent.Subscriber`), `EDA.StageInstance` (`create/1`, `fetch/1`, `modify/2`,
+  `delete/1`), `EDA.Entitlement` (`list/1`, `fetch/1`, `consume/1`, `create_test/1`,
+  `delete_test/1`) and `EDA.SoundboardSound` (`create/2`, `modify/3`, `delete/3`).
+
 - Typed message calls: `EDA.Message.list/2`, `history/3`, `stream/2`, `pinned/2`, `pins/2`
   (each pin with its `pinned_at` as a `DateTime`) and `forward/2`; `EDA.Poll.expire/1` and
   `voters/3`; `EDA.Reaction.users/3` and `stream_users/3`. They return `EDA.Message` and

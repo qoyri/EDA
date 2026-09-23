@@ -95,4 +95,39 @@ defmodule EDA.Entitlement do
   end
 
   defp parse_time(value), do: EDA.Timestamp.parse(value)
+
+  # ── Entity Manager ──
+
+  use EDA.Entity
+
+  @doc """
+  Lists the app's entitlements. Takes the filters of `EDA.API.Entitlement.list/1`: `:user_id`,
+  `:sku_ids`, `:guild_id`, `:before`, `:after`, `:limit`, `:exclude_ended`, `:exclude_deleted`.
+  """
+  @spec list(keyword()) :: {:ok, [t()]} | {:error, term()}
+  def list(opts \\ []), do: EDA.API.Entitlement.list(opts) |> parse_list()
+
+  @doc "Fetches one entitlement."
+  @spec fetch(String.t() | integer()) :: {:ok, t()} | {:error, term()}
+  def fetch(entitlement_id), do: EDA.API.Entitlement.get(entitlement_id) |> parse_response()
+
+  @doc "Marks a consumable entitlement as used."
+  @spec consume(t() | String.t() | integer()) :: :ok | {:error, term()}
+  def consume(%__MODULE__{id: id}), do: consume(id)
+  def consume(entitlement_id), do: EDA.API.Entitlement.consume(entitlement_id)
+
+  @doc """
+  Grants a test entitlement to a user or guild, for trying premium features without paying.
+  Takes `:sku_id`, `:owner_id` and `:owner_type`.
+  """
+  @spec create_test(map() | keyword()) :: {:ok, t()} | {:error, term()}
+  def create_test(opts), do: EDA.API.Entitlement.create_test(opts) |> parse_response()
+
+  @doc "Deletes a test entitlement."
+  @spec delete_test(t() | String.t() | integer()) :: :ok | {:error, term()}
+  def delete_test(%__MODULE__{id: id}), do: delete_test(id)
+  def delete_test(entitlement_id), do: EDA.API.Entitlement.delete_test(entitlement_id)
+
+  defp parse_list({:ok, list}) when is_list(list), do: {:ok, Enum.map(list, &from_raw/1)}
+  defp parse_list({:error, _} = err), do: err
 end

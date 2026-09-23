@@ -98,6 +98,32 @@ defmodule EDA.SoundboardSound do
   end
 
   @doc """
+  Uploads a soundboard sound to a guild. Takes the options of `EDA.API.Soundboard.create/2`:
+  `:name`, `:sound` (a path, the MP3 or Ogg bytes, or a data URI; see `EDA.SoundData`),
+  `:volume`, `:emoji_id` or `:emoji_name`.
+  """
+  @spec create(String.t() | integer(), keyword() | map()) :: {:ok, t()} | {:error, term()}
+  def create(guild_id, opts), do: parse_one(EDA.API.Soundboard.create(guild_id, opts))
+
+  @doc "Modifies a guild's sound: its `:name`, `:volume` or emoji."
+  @spec modify(String.t() | integer(), t() | String.t() | integer(), keyword() | map()) ::
+          {:ok, t()} | {:error, term()}
+  def modify(guild_id, %__MODULE__{sound_id: id}, opts), do: modify(guild_id, id, opts)
+
+  def modify(guild_id, sound_id, opts),
+    do: parse_one(EDA.API.Soundboard.modify(guild_id, sound_id, opts))
+
+  @doc "Deletes a guild's sound."
+  @spec delete(String.t() | integer(), t() | String.t() | integer(), keyword()) ::
+          :ok | {:error, term()}
+  def delete(guild_id, sound, opts \\ [])
+  def delete(guild_id, %__MODULE__{sound_id: id}, opts), do: delete(guild_id, id, opts)
+  def delete(guild_id, sound_id, opts), do: EDA.API.Soundboard.delete(guild_id, sound_id, opts)
+
+  defp parse_one({:ok, raw}) when is_map(raw), do: {:ok, from_raw(raw)}
+  defp parse_one({:error, _} = err), do: err
+
+  @doc """
   Plays a sound into a voice channel the bot has joined.
 
   Takes a struct or a sound id. For a guild sound played in another guild's channel, the

@@ -57,4 +57,29 @@ defmodule EDA.StageInstance do
   """
   @spec privacy_level_value(atom() | integer()) :: integer()
   def privacy_level_value(level), do: EDA.Enum.value!(@privacy_levels, level, "privacy level")
+
+  # ── Entity Manager ──
+
+  use EDA.Entity
+
+  @doc """
+  Opens a stage: takes `:channel_id`, `:topic` and optionally `:privacy_level`,
+  `:send_start_notification` and `:guild_scheduled_event_id`.
+  """
+  @spec create(map()) :: {:ok, t()} | {:error, term()}
+  def create(params), do: EDA.API.Stage.create(params) |> parse_response()
+
+  @doc "Fetches the live stage in a stage channel."
+  @spec fetch(String.t() | integer()) :: {:ok, t()} | {:error, term()}
+  def fetch(channel_id), do: EDA.API.Stage.get(channel_id) |> parse_response()
+
+  @doc "Changes a live stage's `topic` or `privacy_level`."
+  @spec modify(t() | String.t() | integer(), map()) :: {:ok, t()} | {:error, term()}
+  def modify(%__MODULE__{channel_id: channel_id}, params), do: modify(channel_id, params)
+  def modify(channel_id, params), do: EDA.API.Stage.modify(channel_id, params) |> parse_response()
+
+  @doc "Ends a stage."
+  @spec delete(t() | String.t() | integer()) :: :ok | {:error, term()}
+  def delete(%__MODULE__{channel_id: channel_id}), do: delete(channel_id)
+  def delete(channel_id), do: EDA.API.Stage.delete(channel_id)
 end
