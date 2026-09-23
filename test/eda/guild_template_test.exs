@@ -88,9 +88,9 @@ defmodule EDA.GuildTemplateTest do
       assert sg.name == "Template Guild"
       assert sg.description == "Guild description"
       assert sg.region == ""
-      assert sg.verification_level == 1
-      assert sg.default_message_notifications == 0
-      assert sg.explicit_content_filter == 2
+      assert sg.verification_level == :low
+      assert sg.default_message_notifications == :all_messages
+      assert sg.explicit_content_filter == :all_members
       assert sg.preferred_locale == "en-US"
       assert sg.afk_timeout == 300
       assert sg.afk_channel_id == 2
@@ -99,11 +99,11 @@ defmodule EDA.GuildTemplateTest do
       assert sg.icon_hash == nil
     end
 
-    test "keeps roles as plain maps with placeholder integer IDs" do
+    test "reads roles as EDA.Role structs with placeholder integer IDs" do
       sg = SourceGuild.from_raw(@raw_template["serialized_source_guild"])
 
       assert length(sg.roles) == 2
-      [everyone, moderator] = sg.roles
+      [%EDA.Role{} = everyone, moderator] = sg.roles
       assert everyone["id"] == 0
       assert everyone["name"] == "@everyone"
       assert moderator["id"] == 1
@@ -111,17 +111,17 @@ defmodule EDA.GuildTemplateTest do
       assert moderator["color"] == 3_447_003
     end
 
-    test "keeps channels as plain maps with placeholder integer IDs" do
+    test "reads channels as EDA.Channel structs with placeholder integer IDs" do
       sg = SourceGuild.from_raw(@raw_template["serialized_source_guild"])
 
       assert length(sg.channels) == 2
-      [general, voice] = sg.channels
+      [%EDA.Channel{} = general, voice] = sg.channels
       assert general["id"] == 1
       assert general["name"] == "general"
-      assert general["type"] == 0
+      assert general.type == :guild_text
       assert voice["id"] == 2
       assert voice["name"] == "Voice"
-      assert voice["type"] == 2
+      assert voice.type == :guild_voice
     end
   end
 

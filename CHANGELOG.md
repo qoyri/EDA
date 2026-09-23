@@ -59,6 +59,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A guild template's source guild reads its `roles` and `channels` as `EDA.Role` and
+  `EDA.Channel` structs (with the template's placeholder integer ids) and its levels as the
+  atoms `EDA.Guild` uses.
+
 - **`GUILD_AUDIT_LOG_ENTRY_CREATE` delivers an `EDA.AuditLog.Entry`**, which gained
   `guild_id`, instead of a struct of its own. An entry's `options` is an
   `EDA.AuditLog.Entry.Options`: the counts Discord sends as strings are integers, the
