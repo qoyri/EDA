@@ -1,7 +1,22 @@
 defmodule EDA.Event.GuildMemberUpdate do
   @moduledoc "Dispatched when a guild member is updated."
   use EDA.Event.Access
-  defstruct [:guild_id, :user, :nick, :roles, :joined_at, :premium_since, :pending, :avatar]
+
+  defstruct [
+    :guild_id,
+    :user,
+    :nick,
+    :roles,
+    :joined_at,
+    :premium_since,
+    :pending,
+    :avatar,
+    :banner,
+    :deaf,
+    :mute,
+    :flags,
+    :communication_disabled_until
+  ]
 
   @type t :: %__MODULE__{
           guild_id: String.t() | nil,
@@ -11,7 +26,12 @@ defmodule EDA.Event.GuildMemberUpdate do
           joined_at: String.t() | nil,
           premium_since: String.t() | nil,
           pending: boolean() | nil,
-          avatar: String.t() | nil
+          avatar: String.t() | nil,
+          banner: String.t() | nil,
+          deaf: boolean() | nil,
+          mute: boolean() | nil,
+          flags: integer() | nil,
+          communication_disabled_until: String.t() | nil
         }
 
   @doc "Converts a raw Discord payload into this event struct."
@@ -25,7 +45,12 @@ defmodule EDA.Event.GuildMemberUpdate do
       joined_at: raw["joined_at"],
       premium_since: raw["premium_since"],
       pending: raw["pending"],
-      avatar: raw["avatar"]
+      avatar: raw["avatar"],
+      banner: raw["banner"],
+      deaf: raw["deaf"],
+      mute: raw["mute"],
+      flags: raw["flags"],
+      communication_disabled_until: raw["communication_disabled_until"]
     }
   end
 
