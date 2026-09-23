@@ -47,7 +47,7 @@ defmodule EDA.Gateway.TaskSupervisorTest do
       # Give the async task time to execute
       Process.sleep(50)
 
-      assert_receive {:event, {:MESSAGE_CREATE, %EDA.Event.MessageCreate{content: "test"}}}, 500
+      assert_receive {:event, {:MESSAGE_CREATE, %EDA.Message{content: "test"}}}, 500
     end
 
     test "counter decrements after task completion" do

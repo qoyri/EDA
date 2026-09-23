@@ -78,7 +78,7 @@ defmodule EDA.Cache do
   Returns `nil` if the bot hasn't connected yet.
   The raw map is also stored for internal callers that need string-key access.
   """
-  @spec me() :: EDA.User.t() | map() | nil
+  @spec me() :: EDA.User.t() | nil
   def me do
     :persistent_term.get(@me_key, nil)
   end

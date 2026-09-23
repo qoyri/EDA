@@ -148,5 +148,27 @@ defmodule EDA.API.GuildTest do
       assert {:ok, %{entries: []}} =
                Guild.audit_log("111", action_type: :member_ban_add)
     end
+
+    test "returns what the entries point at, not only users and webhooks", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "GET", "/guilds/111/audit-logs", fn conn ->
+        json(conn, %{
+          "audit_log_entries" => [],
+          "users" => [],
+          "webhooks" => [],
+          "application_commands" => [%{"id" => "c1", "name" => "ban"}],
+          "auto_moderation_rules" => [%{"id" => "r1", "name" => "no links"}],
+          "guild_scheduled_events" => [%{"id" => "e1", "name" => "raid"}],
+          "integrations" => [%{"id" => "i1", "name" => "bot"}],
+          "threads" => [%{"id" => "t1", "name" => "appeal"}]
+        })
+      end)
+
+      assert {:ok, log} = Guild.audit_log("111")
+      assert [%{"name" => "ban"}] = log.application_commands
+      assert [%{"name" => "no links"}] = log.auto_moderation_rules
+      assert [%{"name" => "raid"}] = log.guild_scheduled_events
+      assert [%{"name" => "bot"}] = log.integrations
+      assert [%{"name" => "appeal"}] = log.threads
+    end
   end
 end

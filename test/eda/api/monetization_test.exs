@@ -8,11 +8,18 @@ defmodule EDA.API.MonetizationTest do
     Application.put_env(:eda, :base_url, "http://localhost:#{bypass.port}")
     Application.put_env(:eda, :token, "test-token")
 
-    # Seed a bot user so app_id() works
-    :persistent_term.put(:eda_current_user, %{"id" => "app123"})
+    # Seed a bot user so app_id() works, the way the gateway does, and put back what was there.
+    previous = :persistent_term.get(:eda_current_user_raw, nil)
+    EDA.Cache.put_me(%{"id" => "app123"})
 
     on_exit(fn ->
       Application.delete_env(:eda, :base_url)
+
+      if previous,
+        do: EDA.Cache.put_me(previous),
+        else:
+          :persistent_term.erase(:eda_current_user) &&
+            :persistent_term.erase(:eda_current_user_raw)
     end)
 
     {:ok, bypass: bypass}

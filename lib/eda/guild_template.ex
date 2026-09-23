@@ -15,7 +15,7 @@ defmodule EDA.GuildTemplate do
   | `description` | string \| nil | Description (0-120 chars) |
   | `usage_count` | integer | Times this template has been used |
   | `creator_id` | snowflake | ID of the template creator |
-  | `creator` | map | User object of the creator |
+  | `creator` | `EDA.User` | The template's creator |
   | `created_at` | string | ISO8601 creation timestamp |
   | `updated_at` | string | ISO8601 last sync timestamp |
   | `source_guild_id` | snowflake | ID of the source guild |
@@ -27,6 +27,8 @@ defmodule EDA.GuildTemplate do
       EDA.GuildTemplate.max_name_length()        # => 100
       EDA.GuildTemplate.max_description_length()  # => 120
   """
+
+  use EDA.Event.Access
 
   defstruct [
     :code,
@@ -48,7 +50,7 @@ defmodule EDA.GuildTemplate do
           description: String.t() | nil,
           usage_count: integer() | nil,
           creator_id: String.t() | nil,
-          creator: map() | nil,
+          creator: EDA.User.t() | nil,
           created_at: String.t() | nil,
           updated_at: String.t() | nil,
           source_guild_id: String.t() | nil,
@@ -82,7 +84,7 @@ defmodule EDA.GuildTemplate do
       description: raw["description"],
       usage_count: raw["usage_count"],
       creator_id: raw["creator_id"],
-      creator: raw["creator"],
+      creator: parse_creator(raw["creator"]),
       created_at: raw["created_at"],
       updated_at: raw["updated_at"],
       source_guild_id: raw["source_guild_id"],
@@ -96,6 +98,9 @@ defmodule EDA.GuildTemplate do
   defp parse_source_guild(raw) when is_map(raw) do
     EDA.GuildTemplate.SourceGuild.from_raw(raw)
   end
+
+  defp parse_creator(nil), do: nil
+  defp parse_creator(raw) when is_map(raw), do: EDA.User.from_raw(raw)
 end
 
 defmodule EDA.GuildTemplate.SourceGuild do
@@ -107,6 +112,8 @@ defmodule EDA.GuildTemplate.SourceGuild do
   Roles and channels are kept as plain maps since their IDs are placeholders
   and they contain only a subset of normal guild role/channel fields.
   """
+
+  use EDA.Event.Access
 
   defstruct [
     :name,

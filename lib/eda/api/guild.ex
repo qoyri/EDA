@@ -80,6 +80,10 @@ defmodule EDA.API.Guild do
     EDA.HTTP.Client.get("/guilds/#{guild_id}/invites")
   end
 
+  # What an audit log response carries besides its entries: the objects they point at.
+  @audit_log_lists ~w(users webhooks application_commands auto_moderation_rules
+                      guild_scheduled_events integrations threads)
+
   @doc """
   Gets the audit log for a guild.
 
@@ -89,9 +93,23 @@ defmodule EDA.API.Guild do
   - `:before` - Get entries before this entry ID
   - `:after` - Get entries after this entry ID
   - `:limit` - Number of entries (1-100, default 50)
+
+  Besides the entries, the result holds what they point at, as Discord sends it: `users`,
+  `webhooks`, `application_commands`, `auto_moderation_rules`, `guild_scheduled_events`,
+  `integrations` and `threads` — so an entry's target can be named without another request.
   """
   @spec audit_log(String.t() | integer(), keyword()) ::
-          {:ok, %{entries: [EDA.AuditLog.Entry.t()], users: [map()], webhooks: [map()]}}
+          {:ok,
+           %{
+             entries: [EDA.AuditLog.Entry.t()],
+             users: [map()],
+             webhooks: [map()],
+             application_commands: [map()],
+             auto_moderation_rules: [map()],
+             guild_scheduled_events: [map()],
+             integrations: [map()],
+             threads: [map()]
+           }}
           | {:error, term()}
   def audit_log(guild_id, opts \\ []) do
     opts = resolve_action_type(opts)
@@ -110,7 +128,8 @@ defmodule EDA.API.Guild do
           (data["audit_log_entries"] || [])
           |> Enum.map(&EDA.AuditLog.Entry.from_raw/1)
 
-        {:ok, %{entries: entries, users: data["users"] || [], webhooks: data["webhooks"] || []}}
+        referenced = Map.new(@audit_log_lists, &{String.to_atom(&1), data[&1] || []})
+        {:ok, Map.put(referenced, :entries, entries)}
 
       error ->
         error

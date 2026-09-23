@@ -6,6 +6,8 @@ defmodule EDA.Sticker do
   Formats: `:png`, `:apng`, `:lottie`, `:gif`.
   """
 
+  use EDA.Event.Access
+
   defstruct [
     :id,
     :pack_id,
@@ -30,7 +32,7 @@ defmodule EDA.Sticker do
           format_type: :png | :apng | :lottie | :gif | integer() | nil,
           available: boolean() | nil,
           guild_id: String.t() | nil,
-          user: map() | nil,
+          user: EDA.User.t() | nil,
           sort_value: integer() | nil
         }
 
@@ -61,7 +63,7 @@ defmodule EDA.Sticker do
       format_type: resolve_format(raw["format_type"]),
       available: raw["available"],
       guild_id: raw["guild_id"],
-      user: raw["user"],
+      user: parse_user(raw["user"]),
       sort_value: raw["sort_value"]
     }
   end
@@ -100,4 +102,7 @@ defmodule EDA.Sticker do
 
   defp resolve_format(int) when is_integer(int), do: Map.get(@format_types, int, int)
   defp resolve_format(other), do: other
+
+  defp parse_user(nil), do: nil
+  defp parse_user(raw) when is_map(raw), do: EDA.User.from_raw(raw)
 end

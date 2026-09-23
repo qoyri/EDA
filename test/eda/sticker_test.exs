@@ -30,7 +30,7 @@ defmodule EDA.StickerTest do
       assert sticker.format_type == :png
       assert sticker.available == true
       assert sticker.guild_id == "g1"
-      assert sticker.user == %{"id" => "u1"}
+      assert %EDA.User{id: "u1"} = sticker.user
       assert sticker.sort_value == 5
     end
 

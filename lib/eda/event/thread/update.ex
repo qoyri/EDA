@@ -1,46 +1,13 @@
 defmodule EDA.Event.ThreadUpdate do
-  @moduledoc "Dispatched when a thread is updated."
-  use EDA.Event.Access
+  @moduledoc """
+  Sent when a thread is updated. Delivers an `EDA.Channel`, not a struct of its own.
 
-  defstruct [
-    :id,
-    :guild_id,
-    :type,
-    :name,
-    :parent_id,
-    :owner_id,
-    :last_message_id,
-    :message_count,
-    :member_count,
-    :thread_metadata
-  ]
+  The consumer receives `{:THREAD_UPDATE, %EDA.Channel{}}`, with every field Discord sent — including
+  what only a thread, a forum, a voice channel or a direct message has, in `thread`, `forum`,
+  `voice` and `dm`. This module only parses the payload.
+  """
 
-  @type t :: %__MODULE__{
-          id: String.t() | nil,
-          guild_id: String.t() | nil,
-          type: integer() | nil,
-          name: String.t() | nil,
-          parent_id: String.t() | nil,
-          owner_id: String.t() | nil,
-          last_message_id: String.t() | nil,
-          message_count: integer() | nil,
-          member_count: integer() | nil,
-          thread_metadata: map() | nil
-        }
-  @doc "Converts a raw Discord payload into this event struct."
-  @spec from_raw(map()) :: t()
-  def from_raw(raw) when is_map(raw) do
-    %__MODULE__{
-      id: raw["id"],
-      guild_id: raw["guild_id"],
-      type: raw["type"],
-      name: raw["name"],
-      parent_id: raw["parent_id"],
-      owner_id: raw["owner_id"],
-      last_message_id: raw["last_message_id"],
-      message_count: raw["message_count"],
-      member_count: raw["member_count"],
-      thread_metadata: raw["thread_metadata"]
-    }
-  end
+  @doc "Parses the `THREAD_UPDATE` payload into an `EDA.Channel`."
+  @spec from_raw(map()) :: EDA.Channel.t()
+  def from_raw(raw) when is_map(raw), do: EDA.Channel.from_raw(raw)
 end

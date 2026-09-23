@@ -15,6 +15,7 @@ defmodule EDA.UserBadgesTest do
   doctest EDA.Member.Flags
   doctest EDA.User.AvatarDecoration
   doctest EDA.User.Nameplate
+  doctest EDA.User.DisplayNameStyles
 
   alias EDA.User.{AvatarDecoration, Collectibles, Flags, Nameplate}
 
@@ -182,10 +183,27 @@ defmodule EDA.UserBadgesTest do
       assert event.communication_disabled_until == "2026-02-01T00:00:00+00:00"
       assert event.banner == "b_hash"
 
-      member = EDA.Event.GuildMemberAdd.member(event)
-      assert %EDA.Member{roles: ["2"], banner: "b_hash"} = member
-      assert EDA.Member.flags(member) == [:did_rejoin]
-      assert member.user.id == "776016158737432626"
+      # The event is the member itself, with its guild.
+      assert %EDA.Member{roles: ["2"], banner: "b_hash", guild_id: "1"} = event
+      assert EDA.Member.flags(event) == [:did_rejoin]
+      assert event.user.id == "776016158737432626"
+    end
+
+    test "the member's own decoration, nameplate and name style come through" do
+      event =
+        EDA.Event.from_raw("GUILD_MEMBER_UPDATE", %{
+          "guild_id" => "1",
+          "user" => @raw_user,
+          "avatar_decoration_data" => @raw_user["avatar_decoration_data"],
+          "collectibles" => @raw_user["collectibles"],
+          "display_name_styles" => %{"font_id" => 8, "effect_id" => 5, "colors" => [747_943]}
+        })
+
+      assert %AvatarDecoration{} = event.avatar_decoration_data
+      assert %Collectibles{nameplate: %Nameplate{}} = event.collectibles
+
+      assert %EDA.User.DisplayNameStyles{font_id: 8, colors: [747_943]} =
+               event.display_name_styles
     end
 
     test "GUILD_MEMBER_UPDATE carries them too" do

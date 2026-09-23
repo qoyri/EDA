@@ -36,8 +36,8 @@ defmodule EDA.ForumTag do
 
   @type t :: %__MODULE__{
           id: String.t() | nil,
-          name: String.t(),
-          moderated: boolean(),
+          name: String.t() | nil,
+          moderated: boolean() | nil,
           emoji_id: String.t() | nil,
           emoji_name: String.t() | nil
         }

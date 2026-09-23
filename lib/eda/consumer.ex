@@ -42,7 +42,7 @@ defmodule EDA.Consumer do
   Events are tuples in the format `{event_type, struct}` where:
 
   - `event_type` is an atom like `:MESSAGE_CREATE`, `:GUILD_CREATE`, etc.
-  - `struct` is a typed event struct (e.g. `%EDA.Event.MessageCreate{}`)
+  - `struct` is a typed struct (e.g. `%EDA.Message{}` for a message)
 
   Struct fields are accessible via dot notation (`msg.content`), atom keys
   (`msg[:content]`), or string keys (`msg["content"]`) thanks to the custom
@@ -54,16 +54,16 @@ defmodule EDA.Consumer do
   ## Common Events
 
   - `{:READY, %EDA.Event.Ready{}}` - Bot has connected and is ready
-  - `{:MESSAGE_CREATE, %EDA.Event.MessageCreate{}}` - A message was created
-  - `{:MESSAGE_UPDATE, %EDA.Event.MessageUpdate{}}` - A message was edited
+  - `{:MESSAGE_CREATE, %EDA.Message{}}` - A message was created
+  - `{:MESSAGE_UPDATE, %EDA.Message{}}` - A message was edited
   - `{:MESSAGE_DELETE, %EDA.Event.MessageDelete{}}` - A message was deleted
-  - `{:GUILD_CREATE, %EDA.Event.GuildCreate{}}` - Bot joined a new guild at runtime
-  - `{:GUILD_AVAILABLE, %EDA.Event.GuildCreate{}}` - A guild finished loading during startup
+  - `{:GUILD_CREATE, %EDA.Guild{}}` - Bot joined a new guild at runtime
+  - `{:GUILD_AVAILABLE, %EDA.Guild{}}` - A guild finished loading during startup
   - `{:GUILD_DELETE, %EDA.Event.GuildDelete{}}` - Bot was removed from a guild
   - `{:GUILD_UNAVAILABLE, %EDA.Event.GuildDelete{}}` - A guild went offline (Discord outage)
   - `{:SHARD_READY, %EDA.Event.ShardReady{}}` - A shard finished loading all its guilds
   - `{:ALL_SHARDS_READY, %EDA.Event.AllShardsReady{}}` - All shards are ready
-  - `{:CHANNEL_CREATE, %EDA.Event.ChannelCreate{}}` - A channel was created
+  - `{:CHANNEL_CREATE, %EDA.Channel{}}` - A channel was created
   - `{:INTERACTION_CREATE, %EDA.Event.InteractionCreate{}}` - A slash command or component interaction
   - `{:GATEWAY_CLOSE, %EDA.Event.GatewayClose{}}` - A shard disconnected from the gateway
   - `{:SESSION_RESUMED, %EDA.Event.SessionResumed{}}` - A shard resumed its previous session

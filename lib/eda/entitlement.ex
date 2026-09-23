@@ -102,4 +102,7 @@ defmodule EDA.Entitlement do
       _ -> nil
     end
   end
+
+  defp parse_time(%DateTime{} = dt), do: dt
+  defp parse_time(_other), do: nil
 end

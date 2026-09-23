@@ -1,22 +1,13 @@
 defmodule EDA.Event.ThreadDelete do
-  @moduledoc "Dispatched when a thread is deleted."
-  use EDA.Event.Access
-  defstruct [:id, :guild_id, :parent_id, :type]
+  @moduledoc """
+  Sent when a thread is deleted. Delivers an `EDA.Channel`, not a struct of its own.
 
-  @type t :: %__MODULE__{
-          id: String.t() | nil,
-          guild_id: String.t() | nil,
-          parent_id: String.t() | nil,
-          type: integer() | nil
-        }
-  @doc "Converts a raw Discord payload into this event struct."
-  @spec from_raw(map()) :: t()
-  def from_raw(raw) when is_map(raw) do
-    %__MODULE__{
-      id: raw["id"],
-      guild_id: raw["guild_id"],
-      parent_id: raw["parent_id"],
-      type: raw["type"]
-    }
-  end
+  The consumer receives `{:THREAD_DELETE, %EDA.Channel{}}`, with every field Discord sent — including
+  what only a thread, a forum, a voice channel or a direct message has, in `thread`, `forum`,
+  `voice` and `dm`. Discord sends only `id`, `guild_id`, `parent_id` and `type`; the other fields are `nil`. This module only parses the payload.
+  """
+
+  @doc "Parses the `THREAD_DELETE` payload into an `EDA.Channel`."
+  @spec from_raw(map()) :: EDA.Channel.t()
+  def from_raw(raw) when is_map(raw), do: EDA.Channel.from_raw(raw)
 end

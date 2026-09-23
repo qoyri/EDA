@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `EDA.ScheduledEvent`, the guild scheduled event as a struct, with its cover `image` and
+  `recurrence_rule`.
+
 - `EDA.Presence.platforms/1` says which platforms a user is connected from, off the
   `client_status` EDA already received and never exposed, with `status_on/2`, `on?/2` and the
   `desktop?/1`, `mobile?/1`, `web?/1` shorthands. They read a `PRESENCE_UPDATE` event, a cached
@@ -31,12 +34,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `guild_tag_badge_url/2`. A decoration is PNG only, animated ones included; a nameplate has an
   animation (`.webm`, the default) and a still (`format: :static`), neither of which Discord
   lists in its CDN endpoints — both were checked against a live profile.
-- `EDA.Member` carries `flags`, `avatar_decoration_data` and `collectibles`; `GUILD_MEMBER_ADD`
-  carries `flags`, `premium_since`, `communication_disabled_until` and `banner`, with
-  `EDA.Event.GuildMemberAdd.member/1` to get an `EDA.Member` from it; `GUILD_MEMBER_UPDATE`
-  carries `flags`, `communication_disabled_until`, `banner`, `deaf` and `mute`.
+- `EDA.Member` carries `flags`, `avatar_decoration_data`, `collectibles`, and the guild it
+  belongs to in `guild_id`, set by `EDA.Member.fetch_member/2` and by the member events.
+- `display_name_styles` on users and members: the font, effect and colours of the name. Discord
+  sends it on about one user in eight but does not document it; its colours arrive as integers
+  or strings, and are integers in `EDA.User.DisplayNameStyles`.
 
 ### Changed
+
+- **`GUILD_SCHEDULED_EVENT_CREATE`, `_UPDATE` and `_DELETE` deliver an `EDA.ScheduledEvent`**,
+  instead of structs of their own that dropped the cover image and the recurrence rule and kept
+  the creator as a raw map; it is an `EDA.User` now.
+
+- **`GUILD_MEMBER_ADD` and `GUILD_MEMBER_UPDATE` deliver an `EDA.Member`**, with `guild_id` set,
+  instead of structs of their own that dropped `flags`, `premium_since` (on a join), the member's
+  decoration and nameplate. `EDA.Member.flags/1`, `EDA.Permission.for_member/2` and the rest take
+  the event as is.
+
+- **`GUILD_CREATE`, `GUILD_AVAILABLE` and `GUILD_UPDATE` deliver an `EDA.Guild`**, instead of
+  structs of their own. The lists only `GUILD_CREATE` carries — `channels`, `threads`, `members`,
+  `voice_states`, `presences`, `stage_instances`, `guild_scheduled_events`,
+  `soundboard_sounds` — are typed (`EDA.Channel`, `EDA.Member`, `EDA.VoiceState`,
+  `EDA.SoundboardSound`) and describe that moment only: they are `nil` on a guild from
+  `EDA.Guild.fetch/1` or the REST API. Read the current state from `EDA.Cache.members/1`,
+  `EDA.Cache.channels_for_guild/1` and the like.
+- **The guild cache holds the guild object alone**, without those lists and without the roles,
+  which each have a cache of their own. `EDA.Guild.fetch/1` fills `roles` from the role cache.
+
+- **`INVITE_CREATE` delivers an `EDA.Invite`**, instead of a struct of its own. `EDA.Invite` gains
+  `role_ids`, filled from the event's `role_ids` or from the partial roles the REST routes send.
+
+- **`EDA.Channel` groups what only one kind of channel has** into `thread`, `forum`, `voice` and
+  `dm`, each `nil` on another kind:
+  - `channel.thread` — `EDA.Channel.Thread`, with `thread_metadata` flattened into it
+    (`channel.thread.archived`, `.locked`, `.invitable`, `.auto_archive_duration`…), the counters,
+    `applied_tags`, `newly_created` and the bot's membership as an `EDA.Channel.ThreadMember`;
+  - `channel.forum` — `EDA.Channel.Forum`: `available_tags`, `default_reaction_emoji`,
+    `default_sort_order`, `default_forum_layout`;
+  - `channel.voice` — `EDA.Channel.Voice`: `bitrate`, `user_limit`, `rtc_region`,
+    `video_quality_mode`, `status`;
+  - `channel.dm` — `EDA.Channel.DM`: `recipients` (as `EDA.User` structs), `icon`,
+    `application_id`, `managed`.
+
+  So `channel.bitrate` becomes `channel.voice.bitrate`, `channel.available_tags` becomes
+  `channel.forum.available_tags` and `channel.thread_metadata["archived"]` becomes
+  `channel.thread.archived`. Keeping every field flat would have taken the struct past 31 fields,
+  where a map leaves its compact form — about 3.5 times the memory for the struct, on the entity
+  the cache holds by the thousand. Measured on 372 real channels, a channel is now smaller than
+  before while holding more.
+- **`CHANNEL_CREATE`, `CHANNEL_UPDATE`, `CHANNEL_DELETE`, `THREAD_CREATE`, `THREAD_UPDATE` and
+  `THREAD_DELETE` deliver an `EDA.Channel`**, instead of structs of their own that kept 10 or 12
+  fields. `THREAD_LIST_SYNC` carries `EDA.Channel` and `EDA.Channel.ThreadMember` structs, and
+  `THREAD_MEMBERS_UPDATE` its added members as `EDA.Channel.ThreadMember`.
+
+- **`MESSAGE_CREATE` and `MESSAGE_UPDATE` deliver an `EDA.Message`**, instead of a struct of their
+  own that copied part of it: match `{:MESSAGE_CREATE, %EDA.Message{} = msg}`. The message received
+  can now be passed straight to `EDA.Message.reply/2`, `edit/2`, `react/2` and `delete/2`, which
+  used to refuse it with a `FunctionClauseError`. `EDA.Event.MessageCreate` and `MessageUpdate`
+  remain as the parsers.
+
+- `EDA.Event.Raw`, the fallback for a gateway event EDA does not type yet, keeps its `data` as
+  Discord sent it, with string keys, instead of converting the top-level keys to atoms: read
+  `raw.data["guild_id"]` rather than `raw.data.guild_id`. Converting created an atom for every key
+  of every unknown payload, and atoms are never freed. The event still reaches the consumer under
+  its own name, so a new event can be matched before EDA types it.
 
 - `EDA.API.Invite.create/2` sends up to 1000 `target_users` as the JSON array Discord now
   accepts, so the list is in force when the call returns, instead of uploading a CSV and leaving
@@ -48,6 +109,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `EDA.User.Collectibles` (holding an `EDA.User.Nameplate`) instead of raw maps. The
   decoration carries `expires_at`, which Discord sends but does not document. Code that read them
   with string keys keeps working, as on every other nested object.
+
+### Fixed
+
+- `EDA.User.avatar_url/1` returned `.png` for every avatar, animated ones included, and neither
+  it, `EDA.Guild.icon_url/1` nor `EDA.Emoji.image_url/1` took a size. All three now take options:
+  `:format` (`:png`, `:jpg`, `:webp`, `:gif`), `:size` (a power of two from 16 to 4096) and
+  `animated: false`. An animated image defaults to GIF, and `:webp` keeps it animated, as Discord
+  recommends. Asking for the GIF of a still image raises, since the CDN answers 415, as does an
+  invalid size or format. Every URL was checked against the CDN.
+
+- `EDA.API.Guild.audit_log/2` returned the entries with their `users` and `webhooks` only. It
+  now also returns the `application_commands`, `auto_moderation_rules`,
+  `guild_scheduled_events`, `integrations` and `threads` Discord sends alongside, so an entry's
+  target can be named without another request.
+
+- `INTERACTION_CREATE` dropped what a user-installed command needs to know where it runs and who
+  installed it. It now keeps `context` (`:guild`, `:bot_dm`, `:private_channel`),
+  `authorizing_integration_owners` (`%{guild_install: _, user_install: _}`),
+  `attachment_size_limit`, `version`, and the partial `guild` and `channel` Discord attaches, as
+  `EDA.Guild` and `EDA.Channel` — the only channel data such a command gets in a guild the bot is
+  not in. `entitlements` are `EDA.Entitlement` structs. The partial guild's `locale` lands in
+  `preferred_locale`.
+
+- More fields Discord documents were dropped: a role's `flags` (selectable in an onboarding
+  prompt); a reaction's `count_details` (`%{burst: _, normal: _}`), `me_burst` and
+  `burst_colors`, without which a super reaction looked like a normal one; a clip attachment's
+  `clip_participants` (as `EDA.User` structs), `clip_created_at` and `application`; an
+  activity's `status_display_type`, `details_url` and `state_url`; a follower webhook's
+  `source_guild` and `source_channel`, and a webhook's `url`.
+
+- `EDA.Guild` kept 12 of the guild object's fields. It now keeps all of them: `features`,
+  `premium_tier`, `premium_subscription_count`, `premium_progress_bar_enabled`, `banner`,
+  `splash`, `discovery_splash`, `icon_hash`, `description`, `vanity_url_code`,
+  `preferred_locale`, the verification, notification, content filter, MFA and NSFW levels, the
+  AFK channel and timeout, the widget settings, the system, rules, public updates and safety
+  alerts channels with the system channel's flags, `application_id`, the member, presence and
+  video limits, the approximate counts, `welcome_screen`, `incidents_data`, `owner`,
+  `permissions`, `emojis` and `stickers`.
+- `EDA.Guild.fetch/1` returned channels, members and roles frozen when the bot joined the guild:
+  the cache stored the whole `GUILD_CREATE` and nothing updated the copy. Every member was also
+  held twice, the second copy outside the member cache's `max_size`.
+- The active threads `GUILD_CREATE` carries were thrown away; they now go to the channel cache.
+  `GUILD_EMOJIS_UPDATE` and `GUILD_STICKERS_UPDATE` now update the guild's emojis and stickers
+  in the cache.
+
+- `INVITE_CREATE` dropped `expires_at`, `created_at`, `target_type`, `target_user`,
+  `target_application` and the roles the invite grants, all of which a bot tracking its invites
+  needs.
+
+- A change to a forum's tags, a channel's flags or a voice channel's region was invisible in
+  `CHANNEL_UPDATE`, whose struct dropped them. `EDA.Channel` also gained what it never kept:
+  `rtc_region`, `video_quality_mode`, a DM's `recipients`, `icon`, `application_id` and `managed`,
+  a thread's `newly_created` and the bot's thread membership.
+
+- A message received through the gateway lost its poll and its reactions — a poll arrived without
+  its poll. It now carries every field Discord documents: `webhook_id` (present on 23 % of the
+  messages sampled on a real bot; the one way to tell a webhook's message apart), `flags`,
+  `application_id`, `interaction_metadata` (who ran the command a reply answers),
+  `message_snapshots` (the content of a forward), `thread` (as an `EDA.Channel`),
+  `mention_channels`, `nonce`, `position`, `activity`, `application`, `call`,
+  `role_subscription_data`, `resolved`, `shared_client_theme` and `channel_type`. Only the
+  deprecated `interaction` is left out.
+
+- `EDA.Emoji`, `EDA.Sticker`, `EDA.Sticker.Pack`, `EDA.AutoMod` and its action and metadata
+  structs, `EDA.GuildTemplate` and its source guild did not implement the access every other
+  struct offers, so `reaction.emoji["name"]` or `get_in(event, ["emoji", "name"])` raised
+  `UndefinedFunctionError` — on the emoji of every reaction event. A test now walks every struct
+  built from Discord data, so one added without it fails.
+- Reading a struct field by string key (`msg["content"]`) no longer converts the key to an atom
+  on every read: it is matched against the struct's own fields, about 2.5 times faster, now
+  quicker than a lookup in a raw map. Writing through that access (`put_in/2`, `pop_in/1`) can no
+  longer add a key the struct does not have or remove one it has: an unknown key raises
+  `KeyError`, and popping a field resets it to `nil`.
 
 ## [0.5.0-beta.2] - 2026-09-22
 

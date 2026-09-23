@@ -14,7 +14,8 @@ defmodule EDA.Role do
     :permissions,
     :managed,
     :mentionable,
-    :tags
+    :tags,
+    :flags
   ]
 
   @type t :: %__MODULE__{
@@ -29,7 +30,8 @@ defmodule EDA.Role do
           permissions: String.t() | nil,
           managed: boolean() | nil,
           mentionable: boolean() | nil,
-          tags: map() | nil
+          tags: map() | nil,
+          flags: non_neg_integer() | nil
         }
 
   @spec from_raw(map()) :: t()
@@ -46,7 +48,8 @@ defmodule EDA.Role do
       permissions: raw["permissions"],
       managed: raw["managed"],
       mentionable: raw["mentionable"],
-      tags: raw["tags"]
+      tags: raw["tags"],
+      flags: raw["flags"]
     }
   end
 

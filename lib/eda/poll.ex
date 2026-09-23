@@ -42,7 +42,7 @@ defmodule EDA.Poll do
   ]
 
   @type t :: %__MODULE__{
-          question: String.t(),
+          question: String.t() | nil,
           answers: [Answer.t()],
           expiry: String.t() | nil,
           duration: integer() | nil,

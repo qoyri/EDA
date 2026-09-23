@@ -24,7 +24,7 @@ defmodule EDA.EventTest do
       }
 
       result = Event.from_raw("MESSAGE_CREATE", data)
-      assert %Event.MessageCreate{} = result
+      assert %EDA.Message{} = result
       assert result.id == "msg1"
       assert result.content == "hello"
       assert result.channel_id == "ch1"
@@ -115,8 +115,7 @@ defmodule EDA.EventTest do
       result = Event.from_raw("SUPER_NEW_EVENT", data)
       assert %Event.Raw{} = result
       assert result.event_type == "SUPER_NEW_EVENT"
-      assert result.data.foo == "bar"
-      assert result.data.baz == 42
+      assert result.data == %{"foo" => "bar", "baz" => 42}
     end
 
     test "GUILD_CREATE extracts all fields" do
@@ -131,7 +130,7 @@ defmodule EDA.EventTest do
       }
 
       result = Event.from_raw("GUILD_CREATE", data)
-      assert %Event.GuildCreate{} = result
+      assert %EDA.Guild{} = result
       assert result.name == "Test Guild"
       assert length(result.channels) == 1
       assert result.member_count == 42

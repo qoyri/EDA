@@ -130,7 +130,7 @@ defmodule EDA.Gateway.EventsTest do
         "content" => "hello"
       })
 
-      assert_receive {:event, {:MESSAGE_CREATE, %EDA.Event.MessageCreate{} = msg}}, 1000
+      assert_receive {:event, {:MESSAGE_CREATE, %EDA.Message{} = msg}}, 1000
       assert msg.id == "msg1"
       assert msg.content == "hello"
       assert msg["channel_id"] == "ch1"
@@ -147,7 +147,7 @@ defmodule EDA.Gateway.EventsTest do
 
       assert_receive {:event, {:UNKNOWN_NEW_EVENT, %EDA.Event.Raw{} = raw}}, 1000
       assert raw.event_type == "UNKNOWN_NEW_EVENT"
-      assert raw.data.foo == "bar"
+      assert raw.data == %{"foo" => "bar"}
 
       Application.delete_env(:eda, :consumer)
     end
@@ -209,7 +209,7 @@ defmodule EDA.Gateway.EventsTest do
         "members" => []
       })
 
-      assert_receive {:event, {:GUILD_AVAILABLE, %EDA.Event.GuildCreate{} = evt}}, 1000
+      assert_receive {:event, {:GUILD_AVAILABLE, %EDA.Guild{} = evt}}, 1000
       assert evt.id == "recovery_g1"
 
       # Should be removed from unavailable set

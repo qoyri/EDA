@@ -11,7 +11,10 @@ defmodule EDA.Webhook do
     :name,
     :avatar,
     :token,
-    :application_id
+    :application_id,
+    :source_guild,
+    :source_channel,
+    :url
   ]
 
   @type t :: %__MODULE__{
@@ -23,7 +26,10 @@ defmodule EDA.Webhook do
           name: String.t() | nil,
           avatar: String.t() | nil,
           token: String.t() | nil,
-          application_id: String.t() | nil
+          application_id: String.t() | nil,
+          source_guild: map() | nil,
+          source_channel: map() | nil,
+          url: String.t() | nil
         }
 
   @spec from_raw(map()) :: t()
@@ -37,7 +43,10 @@ defmodule EDA.Webhook do
       name: raw["name"],
       avatar: raw["avatar"],
       token: raw["token"],
-      application_id: raw["application_id"]
+      application_id: raw["application_id"],
+      source_guild: raw["source_guild"],
+      source_channel: raw["source_channel"],
+      url: raw["url"]
     }
   end
 

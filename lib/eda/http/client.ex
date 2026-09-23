@@ -184,7 +184,6 @@ defmodule EDA.HTTP.Client do
   def app_id do
     case EDA.Cache.me() do
       %EDA.User{id: id} when not is_nil(id) -> id
-      %{"id" => id} when not is_nil(id) -> id
       _ -> raise "application_id not available, bot not connected"
     end
   end

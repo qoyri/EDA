@@ -1,7 +1,26 @@
 defmodule EDA.Message do
-  @moduledoc "Represents a Discord message."
+  @moduledoc """
+  A Discord message, from the REST API or from `MESSAGE_CREATE` and `MESSAGE_UPDATE`.
+
+  The two gateway events deliver this struct itself, so what a bot receives can be passed
+  straight to `reply/2`, `edit/2`, `react/2` or `delete/2`. They add `guild_id`, `member` and
+  `channel_type`, which a message fetched over REST does not carry.
+
+  Every field Discord documents is kept. Nested objects that have no struct of their own yet —
+  `activity`, `application`, `call`, `interaction_metadata`, `message_snapshots`, `resolved`,
+  `role_subscription_data`, `shared_client_theme`, `mention_channels` — are the maps Discord
+  sent.
+
+  Without the `MESSAGE_CONTENT` intent, `content`, `embeds`, `attachments` and `components`
+  arrive empty and `poll` is absent, for messages the bot is neither mentioned in nor the
+  author of.
+  """
   use EDA.Event.Access
 
+  # A message is not cached, so a map past its compact form costs nothing held in bulk; its
+  # fields stay flat, as Discord sends them. The limit matters for what the cache holds by the
+  # thousand; see test/eda/cached_struct_size_test.exs.
+  # credo:disable-for-next-line Credo.Check.Warning.StructFieldAmount
   defstruct [
     :id,
     :channel_id,
@@ -24,7 +43,23 @@ defmodule EDA.Message do
     :message_reference,
     :components,
     :sticker_items,
-    :poll
+    :poll,
+    :webhook_id,
+    :application_id,
+    :flags,
+    :interaction_metadata,
+    :message_snapshots,
+    :thread,
+    :mention_channels,
+    :nonce,
+    :position,
+    :activity,
+    :application,
+    :call,
+    :role_subscription_data,
+    :resolved,
+    :shared_client_theme,
+    :channel_type
   ]
 
   @type t :: %__MODULE__{
@@ -49,7 +84,23 @@ defmodule EDA.Message do
           message_reference: map() | nil,
           components: [map()] | nil,
           sticker_items: [map()] | nil,
-          poll: EDA.Poll.t() | nil
+          poll: EDA.Poll.t() | nil,
+          webhook_id: String.t() | nil,
+          application_id: String.t() | nil,
+          flags: non_neg_integer() | nil,
+          interaction_metadata: map() | nil,
+          message_snapshots: [map()] | nil,
+          thread: EDA.Channel.t() | nil,
+          mention_channels: [map()] | nil,
+          nonce: String.t() | integer() | nil,
+          position: integer() | nil,
+          activity: map() | nil,
+          application: map() | nil,
+          call: map() | nil,
+          role_subscription_data: map() | nil,
+          resolved: map() | nil,
+          shared_client_theme: map() | nil,
+          channel_type: integer() | nil
         }
 
   @spec from_raw(map()) :: t()
@@ -76,7 +127,23 @@ defmodule EDA.Message do
       message_reference: raw["message_reference"],
       components: raw["components"],
       sticker_items: raw["sticker_items"],
-      poll: parse_poll(raw["poll"])
+      poll: parse_poll(raw["poll"]),
+      webhook_id: raw["webhook_id"],
+      application_id: raw["application_id"],
+      flags: raw["flags"],
+      interaction_metadata: raw["interaction_metadata"],
+      message_snapshots: raw["message_snapshots"],
+      thread: parse_thread(raw["thread"]),
+      mention_channels: raw["mention_channels"],
+      nonce: raw["nonce"],
+      position: raw["position"],
+      activity: raw["activity"],
+      application: raw["application"],
+      call: raw["call"],
+      role_subscription_data: raw["role_subscription_data"],
+      resolved: raw["resolved"],
+      shared_client_theme: raw["shared_client_theme"],
+      channel_type: raw["channel_type"]
     }
   end
 
@@ -97,6 +164,9 @@ defmodule EDA.Message do
 
   defp parse_message(nil), do: nil
   defp parse_message(raw) when is_map(raw), do: from_raw(raw)
+
+  defp parse_thread(nil), do: nil
+  defp parse_thread(raw) when is_map(raw), do: EDA.Channel.from_raw(raw)
 
   defp parse_poll(nil), do: nil
   defp parse_poll(raw) when is_map(raw), do: EDA.Poll.from_raw(raw)
