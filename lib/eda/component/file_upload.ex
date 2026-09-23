@@ -5,7 +5,16 @@ defmodule EDA.Component.FileUpload do
 
   use EDA.Event.Access
 
-  defstruct [:id, :custom_id, :min_values, :max_values, :required, :values, type: :file_upload]
+  defstruct [
+    :id,
+    :custom_id,
+    :min_values,
+    :max_values,
+    :required,
+    :values,
+    :file_types,
+    type: :file_upload
+  ]
 
   @type t :: %__MODULE__{
           type: :file_upload,
@@ -14,7 +23,8 @@ defmodule EDA.Component.FileUpload do
           min_values: non_neg_integer() | nil,
           max_values: non_neg_integer() | nil,
           required: boolean() | nil,
-          values: [String.t()] | nil
+          values: [String.t()] | nil,
+          file_types: [String.t()] | nil
         }
 
   @doc false
@@ -26,7 +36,8 @@ defmodule EDA.Component.FileUpload do
       min_values: raw["min_values"],
       max_values: raw["max_values"],
       required: raw["required"],
-      values: raw["values"]
+      values: raw["values"],
+      file_types: raw["file_types"]
     }
   end
 end

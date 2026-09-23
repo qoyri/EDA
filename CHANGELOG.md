@@ -66,6 +66,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The `EDA.Component` and `EDA.Modal` builders return the component structs**, the same a
+  received message's components are read into: `button/2` an `EDA.Component.Button` with
+  `style: :primary`, `separator/1` an `EDA.Component.Separator` with `spacing: :large`,
+  `text_field/3` an `EDA.Component.TextInput` with `style: :short`, a select's
+  `default_values` `{:user, id}` tuples, and so on. They encode to Discord's integers when
+  sent, so nothing changes on the wire; code that read the builders' maps (`button.style == 1`)
+  reads atoms now. `:emoji` also takes an `EDA.Emoji` or a bare Unicode string.
+  `EDA.Component.FileUpload` gained `file_types`.
+
 - **`EDA.Command` is also a registered command**, read by `from_raw/1`: it gained `id`,
   `application_id`, `guild_id`, `version`, `handler` and `integration_types`, and its `type`
   (`:slash`, `:user`, `:message`, `:primary_entry_point`) and `contexts` (`:guild`, `:bot_dm`,

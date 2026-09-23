@@ -8,7 +8,7 @@ defmodule EDA.ComponentTest do
   describe "container/1" do
     test "creates a container with components" do
       c = container(components: [text_display("Hello")])
-      assert c.type == 17
+      assert c.type == :container
       assert length(c.components) == 1
     end
 
@@ -48,7 +48,7 @@ defmodule EDA.ComponentTest do
   describe "action_row/1" do
     test "creates an action row with buttons" do
       row = action_row([button("Click", custom_id: "btn1")])
-      assert row.type == 1
+      assert row.type == :action_row
       assert length(row.components) == 1
     end
 
@@ -60,7 +60,7 @@ defmodule EDA.ComponentTest do
 
     test "allows one select menu" do
       row = action_row([string_select("sel", [select_option("A", "a")])])
-      assert row.type == 1
+      assert row.type == :action_row
     end
 
     test "raises on empty components" do
@@ -101,9 +101,9 @@ defmodule EDA.ComponentTest do
   describe "section/2" do
     test "creates a section with single text and accessory" do
       s = section(text_display("Hello"), accessory: thumbnail("https://example.com/img.png"))
-      assert s.type == 9
+      assert s.type == :section
       assert length(s.components) == 1
-      assert s.accessory.type == 11
+      assert s.accessory.type == :thumbnail
     end
 
     test "creates a section with multiple texts and accessory" do
@@ -113,7 +113,7 @@ defmodule EDA.ComponentTest do
         )
 
       assert length(s.components) == 3
-      assert s.accessory.type == 2
+      assert s.accessory.type == :button
     end
 
     test "raises when accessory is missing" do
@@ -124,12 +124,12 @@ defmodule EDA.ComponentTest do
 
     test "accepts thumbnail accessory" do
       s = section(text_display("Hi"), accessory: thumbnail("https://example.com/img.png"))
-      assert s.accessory.type == 11
+      assert s.accessory.type == :thumbnail
     end
 
     test "accepts button accessory" do
       s = section(text_display("Hi"), accessory: button("Click", custom_id: "btn"))
-      assert s.accessory.type == 2
+      assert s.accessory.type == :button
     end
 
     test "raises on empty texts" do
@@ -164,9 +164,9 @@ defmodule EDA.ComponentTest do
   describe "separator/1" do
     test "creates a default separator" do
       s = separator()
-      assert s.type == 14
-      refute Map.has_key?(s, :divider)
-      refute Map.has_key?(s, :spacing)
+      assert s.type == :separator
+      assert s.divider == nil
+      assert s.spacing == nil
     end
 
     test "accepts divider option" do
@@ -176,12 +176,12 @@ defmodule EDA.ComponentTest do
 
     test "accepts spacing :small" do
       s = separator(spacing: :small)
-      assert s.spacing == 1
+      assert s.spacing == :small
     end
 
     test "accepts spacing :large" do
       s = separator(spacing: :large)
-      assert s.spacing == 2
+      assert s.spacing == :large
     end
 
     test "raises on invalid spacing" do
@@ -196,7 +196,7 @@ defmodule EDA.ComponentTest do
   describe "text_display/1" do
     test "creates a text display" do
       t = text_display("# Hello")
-      assert t.type == 10
+      assert t.type == :text_display
       assert t.content == "# Hello"
     end
 
@@ -212,8 +212,8 @@ defmodule EDA.ComponentTest do
   describe "thumbnail/2" do
     test "creates a thumbnail" do
       t = thumbnail("https://example.com/img.png")
-      assert t.type == 11
-      assert t.media == %{url: "https://example.com/img.png"}
+      assert t.type == :thumbnail
+      assert t.media == %EDA.Component.Media{url: "https://example.com/img.png"}
     end
 
     test "accepts description" do
@@ -238,7 +238,7 @@ defmodule EDA.ComponentTest do
   describe "media_gallery/1" do
     test "creates a media gallery" do
       g = media_gallery([media_item("https://example.com/a.png")])
-      assert g.type == 12
+      assert g.type == :media_gallery
       assert length(g.items) == 1
     end
 
@@ -268,7 +268,7 @@ defmodule EDA.ComponentTest do
   describe "media_item/2" do
     test "creates a media item" do
       m = media_item("https://example.com/img.png")
-      assert m.media == %{url: "https://example.com/img.png"}
+      assert m.media == %EDA.Component.Media{url: "https://example.com/img.png"}
     end
 
     test "accepts description and spoiler" do
@@ -289,8 +289,8 @@ defmodule EDA.ComponentTest do
   describe "file/2" do
     test "creates a file component" do
       f = file("attachment://report.pdf")
-      assert f.type == 13
-      assert f.file == %{url: "attachment://report.pdf"}
+      assert f.type == :file
+      assert f.file == %EDA.Component.Media{url: "attachment://report.pdf"}
     end
 
     test "accepts spoiler" do
@@ -310,29 +310,29 @@ defmodule EDA.ComponentTest do
   describe "button/2" do
     test "creates a button with custom_id" do
       b = button("Click", custom_id: "btn_1")
-      assert b.type == 2
-      assert b.style == 2
+      assert b.type == :button
+      assert b.style == :secondary
       assert b.label == "Click"
       assert b.custom_id == "btn_1"
     end
 
     test "accepts all style atoms" do
-      assert button("A", custom_id: "a", style: :primary).style == 1
-      assert button("B", custom_id: "b", style: :secondary).style == 2
-      assert button("C", custom_id: "c", style: :success).style == 3
-      assert button("D", custom_id: "d", style: :danger).style == 4
-      assert button("E", url: "https://example.com", style: :link).style == 5
+      assert button("A", custom_id: "a", style: :primary).style == :primary
+      assert button("B", custom_id: "b", style: :secondary).style == :secondary
+      assert button("C", custom_id: "c", style: :success).style == :success
+      assert button("D", custom_id: "d", style: :danger).style == :danger
+      assert button("E", url: "https://example.com", style: :link).style == :link
     end
 
     test "link button requires url" do
       b = button("Visit", style: :link, url: "https://example.com")
       assert b.url == "https://example.com"
-      refute Map.has_key?(b, :custom_id)
+      assert b.custom_id == nil
     end
 
     test "accepts emoji" do
       b = button("Like", custom_id: "like", emoji: %{name: "👍"})
-      assert b.emoji == %{name: "👍"}
+      assert b.emoji == %EDA.Emoji{name: "👍"}
     end
 
     test "accepts disabled" do
@@ -376,14 +376,14 @@ defmodule EDA.ComponentTest do
   describe "link_button/3" do
     test "creates a link button" do
       b = link_button("Visit", "https://example.com")
-      assert b.style == 5
+      assert b.style == :link
       assert b.url == "https://example.com"
       assert b.label == "Visit"
     end
 
     test "passes through options" do
       b = link_button("Docs", "https://docs.com", emoji: %{name: "📚"})
-      assert b.emoji == %{name: "📚"}
+      assert b.emoji == %EDA.Emoji{name: "📚"}
     end
   end
 
@@ -397,7 +397,7 @@ defmodule EDA.ComponentTest do
           select_option("Blue", "blue")
         ])
 
-      assert s.type == 3
+      assert s.type == :string_select
       assert s.custom_id == "color"
       assert length(s.options) == 2
     end
@@ -457,7 +457,7 @@ defmodule EDA.ComponentTest do
 
     test "accepts emoji and default" do
       o = select_option("Red", "red", emoji: %{name: "🔴"}, default: true)
-      assert o.emoji == %{name: "🔴"}
+      assert o.emoji == %EDA.Emoji{name: "🔴"}
       assert o.default == true
     end
 
@@ -485,7 +485,7 @@ defmodule EDA.ComponentTest do
   describe "user_select/2" do
     test "creates a user select" do
       s = user_select("pick_user")
-      assert s.type == 5
+      assert s.type == :user_select
       assert s.custom_id == "pick_user"
     end
 
@@ -498,7 +498,7 @@ defmodule EDA.ComponentTest do
   describe "role_select/2" do
     test "creates a role select" do
       s = role_select("pick_role")
-      assert s.type == 6
+      assert s.type == :role_select
       assert s.custom_id == "pick_role"
     end
   end
@@ -506,7 +506,7 @@ defmodule EDA.ComponentTest do
   describe "mentionable_select/2" do
     test "creates a mentionable select" do
       s = mentionable_select("pick_mention")
-      assert s.type == 7
+      assert s.type == :mentionable_select
       assert s.custom_id == "pick_mention"
     end
   end
@@ -514,13 +514,13 @@ defmodule EDA.ComponentTest do
   describe "channel_select/2" do
     test "creates a channel select" do
       s = channel_select("pick_channel")
-      assert s.type == 8
+      assert s.type == :channel_select
       assert s.custom_id == "pick_channel"
     end
 
     test "accepts channel_types" do
       s = channel_select("ch", channel_types: [:guild_text, :guild_voice])
-      assert s.channel_types == [0, 2]
+      assert s.channel_types == [:guild_text, :guild_voice]
     end
 
     test "raises on unknown channel type" do
@@ -555,7 +555,7 @@ defmodule EDA.ComponentTest do
           ]
         )
 
-      assert msg.type == 17
+      assert msg.type == :container
       assert msg.accent_color == 0x5865F2
       assert length(msg.components) == 5
     end

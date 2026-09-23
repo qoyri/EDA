@@ -18,7 +18,7 @@ defmodule EDA.ModalComponentsTest do
     test "wraps a component, with an optional description" do
       l = label("Your name", text_field("name", :short), description: "As on your ID")
 
-      assert l == %{
+      assert EDA.Component.to_raw(l) == %{
                type: 18,
                label: "Your name",
                description: "As on your ID",
@@ -67,7 +67,7 @@ defmodule EDA.ModalComponentsTest do
             EDA.Component.mentionable_select("m", []),
             EDA.Component.channel_select("c", [])
           ] do
-        assert %{type: 18, component: ^select} = label("Pick", select)
+        assert %EDA.Component.Label{component: ^select} = label("Pick", select)
       end
     end
   end
@@ -83,7 +83,7 @@ defmodule EDA.ModalComponentsTest do
           value: "prefilled"
         )
 
-      assert field == %{
+      assert EDA.Component.to_raw(field) == %{
                type: 4,
                custom_id: "bio",
                style: 2,
@@ -104,7 +104,7 @@ defmodule EDA.ModalComponentsTest do
     test "type 19, with its range and file type filters" do
       upload = file_upload("shots", min_values: 1, max_values: 5, file_types: [:image, ".pdf"])
 
-      assert upload.type == 19
+      assert upload.type == :file_upload
       assert upload.custom_id == "shots"
       assert upload.min_values == 1
       assert upload.max_values == 5
@@ -136,7 +136,12 @@ defmodule EDA.ModalComponentsTest do
   describe "choice/3" do
     test "a label, a value, and optionally a description and a default" do
       assert choice("Warrior", "warrior", description: "Strong", default: true) ==
-               %{label: "Warrior", value: "warrior", description: "Strong", default: true}
+               %EDA.Component.SelectOption{
+                 label: "Warrior",
+                 value: "warrior",
+                 description: "Strong",
+                 default: true
+               }
     end
 
     test "each is at most 100 characters" do
@@ -150,7 +155,7 @@ defmodule EDA.ModalComponentsTest do
     test "type 21, between 2 and 10 options" do
       group = radio_group("class", [choice("A", "a"), choice("B", "b")], required: false)
 
-      assert group.type == 21
+      assert group.type == :radio_group
       assert group.required == false
       assert length(group.options) == 2
 
@@ -178,7 +183,7 @@ defmodule EDA.ModalComponentsTest do
     test "type 22, between 1 and 10 options, with a selection range" do
       group = checkbox_group("days", [choice("Mon", "mon"), choice("Fri", "fri")], max_values: 2)
 
-      assert group.type == 22
+      assert group.type == :checkbox_group
       assert group.max_values == 2
 
       assert_raise ArgumentError, ~r/1–10 options/, fn -> checkbox_group("d", []) end
@@ -193,7 +198,7 @@ defmodule EDA.ModalComponentsTest do
 
   describe "checkbox/2" do
     test "type 23, optionally ticked" do
-      assert checkbox("subscribe", default: true) ==
+      assert EDA.Component.to_raw(checkbox("subscribe", default: true)) ==
                %{type: 23, custom_id: "subscribe", default: true}
     end
 
@@ -213,7 +218,11 @@ defmodule EDA.ModalComponentsTest do
           text_input("legacy", "Legacy", :short)
         ])
 
-      assert [%{type: 10}, %{type: 18}, %{type: 1, components: [%{type: 4}]}] = m.components
+      assert [
+               %EDA.Component.TextDisplay{},
+               %EDA.Component.Label{},
+               %EDA.Component.ActionRow{components: [%EDA.Component.TextInput{}]}
+             ] = m.components
     end
 
     test "a component that needs a label is refused bare, naming the fix" do
@@ -263,20 +272,27 @@ defmodule EDA.ModalComponentsTest do
     end
 
     test "default values, typed by the select" do
-      assert %{default_values: [%{id: "1", type: "user"}]} =
+      assert %{default_values: [{:user, "1"}]} =
                user_select("u", default_values: ["1"])
 
-      assert %{default_values: [%{id: "2", type: "role"}]} =
+      assert %{default_values: [{:role, "2"}]} =
                EDA.Component.role_select("r", default_values: [2])
 
-      assert %{default_values: [%{id: "3", type: "channel"}]} =
+      assert %{default_values: [{:channel, "3"}]} =
                EDA.Component.channel_select("c", default_values: ["3"])
 
-      assert %{default_values: [%{id: "4", type: "user"}, %{id: "5", type: "role"}]} =
-               EDA.Component.mentionable_select("m",
-                 max_values: 2,
-                 default_values: [{:user, "4"}, {:role, "5"}]
-               )
+      mentionable =
+        EDA.Component.mentionable_select("m",
+          max_values: 2,
+          default_values: [{:user, "4"}, {:role, "5"}]
+        )
+
+      assert mentionable.default_values == [{:user, "4"}, {:role, "5"}]
+
+      assert EDA.Component.to_raw(mentionable).default_values == [
+               %{id: "4", type: "user"},
+               %{id: "5", type: "role"}
+             ]
     end
 
     test "a mentionable default must say whether it is a user or a role" do
