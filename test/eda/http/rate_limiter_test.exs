@@ -179,8 +179,12 @@ defmodule EDA.HTTP.RateLimiterTest do
           )
         end)
 
-      # Wait until all three are in the queue, then free the bucket and let it drain.
+      # Wait until all three are in the queue: that queue, sorted by priority, is what decides the
+      # order they are granted in.
       wait_until(fn -> queued_for("priority-test-bucket") == 3 end)
+      assert queued_priorities("priority-test-bucket") == [0, 1, 2]
+
+      # Free the bucket and let it drain.
 
       RateLimiter.report_headers(shared_key, [
         {"x-ratelimit-remaining", "0"},
@@ -191,12 +195,14 @@ defmodule EDA.HTTP.RateLimiterTest do
       Process.sleep(20)
       send(RateLimiter, :process_queue)
 
-      Task.await_many([t_low, t_normal, t_urgent], 5000)
+      assert [{:ok, :low}, {:ok, :normal}, {:ok, :urgent}] =
+               Task.await_many([t_low, t_normal, t_urgent], 5000)
 
-      execution_order = results |> Agent.get(& &1) |> Enum.map(fn {priority, _} -> priority end)
+      # Once granted, the three run at the same time, each in its own process, so the order they
+      # finish in says nothing about priority; the queue order above does.
+      finished = results |> Agent.get(& &1) |> Enum.map(fn {priority, _} -> priority end)
       Agent.stop(results)
-
-      assert execution_order == [:urgent, :normal, :low]
+      assert Enum.sort(finished) == [:low, :normal, :urgent]
     end
   end
 
@@ -205,6 +211,15 @@ defmodule EDA.HTTP.RateLimiterTest do
     |> :sys.get_state()
     |> Map.fetch!(:queue)
     |> Enum.count(fn {_priority, _at, _from, bucket} -> bucket == discord_bucket end)
+  end
+
+  # 0 is urgent, 1 normal, 2 low, in the order the queue holds them.
+  defp queued_priorities(discord_bucket) do
+    RateLimiter
+    |> :sys.get_state()
+    |> Map.fetch!(:queue)
+    |> Enum.filter(fn {_priority, _at, _from, bucket} -> bucket == discord_bucket end)
+    |> Enum.map(fn {priority, _at, _from, _bucket} -> priority end)
   end
 
   defp wait_until(check, attempts \\ 200) do
