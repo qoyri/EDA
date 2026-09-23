@@ -100,8 +100,10 @@ defmodule EDA.Sticker do
   defp resolve_type(int) when is_integer(int), do: Map.get(@sticker_types, int, int)
   defp resolve_type(other), do: other
 
-  defp resolve_format(int) when is_integer(int), do: Map.get(@format_types, int, int)
-  defp resolve_format(other), do: other
+  @doc false
+  # Shared with EDA.Sticker.Item.
+  def resolve_format(int) when is_integer(int), do: Map.get(@format_types, int, int)
+  def resolve_format(other), do: other
 
   defp parse_user(nil), do: nil
   defp parse_user(raw) when is_map(raw), do: EDA.User.from_raw(raw)

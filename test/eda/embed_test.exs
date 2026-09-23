@@ -3,6 +3,9 @@ defmodule EDA.EmbedTest do
 
   import EDA.Embed
 
+  doctest EDA.Embed, only: [from_raw: 1]
+  doctest EDA.Embed.Media
+
   describe "new/0" do
     test "returns an empty embed struct" do
       embed = new()
@@ -64,21 +67,24 @@ defmodule EDA.EmbedTest do
   end
 
   describe "timestamp/2" do
-    test "converts DateTime to ISO 8601" do
-      {:ok, dt, _} = DateTime.from_iso8601("2024-01-15T12:00:00Z")
-      embed = new() |> timestamp(dt)
-      assert embed.timestamp == "2024-01-15T12:00:00Z"
+    test "keeps a DateTime, sent as ISO 8601" do
+      embed = new() |> timestamp(~U[2024-01-15 12:00:00Z])
+      assert embed.timestamp == ~U[2024-01-15 12:00:00Z]
+      assert to_map(embed).timestamp == "2024-01-15T12:00:00Z"
     end
 
-    test "converts NaiveDateTime to ISO 8601 with Z suffix" do
-      ndt = ~N[2024-01-15 12:00:00]
-      embed = new() |> timestamp(ndt)
-      assert embed.timestamp == "2024-01-15T12:00:00Z"
+    test "takes a NaiveDateTime as UTC" do
+      embed = new() |> timestamp(~N[2024-01-15 12:00:00])
+      assert embed.timestamp == ~U[2024-01-15 12:00:00Z]
     end
 
-    test "passes through raw string" do
+    test "parses an ISO 8601 string, and refuses one that is not" do
       embed = new() |> timestamp("2024-01-15T12:00:00.000Z")
-      assert embed.timestamp == "2024-01-15T12:00:00.000Z"
+      assert embed.timestamp == ~U[2024-01-15 12:00:00.000Z]
+
+      assert_raise ArgumentError, ~r/invalid ISO 8601 timestamp/, fn ->
+        new() |> timestamp("yesterday")
+      end
     end
   end
 
@@ -165,12 +171,16 @@ defmodule EDA.EmbedTest do
   describe "footer/3" do
     test "sets footer with text only" do
       embed = new() |> footer("Footer text")
-      assert embed.footer == %{text: "Footer text"}
+      assert embed.footer == %EDA.Embed.Footer{text: "Footer text"}
     end
 
     test "sets footer with icon_url" do
       embed = new() |> footer("Footer", icon_url: "https://example.com/icon.png")
-      assert embed.footer == %{text: "Footer", icon_url: "https://example.com/icon.png"}
+
+      assert embed.footer == %EDA.Embed.Footer{
+               text: "Footer",
+               icon_url: "https://example.com/icon.png"
+             }
     end
 
     test "raises when footer text exceeds 2048 characters" do
@@ -183,7 +193,7 @@ defmodule EDA.EmbedTest do
   describe "author/3" do
     test "sets author with name only" do
       embed = new() |> author("Author")
-      assert embed.author == %{name: "Author"}
+      assert embed.author == %EDA.Embed.Author{name: "Author"}
     end
 
     test "sets author with all options" do
@@ -191,7 +201,7 @@ defmodule EDA.EmbedTest do
         new()
         |> author("Author", url: "https://example.com", icon_url: "https://example.com/icon.png")
 
-      assert embed.author == %{
+      assert embed.author == %EDA.Embed.Author{
                name: "Author",
                url: "https://example.com",
                icon_url: "https://example.com/icon.png"
@@ -208,26 +218,26 @@ defmodule EDA.EmbedTest do
   describe "thumbnail/2" do
     test "sets thumbnail url" do
       embed = new() |> thumbnail("https://example.com/thumb.png")
-      assert embed.thumbnail == %{url: "https://example.com/thumb.png"}
+      assert embed.thumbnail == %EDA.Embed.Media{url: "https://example.com/thumb.png"}
     end
   end
 
   describe "image/2" do
     test "sets image url" do
       embed = new() |> image("https://example.com/image.png")
-      assert embed.image == %{url: "https://example.com/image.png"}
+      assert embed.image == %EDA.Embed.Media{url: "https://example.com/image.png"}
     end
   end
 
   describe "field/4" do
     test "adds a field" do
       embed = new() |> field("Name", "Value")
-      assert embed.fields == [%{name: "Name", value: "Value", inline: false}]
+      assert embed.fields == [%EDA.Embed.Field{name: "Name", value: "Value", inline: false}]
     end
 
     test "adds an inline field" do
       embed = new() |> field("Name", "Value", inline: true)
-      assert embed.fields == [%{name: "Name", value: "Value", inline: true}]
+      assert embed.fields == [%EDA.Embed.Field{name: "Name", value: "Value", inline: true}]
     end
 
     test "appends fields in order" do
@@ -315,6 +325,66 @@ defmodule EDA.EmbedTest do
       assert_raise ArgumentError, ~r/exceeds 6000/, fn ->
         validate!(embed)
       end
+    end
+  end
+
+  describe "received embeds" do
+    # The shape of a link embed Discord generated, as captured on a real message.
+    @link %{
+      "type" => "video",
+      "url" => "https://www.youtube.com/watch?v=x",
+      "title" => "A video",
+      "color" => 16_711_680,
+      "timestamp" => "2024-01-15T12:00:00.000000+00:00",
+      "provider" => %{"name" => "YouTube", "url" => "https://www.youtube.com"},
+      "author" => %{"name" => "Channel", "url" => "https://www.youtube.com/@c"},
+      "thumbnail" => %{
+        "url" => "https://i.ytimg.com/vi/x/hqdefault.jpg",
+        "proxy_url" => "https://images-ext-1.discordapp.net/external/x.jpg",
+        "width" => 480,
+        "height" => 360,
+        "content_type" => "image/jpeg",
+        "placeholder" => "3PcNFYSWh4iAeGd4d4iHeIeHeFCHeHAH",
+        "placeholder_version" => 1,
+        "flags" => 0
+      },
+      "video" => %{"url" => "https://www.youtube.com/embed/x", "width" => 1280, "height" => 720},
+      "fields" => [
+        %{"name" => "a", "value" => "b", "inline" => true},
+        %{"name" => "c", "value" => "d"}
+      ]
+    }
+
+    test "are read down to their parts" do
+      embed = EDA.Embed.from_raw(@link)
+
+      assert embed.type == :video
+      assert embed.timestamp == ~U[2024-01-15 12:00:00.000000Z]
+      assert %EDA.Embed.Provider{name: "YouTube"} = embed.provider
+      assert %EDA.Embed.Media{width: 480, content_type: "image/jpeg"} = embed.thumbnail
+      assert %EDA.Embed.Media{width: 1280} = embed.video
+      refute EDA.Embed.Media.animated?(embed.thumbnail)
+      assert [%EDA.Embed.Field{inline: true}, %EDA.Embed.Field{inline: false}] = embed.fields
+      assert embed["title"] == "A video" and embed.thumbnail["width"] == 480
+    end
+
+    test "a type Discord adds later stays its string, and an embed without parts is empty" do
+      assert %EDA.Embed{type: "carousel", fields: [], footer: nil} =
+               EDA.Embed.from_raw(%{"type" => "carousel"})
+    end
+
+    test "can be sent again, without what only Discord sets" do
+      map = @link |> EDA.Embed.from_raw() |> to_map()
+
+      assert map.thumbnail == %{url: "https://i.ytimg.com/vi/x/hqdefault.jpg"}
+      assert map.author == %{name: "Channel", url: "https://www.youtube.com/@c"}
+      assert map.timestamp == "2024-01-15T12:00:00.000000Z"
+      refute Map.has_key?(map, :type) or Map.has_key?(map, :video) or Map.has_key?(map, :provider)
+    end
+
+    test "a message's embeds are EDA.Embed structs" do
+      message = EDA.Message.from_raw(%{"id" => "1", "embeds" => [@link]})
+      assert [%EDA.Embed{type: :video}] = message.embeds
     end
   end
 
@@ -439,7 +509,7 @@ defmodule EDA.EmbedTest do
       assert embed.description == "A test embed"
       assert embed.color == 0x5865F2
       assert embed.url == "https://example.com"
-      assert embed.timestamp == "2024-01-15T12:00:00Z"
+      assert embed.timestamp == ~U[2024-01-15 12:00:00Z]
       assert embed.footer.text == "Footer"
       assert embed.author.name == "Author"
       assert embed.thumbnail.url == "https://example.com/thumb.png"

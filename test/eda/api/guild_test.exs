@@ -134,7 +134,7 @@ defmodule EDA.API.GuildTest do
 
       assert %EDA.AuditLog.Entry{} = entry
       assert entry.id == "entry1"
-      assert entry.action_type == 22
+      assert entry.action_type == :member_ban_add
       assert [%EDA.AuditLog.Change{key: "name"}] = entry.changes
     end
 

@@ -27,6 +27,22 @@ defmodule EDA.Component do
         )
 
       EDA.API.Message.create(channel_id, components: [msg], v2: true)
+
+  ## Received components
+
+  The components of a received message are structs, one per kind: `EDA.Component.ActionRow`,
+  `Button`, `SelectMenu` (with its `SelectOption`s), `Section`, `TextDisplay`, `Thumbnail`,
+  `MediaGallery`, `File`, `Separator` and `Container`, their images an `EDA.Component.Media`.
+  A submitted modal adds `Label`, `TextInput`, `FileUpload`, `RadioGroup`, `CheckboxGroup` and
+  `Checkbox`, each with the `value` or `values` the user gave.
+  Each has its `type` as an atom, Discord's name lowercased (`:action_row`, `:string_select`…),
+  and the `id` Discord numbers it with. A kind EDA does not know yet stays the raw map.
+
+  They can be sent back as they are, mixed with maps from the builders, which is how a message
+  is edited in place:
+
+      components = EDA.Component.disable_all(message.components)
+      EDA.Message.edit(message, components: components)
   """
 
   # ── Component Type Constants ───────────────────────────────────────
@@ -47,6 +63,98 @@ defmodule EDA.Component do
   @separator 14
   @container 17
 
+  @type_names %{
+    1 => :action_row,
+    2 => :button,
+    3 => :string_select,
+    4 => :text_input,
+    5 => :user_select,
+    6 => :role_select,
+    7 => :mentionable_select,
+    8 => :channel_select,
+    9 => :section,
+    10 => :text_display,
+    11 => :thumbnail,
+    12 => :media_gallery,
+    13 => :file,
+    14 => :separator,
+    17 => :container,
+    18 => :label,
+    19 => :file_upload,
+    21 => :radio_group,
+    22 => :checkbox_group,
+    23 => :checkbox
+  }
+
+  @structs %{
+    1 => EDA.Component.ActionRow,
+    2 => EDA.Component.Button,
+    3 => EDA.Component.SelectMenu,
+    5 => EDA.Component.SelectMenu,
+    6 => EDA.Component.SelectMenu,
+    7 => EDA.Component.SelectMenu,
+    8 => EDA.Component.SelectMenu,
+    9 => EDA.Component.Section,
+    10 => EDA.Component.TextDisplay,
+    11 => EDA.Component.Thumbnail,
+    12 => EDA.Component.MediaGallery,
+    13 => EDA.Component.File,
+    14 => EDA.Component.Separator,
+    17 => EDA.Component.Container,
+    4 => EDA.Component.TextInput,
+    18 => EDA.Component.Label,
+    19 => EDA.Component.FileUpload,
+    21 => EDA.Component.RadioGroup,
+    22 => EDA.Component.CheckboxGroup,
+    23 => EDA.Component.Checkbox
+  }
+
+  @typedoc "A component's kind, Discord's name lowercased; a kind added later stays its integer."
+  @type type ::
+          :action_row
+          | :button
+          | :string_select
+          | :text_input
+          | :user_select
+          | :role_select
+          | :mentionable_select
+          | :channel_select
+          | :section
+          | :text_display
+          | :thumbnail
+          | :media_gallery
+          | :file
+          | :separator
+          | :container
+          | :label
+          | :file_upload
+          | :radio_group
+          | :checkbox_group
+          | :checkbox
+          | integer()
+
+  @type button_style :: :primary | :secondary | :success | :danger | :link | :premium
+
+  @typedoc "A received component, or the raw map of a kind EDA does not know yet."
+  @type t ::
+          EDA.Component.ActionRow.t()
+          | EDA.Component.Button.t()
+          | EDA.Component.SelectMenu.t()
+          | EDA.Component.Section.t()
+          | EDA.Component.TextDisplay.t()
+          | EDA.Component.Thumbnail.t()
+          | EDA.Component.MediaGallery.t()
+          | EDA.Component.File.t()
+          | EDA.Component.Separator.t()
+          | EDA.Component.Container.t()
+          | EDA.Component.TextInput.t()
+          | EDA.Component.Label.t()
+          | EDA.Component.FileUpload.t()
+          | EDA.Component.RadioGroup.t()
+          | EDA.Component.CheckboxGroup.t()
+          | EDA.Component.Checkbox.t()
+          | map()
+
   # ── Button Styles ──────────────────────────────────────────────────
 
   @button_styles %{
@@ -64,6 +172,116 @@ defmodule EDA.Component do
     small: 1,
     large: 2
   }
+
+  @separator_spacing_names Map.new(@separator_spacing, fn {k, v} -> {v, k} end)
+  @button_style_names Map.new(@button_styles, fn {k, v} -> {v, k} end)
+
+  # ── Reading ────────────────────────────────────────────────────────
+
+  @doc """
+  A component as Discord sends it, as its struct; a kind EDA does not know stays the raw map.
+
+      iex> EDA.Component.from_raw(%{"type" => 2, "style" => 1, "label" => "Go", "custom_id" => "go"})
+      %EDA.Component.Button{style: :primary, label: "Go", custom_id: "go", disabled: false}
+      iex> EDA.Component.from_raw(%{"type" => 99, "content" => "?"})
+      %{"type" => 99, "content" => "?"}
+  """
+  @spec from_raw(map()) :: t()
+  def from_raw(%{"type" => type} = raw) when is_map_key(@structs, type),
+    do: Map.fetch!(@structs, type).from_raw(raw)
+
+  def from_raw(raw) when is_map(raw), do: raw
+
+  @doc false
+  def parse(nil), do: nil
+  def parse(raw), do: from_raw(raw)
+
+  @doc false
+  def parse_list(nil), do: nil
+  def parse_list(list) when is_list(list), do: Enum.map(list, &from_raw/1)
+
+  @doc false
+  def parse_emoji(nil), do: nil
+  def parse_emoji(raw), do: EDA.Emoji.from_raw(raw)
+
+  @doc false
+  def parse_options(nil), do: nil
+  def parse_options(list), do: Enum.map(list, &EDA.Component.SelectOption.from_raw/1)
+
+  @text_input_styles %{1 => :short, 2 => :paragraph}
+
+  @doc false
+  def text_input_style(style), do: EDA.Enum.name(@text_input_styles, style)
+
+  @doc false
+  def type_name(type), do: EDA.Enum.name(@type_names, type)
+
+  @doc false
+  def button_style(style), do: EDA.Enum.name(@button_style_names, style)
+
+  @doc false
+  def spacing(spacing), do: EDA.Enum.name(@separator_spacing_names, spacing)
+
+  @doc """
+  A component struct as the map Discord takes, down to its children; maps pass through.
+
+  The component structs encode to JSON this way, so they can be sent as they are.
+
+      iex> EDA.Component.to_raw(%EDA.Component.Separator{id: 3, divider: true, spacing: :large})
+      %{type: 14, id: 3, divider: true, spacing: 2}
+  """
+  @spec to_raw(struct() | map()) :: map()
+  def to_raw(%_{} = component) do
+    component
+    |> Map.from_struct()
+    |> Enum.reduce(%{}, fn {key, value}, acc ->
+      case encode_field(component, key, value) do
+        nil -> acc
+        encoded -> Map.put(acc, key, encoded)
+      end
+    end)
+  end
+
+  def to_raw(map) when is_map(map), do: map
+
+  defp encode_field(_component, _key, nil), do: nil
+
+  defp encode_field(_component, :type, type) when is_atom(type),
+    do: EDA.Enum.value!(@type_names, type, "component type")
+
+  defp encode_field(%EDA.Component.TextInput{}, :style, style) when is_atom(style),
+    do: EDA.Enum.value!(@text_input_styles, style, "text input style")
+
+  defp encode_field(_component, :style, style) when is_atom(style),
+    do: EDA.Enum.value!(@button_style_names, style, "button style")
+
+  defp encode_field(_component, key, value), do: encode_field(key, value)
+
+  defp encode_field(:spacing, spacing) when is_atom(spacing),
+    do: EDA.Enum.value!(@separator_spacing_names, spacing, "separator spacing")
+
+  defp encode_field(:channel_types, types), do: Enum.map(types, &EDA.Channel.type_value/1)
+
+  defp encode_field(:default_values, values) do
+    Enum.map(values, fn
+      {type, id} -> %{id: to_string(id), type: to_string(type)}
+      map -> map
+    end)
+  end
+
+  defp encode_field(:emoji, %EDA.Emoji{} = emoji) do
+    %{id: emoji.id, name: emoji.name, animated: emoji.animated}
+    |> Map.reject(fn {_k, v} -> is_nil(v) end)
+  end
+
+  defp encode_field(key, %EDA.Component.Media{url: url}) when key in [:media, :file],
+    do: %{url: url}
+
+  defp encode_field(key, list) when key in [:components, :items, :options] and is_list(list),
+    do: Enum.map(list, &to_raw/1)
+
+  defp encode_field(key, %_{} = child) when key in [:accessory, :component], do: to_raw(child)
+  defp encode_field(_key, value), do: value
 
   # ── Layout Components ──────────────────────────────────────────────
 
@@ -535,21 +753,6 @@ defmodule EDA.Component do
   def channel_select(custom_id, opts \\ []) when is_binary(custom_id) do
     validate_custom_id!(custom_id)
 
-    channel_type_map = %{
-      guild_text: 0,
-      dm: 1,
-      guild_voice: 2,
-      group_dm: 3,
-      guild_category: 4,
-      guild_announcement: 5,
-      announcement_thread: 10,
-      public_thread: 11,
-      private_thread: 12,
-      guild_stage_voice: 13,
-      guild_forum: 15,
-      guild_media: 16
-    }
-
     map = %{type: @channel_select, custom_id: custom_id}
     map = put_if(map, :placeholder, opts[:placeholder])
     map = put_if(map, :min_values, opts[:min_values])
@@ -564,10 +767,7 @@ defmodule EDA.Component do
 
       types when is_list(types) ->
         resolved =
-          Enum.map(types, fn t ->
-            channel_type_map[t] ||
-              raise ArgumentError, "unknown channel type #{inspect(t)}"
-          end)
+          Enum.map(types, &EDA.Channel.type_value/1)
 
         Map.put(map, :channel_types, resolved)
     end
@@ -682,19 +882,25 @@ defmodule EDA.Component do
 
   ## Examples
 
-      disabled = EDA.Component.disable_all(message["components"])
+      disabled = EDA.Component.disable_all(message.components)
 
       EDA.Interaction.respond(interaction,
         type: :update,
         components: disabled
       )
   """
-  @spec disable_all([map()] | nil) :: [map()]
+  @spec disable_all([t()] | nil) :: [t()]
   def disable_all(nil), do: []
 
   def disable_all(components) when is_list(components) do
     Enum.map(components, &disable_component/1)
   end
+
+  defp disable_component(%EDA.Component.Button{} = c), do: %{c | disabled: true}
+  defp disable_component(%EDA.Component.SelectMenu{} = c), do: %{c | disabled: true}
+
+  defp disable_component(%EDA.Component.Section{accessory: accessory} = c),
+    do: %{c | accessory: disable_component(accessory)}
 
   defp disable_component(%{"type" => t} = c) when t in @interactive_types do
     Map.put(c, "disabled", true)
@@ -703,6 +909,12 @@ defmodule EDA.Component do
   defp disable_component(%{type: t} = c) when t in @interactive_types do
     Map.put(c, :disabled, true)
   end
+
+  defp disable_component(%{"accessory" => accessory} = c) when is_map(accessory),
+    do: Map.put(c, "accessory", disable_component(accessory))
+
+  defp disable_component(%{accessory: accessory} = c) when is_map(accessory),
+    do: Map.put(c, :accessory, disable_component(accessory))
 
   defp disable_component(%{"components" => children} = c) do
     Map.put(c, "components", disable_all(children))

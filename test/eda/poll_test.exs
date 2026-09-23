@@ -29,9 +29,9 @@ defmodule EDA.PollTest do
       poll = Poll.from_raw(raw)
       assert poll.question == "Best language?"
       assert length(poll.answers) == 2
-      assert poll.expiry == "2025-06-01T00:00:00+00:00"
+      assert poll.expiry == ~U[2025-06-01 00:00:00Z]
       assert poll.allow_multiselect == true
-      assert poll.layout_type == 1
+      assert poll.layout_type == :default
 
       assert {true, [%AnswerCount{id: 1, count: 10}, %AnswerCount{id: 2, count: 5}]} =
                poll.results
@@ -90,7 +90,7 @@ defmodule EDA.PollTest do
       assert poll.question == "Favorite color?"
       assert poll.duration == 24
       assert poll.allow_multiselect == false
-      assert poll.layout_type == 1
+      assert poll.layout_type == :default
       assert poll.answers == []
     end
 

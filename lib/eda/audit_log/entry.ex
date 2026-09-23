@@ -1,17 +1,23 @@
 defmodule EDA.AuditLog.Entry do
-  @moduledoc "A single audit log entry."
+  @moduledoc """
+  A single audit log entry, from `EDA.API.AuditLog` or the `GUILD_AUDIT_LOG_ENTRY_CREATE`
+  event, which adds its `guild_id`.
+
+  `changes` are `EDA.AuditLog.Change` structs, `options` an `EDA.AuditLog.Entry.Options`.
+  """
   use EDA.Event.Access
 
-  defstruct [:id, :target_id, :user_id, :action_type, :changes, :reason, :options]
+  defstruct [:id, :guild_id, :target_id, :user_id, :action_type, :changes, :reason, :options]
 
   @type t :: %__MODULE__{
           id: String.t() | nil,
+          guild_id: String.t() | nil,
           target_id: String.t() | nil,
           user_id: String.t() | nil,
-          action_type: integer() | nil,
+          action_type: atom() | integer() | nil,
           changes: [EDA.AuditLog.Change.t()] | nil,
           reason: String.t() | nil,
-          options: map() | nil
+          options: EDA.AuditLog.Entry.Options.t() | nil
         }
 
   @doc "Converts a raw audit log entry map into this struct. Parses changes into Change structs."
@@ -25,12 +31,13 @@ defmodule EDA.AuditLog.Entry do
 
     %__MODULE__{
       id: raw["id"],
+      guild_id: raw["guild_id"],
       target_id: raw["target_id"],
       user_id: raw["user_id"],
-      action_type: raw["action_type"],
+      action_type: EDA.Enum.name(EDA.AuditLog.action_types(), raw["action_type"]),
       changes: changes,
       reason: raw["reason"],
-      options: raw["options"]
+      options: EDA.AuditLog.Entry.Options.from_raw(raw["options"])
     }
   end
 end

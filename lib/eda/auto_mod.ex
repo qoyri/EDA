@@ -29,6 +29,15 @@ defmodule EDA.AutoMod do
 
   use EDA.Event.Access
 
+  @event_types %{1 => :message_send, 2 => :member_update}
+  @trigger_types %{
+    1 => :keyword,
+    3 => :spam,
+    4 => :keyword_preset,
+    5 => :mention_spam,
+    6 => :member_profile
+  }
+
   defstruct [
     :id,
     :guild_id,
@@ -48,8 +57,9 @@ defmodule EDA.AutoMod do
           guild_id: String.t() | nil,
           name: String.t() | nil,
           creator_id: String.t() | nil,
-          event_type: integer() | nil,
-          trigger_type: integer() | nil,
+          event_type: :message_send | :member_update | integer() | nil,
+          trigger_type:
+            :keyword | :spam | :keyword_preset | :mention_spam | :member_profile | integer() | nil,
           trigger_metadata: TriggerMetadata.t() | nil,
           actions: [Action.t()] | nil,
           enabled: boolean() | nil,
@@ -187,8 +197,8 @@ defmodule EDA.AutoMod do
       guild_id: raw["guild_id"],
       name: raw["name"],
       creator_id: raw["creator_id"],
-      event_type: raw["event_type"],
-      trigger_type: raw["trigger_type"],
+      event_type: EDA.Enum.name(@event_types, raw["event_type"]),
+      trigger_type: EDA.Enum.name(@trigger_types, raw["trigger_type"]),
       trigger_metadata: TriggerMetadata.from_raw(raw["trigger_metadata"]),
       actions: actions,
       enabled: raw["enabled"],
@@ -196,4 +206,23 @@ defmodule EDA.AutoMod do
       exempt_channels: raw["exempt_channels"]
     }
   end
+
+  @doc """
+  The integer Discord uses for an event type, from its atom (`:message_send`, `:member_update`)
+  or the integer itself.
+  """
+  @spec event_type_value(atom() | integer()) :: integer()
+  def event_type_value(value), do: EDA.Enum.value!(@event_types, value, "AutoMod event type")
+
+  @doc """
+  The integer Discord uses for a trigger type, from its atom (`:keyword`, `:spam`,
+  `:keyword_preset`, `:mention_spam`, `:member_profile`) or the integer itself.
+  """
+  @spec trigger_type_value(atom() | integer()) :: integer()
+  def trigger_type_value(value),
+    do: EDA.Enum.value!(@trigger_types, value, "AutoMod trigger type")
+
+  @doc false
+  # The trigger names, for the execution event.
+  def trigger_types, do: @trigger_types
 end

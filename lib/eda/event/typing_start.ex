@@ -7,7 +7,7 @@ defmodule EDA.Event.TypingStart do
           channel_id: String.t() | nil,
           guild_id: String.t() | nil,
           user_id: String.t() | nil,
-          timestamp: integer() | nil,
+          timestamp: DateTime.t() | nil,
           member: EDA.Member.t() | nil
         }
   @doc "Converts a raw Discord payload into this event struct."
@@ -17,7 +17,7 @@ defmodule EDA.Event.TypingStart do
       channel_id: raw["channel_id"],
       guild_id: raw["guild_id"],
       user_id: raw["user_id"],
-      timestamp: raw["timestamp"],
+      timestamp: EDA.Timestamp.from_unix(raw["timestamp"]),
       member: parse_member(raw["member"])
     }
   end

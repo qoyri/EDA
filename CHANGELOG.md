@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `EDA.User` has a `member` field, set on the users a guild message mentions: Discord attaches
+  their partial member to each, which EDA used to drop. It is an `EDA.Member` with the
+  message's `guild_id`, and `nil` on any other user.
+
+- `EDA.SKU`, what an app sells, with `list/0` returning structs, `type` as an atom and
+  `EDA.SKU.Flags` read by `flags/1` and `flag?/2`.
+
+- `EDA.StageInstance`, a live stage as a struct, which `STAGE_INSTANCE_CREATE`, `_UPDATE` and
+  `_DELETE` now deliver instead of structs of their own.
+
+- `EDA.Timestamp`, which reads Discord's timestamps into `DateTime` structs: `parse/1` for the
+  ISO 8601 dates, `from_unix/1` and `from_unix_ms/1` for the Unix times a few payloads carry. It
+  reads the two shapes Discord uses by matching bytes, 3 to 4 times faster than
+  `DateTime.from_iso8601/1`, and agreed with it on every one of 1366 real dates. Use it on the
+  raw maps the cache holds.
+- `EDA.Mention.timestamp/2` takes a `DateTime` as well as a Unix time.
+
 - `EDA.ScheduledEvent`, the guild scheduled event as a struct, with its cover `image` and
   `recurrence_rule`.
 
@@ -39,8 +56,148 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `display_name_styles` on users and members: the font, effect and colours of the name. Discord
   sends it on about one user in eight but does not document it; its colours arrive as integers
   or strings, and are integers in `EDA.User.DisplayNameStyles`.
+- The other bitfields Discord sends get the same treatment: `EDA.Message.Flags` (crossposted,
+  ephemeral, voice message, forwarded snapshot, components v2…), `EDA.Role.Flags`,
+  `EDA.Guild.SystemChannelFlags` (which notices the system channel suppresses) and
+  `EDA.Activity.Flags`, read off their entity by `EDA.Message.flags/1` and `flag?/2`,
+  `EDA.Role.flags/1` and `flag?/2`, `EDA.Guild.system_channel_flags/1` and
+  `system_channel_flag?/2`, `EDA.Activity.flags/1` and `flag?/2`. The integer stays in the
+  struct, so a bit Discord adds later is not lost.
 
 ### Changed
+
+- **Every event whose payload is an entity delivers the entity**, not a struct wrapping it:
+  `GUILD_ROLE_CREATE` and `_UPDATE` an `EDA.Role` (which gained `guild_id`, also set by a
+  guild's `roles`, `fetch_role/2`, `create/3`, `modify/4` and `set_colors/4`),
+  `VOICE_STATE_UPDATE` an `EDA.VoiceState`, `GUILD_SOUNDBOARD_SOUND_CREATE` and `_UPDATE` an
+  `EDA.SoundboardSound`, `AUTO_MODERATION_RULE_*` an `EDA.AutoMod`, `USER_UPDATE` an
+  `EDA.User`, `ENTITLEMENT_*` an `EDA.Entitlement`, `SUBSCRIPTION_*` an `EDA.Subscription`,
+  `INTEGRATION_CREATE` and `_UPDATE` an `EDA.Integration`,
+  `APPLICATION_COMMAND_PERMISSIONS_UPDATE` an `EDA.Command.Permissions`, and
+  `THREAD_MEMBER_UPDATE` an `EDA.Channel.ThreadMember` (which gained `guild_id`). Match
+  `{:USER_UPDATE, %EDA.User{} = user}` where you matched `%EDA.Event.UserUpdate{user: user}`.
+
+- A guild template's source guild reads its `roles` and `channels` as `EDA.Role` and
+  `EDA.Channel` structs (with the template's placeholder integer ids) and its levels as the
+  atoms `EDA.Guild` uses.
+
+- **`GUILD_AUDIT_LOG_ENTRY_CREATE` delivers an `EDA.AuditLog.Entry`**, which gained
+  `guild_id`, instead of a struct of its own. An entry's `options` is an
+  `EDA.AuditLog.Entry.Options`: the counts Discord sends as strings are integers, the
+  overwrite `type` is `:role` or `:member`, the AutoMod trigger type an atom.
+
+- **A scheduled event's `recurrence_rule` and `entity_metadata` are structs.**
+  `EDA.ScheduledEvent.RecurrenceRule` names the frequency (`:weekly`…), weekdays (`:friday`)
+  and months (`:july`), holds "the n-th weekday" as `{1, :friday}`, and its `start` and `end`
+  are `DateTime`s. Both it and `EDA.ScheduledEvent.EntityMetadata` encode as Discord takes
+  them, so they can be sent to `EDA.API.ScheduledEvent.create/2` and `modify/3`.
+
+- **What a guild nests is structs**: `welcome_screen` an `EDA.Guild.WelcomeScreen` of
+  `EDA.Guild.WelcomeScreen.Channel`s (both encode as Discord takes them), `incidents_data` an
+  `EDA.Guild.IncidentsData` of `DateTime`s, and `GUILD_CREATE`'s `presences`,
+  `stage_instances` and `guild_scheduled_events` lists of `EDA.Event.PresenceUpdate`,
+  `EDA.StageInstance` and `EDA.ScheduledEvent`. `GUILD_MEMBERS_CHUNK`'s `presences` are
+  `EDA.Event.PresenceUpdate` structs too, and its members and presences carry the `guild_id`.
+  A forum's `default_reaction_emoji` is an `EDA.Channel.DefaultReaction`.
+
+- **The partial objects other objects nest are their structs**: an invite's `guild`,
+  `channel`, `target_application` and `guild_scheduled_event`; a webhook's `source_guild` and
+  `source_channel`; an integration's `application` and `account`
+  (`EDA.Integration.Account`); an attachment's `application`; an application's `guild` and
+  `team`, the new `EDA.Team` with its `EDA.Team.Member`s; and `READY`'s `guilds` and
+  `application`.
+
+- **An interaction's `data` is a struct**, one per shape: `EDA.Interaction.CommandData` for a
+  command or its autocomplete (`type` `:slash`, `:user`, `:message` or `:primary_entry_point`,
+  `options` as `EDA.Interaction.Option`s with their `type` an atom), `ComponentData` for a
+  button or a select, `ModalSubmitData` for a modal, whose components are `EDA.Component`
+  structs, now including the modal ones (`Label`, `TextInput`, `FileUpload`, `RadioGroup`,
+  `CheckboxGroup`, `Checkbox`). `resolved` is an `EDA.Resolved`. The `EDA.Interaction` and
+  `EDA.Modal` helpers read the event or a raw interaction map alike;
+  `EDA.Interaction.resolved/3` returns the struct and takes `:users`-style atoms as well as
+  strings, and `component_type/1` returns the atom (`:button`, `:string_select`…).
+
+- **A role's `tags` and an activity's parts are structs.** `EDA.Role.Tags` reads the keys
+  Discord marks by sending them as `null` (`premium_subscriber`, `available_for_purchase`,
+  `guild_connections`) as booleans. An activity's `timestamps` is an
+  `EDA.Activity.Timestamps` of `DateTime`s, its `assets`, `party` and `secrets` are
+  `EDA.Activity.Assets`, `Party` and `Secrets`.
+
+- **Every object a message nests is a struct.** `message_reference` is an
+  `EDA.Message.Reference` (`type` `:default` for a reply, `:forward` for a forward; it encodes
+  as Discord takes it), `sticker_items` `EDA.Sticker.Item`s, `interaction_metadata` an
+  `EDA.Message.InteractionMetadata` (named interaction type, users, nested triggering
+  interaction), `call`, `activity`, `role_subscription_data`, `shared_client_theme` and
+  `mention_channels` their `EDA.Message.*` structs, `application` an `EDA.App`, and
+  `resolved` an `EDA.Resolved`, maps from id to struct with each member's user put back.
+  `message_snapshots` is a list of partial `EDA.Message` structs, without Discord's `message`
+  wrapper, and `channel_type` an atom.
+
+- **A message's components are structs**, one per kind: `EDA.Component.ActionRow`, `Button`,
+  `SelectMenu` (with its `SelectOption`s), `Section`, `TextDisplay`, `Thumbnail`,
+  `MediaGallery`, `File`, `Separator` and `Container`, their images an `EDA.Component.Media`.
+  Each has its `type` as an atom and the `id` Discord gives it; a button's `style`, a
+  separator's `spacing`, a select's `channel_types` are atoms, its `default_values`
+  `{:user, id}`-style tuples. A kind EDA does not know yet stays the raw map. They encode to
+  JSON as Discord takes them, so `EDA.Component.disable_all/1`, which now reaches a section's
+  accessory, can take a received message's components and send them back.
+  `EDA.Component.from_raw/1` and `to_raw/1` are public.
+
+- **A message's embeds are `EDA.Embed` structs**, down to their parts: `EDA.Embed.Footer`,
+  `Author`, `Field`, `Media` (image, thumbnail and video, with the size, content type and
+  placeholder Discord adds) and `Provider`. `EDA.Embed` gained `type` (`:rich`, `:video`,
+  `:link`…), `video`, `provider` and `flags`, and `from_raw/1`. The builder builds the same
+  structs, so `embed.footer.text` reads either; `timestamp` is a `DateTime` in both. A received
+  embed can be sent again: `to_map/1` leaves out what only Discord sets.
+
+- **The enumerations that had a helper are atoms in the struct too**, the helper taking the atom
+  as well: `EDA.Invite` `type` and `target_type`, `EDA.Subscription.status`,
+  `EDA.User.premium_type`, the `type` of `INTERACTION_CREATE` (with the names
+  `EDA.Interaction.interaction_type/1` already used: `:command`, `:component`, `:autocomplete`,
+  `:modal_submit`, `:ping`), and an audit log entry's `action_type`
+  (`EDA.AuditLog.action_name/1`'s names).
+- **AutoMod**: a rule's `event_type` (`:message_send`, `:member_update`) and `trigger_type`
+  (`:keyword`, `:spam`, `:keyword_preset`, `:mention_spam`, `:member_profile`), an action's `type`
+  (`:block_message`, `:send_alert_message`, `:timeout`, `:block_member_interaction`), the keyword
+  `presets` (`:profanity`, `:sexual_content`, `:slurs`) and the execution event's
+  `rule_trigger_type` are atoms. The action constructors build them, and `to_map/1` and
+  `EDA.API.AutoMod.create/2` and `modify/3` send Discord's integers, whether given atoms, integers,
+  structs or maps.
+
+- **More enumerations are atoms**, Discord's names in lowercase, an unknown value staying the
+  integer: `EDA.Message.type` (`:default`, `:reply`, `:chat_input_command`, `:thread_created`…),
+  `EDA.Webhook.type` (`:incoming`, `:channel_follower`, `:application`), `EDA.Activity` `type`
+  (`:playing`, `:streaming`, `:listening`, `:watching`, `:custom`, `:competing`) and
+  `status_display_type`, `EDA.PermissionOverwrite.type` (`:role`, `:member`),
+  `EDA.Poll.layout_type` (`:default`), `EDA.ScheduledEvent` `privacy_level`, `status` and
+  `entity_type`, `EDA.StageInstance.privacy_level`, and on `EDA.Guild` `verification_level`,
+  `default_message_notifications`, `explicit_content_filter`, `mfa_level`, `nsfw_level` and
+  `premium_tier` (`:none`, `:tier_1`…). The calls that send them — creating a channel or a thread,
+  editing a permission overwrite, modifying a guild, creating or modifying a scheduled event,
+  building a poll — take the atom or the integer, and refuse an atom Discord does not have, naming
+  the ones it does.
+
+- **A channel's `type` is an atom**, Discord's name in lowercase: `:guild_text`, `:dm`,
+  `:guild_voice`, `:group_dm`, `:guild_category`, `:guild_announcement`, `:announcement_thread`,
+  `:public_thread`, `:private_thread`, `:guild_stage_voice`, `:guild_directory` (newly known),
+  `:guild_forum`, `:guild_media`. A type Discord adds later stays the integer.
+  `EDA.Channel.type_value/1` and `type_name/1` convert; the `type_*/0` functions still return the
+  integers. So do a voice channel's `video_quality_mode` (`:auto`, `:full`) and a forum's
+  `default_sort_order` (`:latest_activity`, `:creation_date`) and `default_forum_layout`
+  (`:not_set`, `:list_view`, `:gallery_view`).
+
+- **Every date is a `DateTime`**, where most were the string Discord sent and a few an integer:
+  `EDA.Message` `timestamp` and `edited_timestamp`; `EDA.Member` `joined_at`, `premium_since` and
+  `communication_disabled_until`; `EDA.Guild.joined_at`; `EDA.Channel.last_pin_timestamp`;
+  `EDA.Channel.Thread` `archive_timestamp` and `create_timestamp`;
+  `EDA.Channel.ThreadMember.join_timestamp`; `EDA.VoiceState.request_to_speak_timestamp`;
+  `EDA.Invite` `expires_at` and `created_at`; `EDA.Poll.expiry`; `EDA.ScheduledEvent`
+  `scheduled_start_time` and `scheduled_end_time`; `EDA.Subscription` `current_period_start`,
+  `current_period_end` and `canceled_at`; `EDA.Integration.synced_at`; `EDA.GuildTemplate`
+  `created_at` and `updated_at`; `EDA.Attachment.clip_created_at`; `EDA.Activity.created_at` (was
+  Unix milliseconds); `TYPING_START`'s `timestamp` (was Unix seconds); `CHANNEL_PINS_UPDATE`'s
+  `last_pin_timestamp` and `THREAD_MEMBER_UPDATE`'s `join_timestamp`. Compare them with
+  `DateTime.compare/2`, or show them with `EDA.Mention.timestamp/2`.
 
 - **`GUILD_SCHEDULED_EVENT_CREATE`, `_UPDATE` and `_DELETE` deliver an `EDA.ScheduledEvent`**,
   instead of structs of their own that dropped the cover image and the recurrence rule and kept

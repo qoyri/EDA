@@ -1,9 +1,15 @@
 defmodule EDA.Role do
-  @moduledoc "Represents a Discord guild role."
+  @moduledoc """
+  Represents a Discord guild role.
+
+  `guild_id` is the guild the role belongs to, set by the role events, by `EDA.Guild`'s
+  `roles`, and by `fetch_role/2`, `create/3`, `modify/4` and `set_colors/4`.
+  """
   use EDA.Event.Access
 
   defstruct [
     :id,
+    :guild_id,
     :name,
     :color,
     :colors,
@@ -19,6 +25,7 @@ defmodule EDA.Role do
   ]
 
   @type t :: %__MODULE__{
+          guild_id: String.t() | nil,
           id: String.t() | nil,
           name: String.t() | nil,
           color: integer() | nil,
@@ -30,7 +37,7 @@ defmodule EDA.Role do
           permissions: String.t() | nil,
           managed: boolean() | nil,
           mentionable: boolean() | nil,
-          tags: map() | nil,
+          tags: EDA.Role.Tags.t() | nil,
           flags: non_neg_integer() | nil
         }
 
@@ -38,6 +45,7 @@ defmodule EDA.Role do
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
       id: raw["id"],
+      guild_id: raw["guild_id"],
       name: raw["name"],
       color: raw["color"],
       colors: EDA.Role.Colors.from_raw(raw["colors"]),
@@ -48,7 +56,7 @@ defmodule EDA.Role do
       permissions: raw["permissions"],
       managed: raw["managed"],
       mentionable: raw["mentionable"],
-      tags: raw["tags"],
+      tags: EDA.Role.Tags.from_raw(raw["tags"]),
       flags: raw["flags"]
     }
   end
@@ -168,12 +176,37 @@ defmodule EDA.Role do
     do: set_colors(guild_id, id, colors, opts)
 
   def set_colors(guild_id, role_id, colors, opts) do
-    EDA.API.Role.set_colors(guild_id, role_id, colors, opts) |> parse_response()
+    EDA.API.Role.set_colors(guild_id, role_id, colors, opts)
+    |> parse_response()
+    |> put_guild(guild_id)
   end
 
   @doc "Returns a mention string like `<@&id>`."
   @spec mention(t()) :: String.t()
   def mention(%__MODULE__{id: id}), do: "<@&#{id}>"
+
+  @doc """
+  The role's flags, from `flags`, as `EDA.Role.Flags` names them. Accepts a struct or a raw map,
+  and gives `[]` when Discord sent none.
+
+      iex> EDA.Role.flags(%EDA.Role{flags: 1})
+      [:in_prompt]
+  """
+  @spec flags(t() | map()) :: [EDA.Role.Flags.flag()]
+  def flags(%__MODULE__{flags: flags}), do: EDA.Role.Flags.to_list(flags)
+  def flags(%{"flags" => flags}), do: EDA.Role.Flags.to_list(flags)
+  def flags(_), do: []
+
+  @doc """
+  Whether `flags` carries a flag.
+
+      iex> EDA.Role.flag?(%EDA.Role{flags: 1}, :in_prompt)
+      true
+  """
+  @spec flag?(t() | map(), EDA.Role.Flags.flag()) :: boolean()
+  def flag?(%__MODULE__{flags: flags}, flag), do: EDA.Role.Flags.has?(flags, flag)
+  def flag?(%{"flags" => flags}, flag), do: EDA.Role.Flags.has?(flags, flag)
+  def flag?(_, _flag), do: false
 
   # ── Entity Manager ──
 
@@ -189,7 +222,13 @@ defmodule EDA.Role do
       nil -> fetch_from_rest(guild_id, role_id)
       raw -> {:ok, from_raw(raw)}
     end
+    |> put_guild(guild_id)
   end
+
+  defp put_guild({:ok, %__MODULE__{} = role}, guild_id),
+    do: {:ok, %{role | guild_id: to_string(guild_id)}}
+
+  defp put_guild(other, _guild_id), do: other
 
   defp fetch_from_rest(guild_id, role_id) do
     role_id_str = to_string(role_id)
@@ -213,7 +252,7 @@ defmodule EDA.Role do
   @spec create(String.t() | integer(), keyword() | map(), keyword()) ::
           {:ok, t()} | {:error, term()}
   def create(guild_id, params \\ [], opts \\ []) do
-    EDA.API.Role.create(guild_id, params, opts) |> parse_response()
+    EDA.API.Role.create(guild_id, params, opts) |> parse_response() |> put_guild(guild_id)
   end
 
   @doc """
@@ -232,7 +271,9 @@ defmodule EDA.Role do
 
   def modify(guild_id, role_id, payload, opts)
       when (is_binary(role_id) or is_integer(role_id)) and is_map(payload) do
-    EDA.API.Role.modify(guild_id, role_id, payload, opts) |> parse_response()
+    EDA.API.Role.modify(guild_id, role_id, payload, opts)
+    |> parse_response()
+    |> put_guild(guild_id)
   end
 
   @doc """

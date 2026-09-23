@@ -30,7 +30,7 @@ defmodule EDA.EventTest do
       assert result.channel_id == "ch1"
       assert result.guild_id == "g1"
       assert result.tts == false
-      assert result.type == 0
+      assert result.type == :default
     end
 
     test "MessageCreate nested maps remain string-keyed" do
@@ -150,7 +150,7 @@ defmodule EDA.EventTest do
       }
 
       result = Event.from_raw("VOICE_STATE_UPDATE", data)
-      assert %Event.VoiceStateUpdate{} = result
+      assert %EDA.VoiceState{} = result
       assert result.self_mute == true
       assert result.self_video == true
       assert result.channel_id == "vc1"

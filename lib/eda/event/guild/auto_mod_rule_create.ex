@@ -1,14 +1,13 @@
 defmodule EDA.Event.AutoModRuleCreate do
-  @moduledoc "Dispatched when an Auto Moderation rule is created."
-  use EDA.Event.Access
+  @moduledoc """
+  Sent when an Auto Moderation rule is created. Delivers an `EDA.AutoMod`, not a struct of its
+  own.
 
-  defstruct [:rule]
+  The consumer receives `{:AUTO_MODERATION_RULE_CREATE, %EDA.AutoMod{}}`. This module only parses
+  the payload.
+  """
 
-  @type t :: %__MODULE__{rule: EDA.AutoMod.t() | nil}
-
-  @doc "Converts a raw Discord payload into this event struct."
-  @spec from_raw(map()) :: t()
-  def from_raw(raw) when is_map(raw) do
-    %__MODULE__{rule: EDA.AutoMod.from_raw(raw)}
-  end
+  @doc "Parses the `AUTO_MODERATION_RULE_CREATE` payload into an `EDA.AutoMod`."
+  @spec from_raw(map()) :: EDA.AutoMod.t()
+  def from_raw(raw) when is_map(raw), do: EDA.AutoMod.from_raw(raw)
 end

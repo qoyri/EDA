@@ -213,13 +213,10 @@ defmodule EDA.SoundboardTest do
     test "every soundboard event is registered, not left to EDA.Event.Raw" do
       sound = %{"sound_id" => "5", "name" => "yay", "guild_id" => "1"}
 
-      assert %EDA.Event.GuildSoundboardSoundCreate{
-               guild_id: "1",
-               sound: %SoundboardSound{sound_id: "5"}
-             } =
+      assert %SoundboardSound{guild_id: "1", sound_id: "5"} =
                EDA.Event.from_raw("GUILD_SOUNDBOARD_SOUND_CREATE", sound)
 
-      assert %EDA.Event.GuildSoundboardSoundUpdate{sound: %SoundboardSound{name: "yay"}} =
+      assert %SoundboardSound{name: "yay"} =
                EDA.Event.from_raw("GUILD_SOUNDBOARD_SOUND_UPDATE", sound)
 
       assert %EDA.Event.GuildSoundboardSoundDelete{guild_id: "1", sound_id: "5"} =

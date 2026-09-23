@@ -122,9 +122,12 @@ defmodule EDA.HTTP.RateLimiterTest do
       shared_bucket = "/guilds/33333333333333333/test"
       shared_key = EDA.HTTP.Bucket.key(:get, shared_bucket)
 
+      # Far longer than it takes to queue the three requests, however loaded the suite is — the
+      # bucket is freed explicitly below. With 0.2 s, the last one (urgent) sometimes arrived after
+      # the reset, found the low one already served, and the test failed one full run in ten.
       RateLimiter.report_headers(shared_key, [
         {"x-ratelimit-remaining", "0"},
-        {"x-ratelimit-reset-after", "0.2"},
+        {"x-ratelimit-reset-after", "5.0"},
         {"x-ratelimit-bucket", "priority-test-bucket"}
       ])
 
@@ -176,18 +179,54 @@ defmodule EDA.HTTP.RateLimiterTest do
           )
         end)
 
-      Task.await_many([t_low, t_normal, t_urgent], 5000)
+      # Wait until all three are in the queue: that queue, sorted by priority, is what decides the
+      # order they are granted in.
+      wait_until(fn -> queued_for("priority-test-bucket") == 3 end)
+      assert queued_priorities("priority-test-bucket") == [0, 1, 2]
 
-      execution_order = Agent.get(results, & &1)
+      # Free the bucket and let it drain.
+
+      RateLimiter.report_headers(shared_key, [
+        {"x-ratelimit-remaining", "0"},
+        {"x-ratelimit-reset-after", "0.01"},
+        {"x-ratelimit-bucket", "priority-test-bucket"}
+      ])
+
+      Process.sleep(20)
+      send(RateLimiter, :process_queue)
+
+      assert [{:ok, :low}, {:ok, :normal}, {:ok, :urgent}] =
+               Task.await_many([t_low, t_normal, t_urgent], 5000)
+
+      # Once granted, the three run at the same time, each in its own process, so the order they
+      # finish in says nothing about priority; the queue order above does.
+      finished = results |> Agent.get(& &1) |> Enum.map(fn {priority, _} -> priority end)
       Agent.stop(results)
+      assert Enum.sort(finished) == [:low, :normal, :urgent]
+    end
+  end
 
-      # Urgent should come before low
-      urgent_idx = Enum.find_index(execution_order, fn {p, _} -> p == :urgent end)
-      low_idx = Enum.find_index(execution_order, fn {p, _} -> p == :low end)
+  defp queued_for(discord_bucket) do
+    RateLimiter
+    |> :sys.get_state()
+    |> Map.fetch!(:queue)
+    |> Enum.count(fn {_priority, _at, _from, bucket} -> bucket == discord_bucket end)
+  end
 
-      if urgent_idx && low_idx do
-        assert urgent_idx < low_idx
-      end
+  # 0 is urgent, 1 normal, 2 low, in the order the queue holds them.
+  defp queued_priorities(discord_bucket) do
+    RateLimiter
+    |> :sys.get_state()
+    |> Map.fetch!(:queue)
+    |> Enum.filter(fn {_priority, _at, _from, bucket} -> bucket == discord_bucket end)
+    |> Enum.map(fn {priority, _at, _from, _bucket} -> priority end)
+  end
+
+  defp wait_until(check, attempts \\ 200) do
+    cond do
+      check.() -> :ok
+      attempts == 0 -> flunk("condition never met")
+      true -> Process.sleep(5) && wait_until(check, attempts - 1)
     end
   end
 

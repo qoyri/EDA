@@ -1,17 +1,13 @@
 defmodule EDA.Event.GuildRoleCreate do
-  @moduledoc "Dispatched when a guild role is created."
-  use EDA.Event.Access
+  @moduledoc """
+  Sent when a guild role is created. Delivers an `EDA.Role` with its `guild_id`, not a struct of
+  its own.
 
-  defstruct [:guild_id, :role]
+  The consumer receives `{:GUILD_ROLE_CREATE, %EDA.Role{}}`. This module only parses the payload.
+  """
 
-  @type t :: %__MODULE__{guild_id: String.t() | nil, role: EDA.Role.t() | nil}
-
-  @doc "Converts a raw Discord payload into this event struct."
-  @spec from_raw(map()) :: t()
-  def from_raw(raw) when is_map(raw) do
-    %__MODULE__{guild_id: raw["guild_id"], role: parse_role(raw["role"])}
-  end
-
-  defp parse_role(nil), do: nil
-  defp parse_role(raw) when is_map(raw), do: EDA.Role.from_raw(raw)
+  @doc "Parses the `GUILD_ROLE_CREATE` payload into an `EDA.Role`."
+  @spec from_raw(map()) :: EDA.Role.t()
+  def from_raw(raw) when is_map(raw),
+    do: %{EDA.Role.from_raw(raw["role"] || %{}) | guild_id: raw["guild_id"]}
 end

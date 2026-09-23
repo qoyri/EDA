@@ -3,6 +3,8 @@ defmodule EDA.MentionTest do
 
   alias EDA.Mention
 
+  doctest EDA.Mention
+
   describe "user/1" do
     test "formats user mention" do
       assert Mention.user("123456") == "<@123456>"

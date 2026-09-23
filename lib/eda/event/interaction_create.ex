@@ -10,8 +10,16 @@ defmodule EDA.Event.InteractionCreate do
   `%{guild_install: guild_id, user_install: user_id}`. A key is missing when that installation
   was not involved, and the guild installation's value is `"0"` in a DM with the bot.
   `attachment_size_limit` is the largest upload the response may carry, in bytes.
+
+  `data` is an `EDA.Interaction.CommandData` for a command or its autocomplete, an
+  `EDA.Interaction.ComponentData` for a button or a select, and an
+  `EDA.Interaction.ModalSubmitData` for a modal.
   """
   use EDA.Event.Access
+
+  # EDA's names for the interaction types, public since before the rule of using Discord's names;
+  # see EDA.Interaction.interaction_type/1.
+  @types %{1 => :ping, 2 => :command, 3 => :component, 4 => :autocomplete, 5 => :modal_submit}
 
   defstruct [
     :id,
@@ -39,8 +47,12 @@ defmodule EDA.Event.InteractionCreate do
   @type t :: %__MODULE__{
           id: String.t() | nil,
           application_id: String.t() | nil,
-          type: integer() | nil,
-          data: map() | nil,
+          type: :ping | :command | :component | :autocomplete | :modal_submit | integer() | nil,
+          data:
+            EDA.Interaction.CommandData.t()
+            | EDA.Interaction.ComponentData.t()
+            | EDA.Interaction.ModalSubmitData.t()
+            | nil,
           guild_id: String.t() | nil,
           channel_id: String.t() | nil,
           member: EDA.Member.t() | nil,
@@ -64,8 +76,8 @@ defmodule EDA.Event.InteractionCreate do
     %__MODULE__{
       id: raw["id"],
       application_id: raw["application_id"],
-      type: raw["type"],
-      data: raw["data"],
+      type: EDA.Enum.name(@types, raw["type"]),
+      data: parse_data(raw["type"], raw["data"]),
       guild_id: raw["guild_id"],
       channel_id: raw["channel_id"],
       member: parse_member(raw["member"]),
@@ -91,10 +103,32 @@ defmodule EDA.Event.InteractionCreate do
   defp parse_context(nil), do: nil
   defp parse_context(value), do: Map.get(@contexts, value, value)
 
-  # Keyed by integration type; a type EDA does not know keeps its string key.
-  defp parse_owners(nil), do: nil
+  @doc false
+  # The data of an interaction, by its type (Discord's integer or EDA's atom). Shared with
+  # EDA.Interaction, which also reads raw interaction maps.
+  def parse_data(_type, nil), do: nil
+  def parse_data(_type, %_{} = data), do: data
 
-  defp parse_owners(owners) when is_map(owners),
+  def parse_data(type, raw) when type in [2, 4, :command, :autocomplete],
+    do: EDA.Interaction.CommandData.from_raw(raw)
+
+  def parse_data(type, raw) when type in [3, :component],
+    do: EDA.Interaction.ComponentData.from_raw(raw)
+
+  def parse_data(type, raw) when type in [5, :modal_submit],
+    do: EDA.Interaction.ModalSubmitData.from_raw(raw)
+
+  def parse_data(_type, raw), do: raw
+
+  @doc false
+  # The interaction type as EDA names it, shared with EDA.Message.InteractionMetadata.
+  def type_name(type), do: EDA.Enum.name(@types, type)
+
+  @doc false
+  # Keyed by integration type; a type EDA does not know keeps its string key.
+  def parse_owners(nil), do: nil
+
+  def parse_owners(owners) when is_map(owners),
     do: Map.new(owners, fn {type, id} -> {Map.get(@integration_types, type, type), id} end)
 
   defp parse_one(nil, _parse), do: nil

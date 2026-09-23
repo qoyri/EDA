@@ -1,13 +1,13 @@
 defmodule EDA.Event.ApplicationCommandPermissionsUpdate do
-  @moduledoc "Dispatched when who may use one of the app's commands in a guild changes."
-  use EDA.Event.Access
+  @moduledoc """
+  Sent when who may use one of the app's commands in a guild changes. Delivers an
+  `EDA.Command.Permissions`, not a struct of its own.
 
-  defstruct [:permissions]
+  The consumer receives `{:APPLICATION_COMMAND_PERMISSIONS_UPDATE, %EDA.Command.Permissions{}}`.
+  This module only parses the payload.
+  """
 
-  @type t :: %__MODULE__{permissions: EDA.Command.Permissions.t()}
-
-  @doc "Converts a raw Discord payload into this event struct."
-  @spec from_raw(map()) :: t()
-  def from_raw(raw) when is_map(raw),
-    do: %__MODULE__{permissions: EDA.Command.Permissions.from_raw(raw)}
+  @doc "Parses the `APPLICATION_COMMAND_PERMISSIONS_UPDATE` payload into an `EDA.Command.Permissions`."
+  @spec from_raw(map()) :: EDA.Command.Permissions.t()
+  def from_raw(raw) when is_map(raw), do: EDA.Command.Permissions.from_raw(raw)
 end

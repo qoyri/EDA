@@ -2,6 +2,8 @@ defmodule EDA.Webhook do
   @moduledoc "Represents a Discord webhook."
   use EDA.Event.Access
 
+  @types %{1 => :incoming, 2 => :channel_follower, 3 => :application}
+
   defstruct [
     :id,
     :type,
@@ -19,7 +21,7 @@ defmodule EDA.Webhook do
 
   @type t :: %__MODULE__{
           id: String.t() | nil,
-          type: integer() | nil,
+          type: :incoming | :channel_follower | :application | integer() | nil,
           guild_id: String.t() | nil,
           channel_id: String.t() | nil,
           user: EDA.User.t() | nil,
@@ -27,8 +29,8 @@ defmodule EDA.Webhook do
           avatar: String.t() | nil,
           token: String.t() | nil,
           application_id: String.t() | nil,
-          source_guild: map() | nil,
-          source_channel: map() | nil,
+          source_guild: EDA.Guild.t() | nil,
+          source_channel: EDA.Channel.t() | nil,
           url: String.t() | nil
         }
 
@@ -36,7 +38,7 @@ defmodule EDA.Webhook do
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
       id: raw["id"],
-      type: raw["type"],
+      type: EDA.Enum.name(@types, raw["type"]),
       guild_id: raw["guild_id"],
       channel_id: raw["channel_id"],
       user: parse_user(raw["user"]),
@@ -44,8 +46,8 @@ defmodule EDA.Webhook do
       avatar: raw["avatar"],
       token: raw["token"],
       application_id: raw["application_id"],
-      source_guild: raw["source_guild"],
-      source_channel: raw["source_channel"],
+      source_guild: raw["source_guild"] && EDA.Guild.from_raw(raw["source_guild"]),
+      source_channel: raw["source_channel"] && EDA.Channel.from_raw(raw["source_channel"]),
       url: raw["url"]
     }
   end

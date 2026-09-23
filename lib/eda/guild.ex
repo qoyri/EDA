@@ -22,6 +22,18 @@ defmodule EDA.Guild do
   """
   use EDA.Event.Access
 
+  @premium_tiers %{0 => :none, 1 => :tier_1, 2 => :tier_2, 3 => :tier_3}
+
+  @nsfw_levels %{0 => :default, 1 => :explicit, 2 => :safe, 3 => :age_restricted}
+
+  @mfa_levels %{0 => :none, 1 => :elevated}
+
+  @content_filters %{0 => :disabled, 1 => :members_without_roles, 2 => :all_members}
+
+  @notification_levels %{0 => :all_messages, 1 => :only_mentions}
+
+  @verification_levels %{0 => :none, 1 => :low, 2 => :medium, 3 => :high, 4 => :very_high}
+
   # There is one guild struct per guild, so a map past its compact form costs nothing held in
   # bulk; its fields stay flat, as Discord sends them. The limit matters for what the cache holds by the
   # thousand; see test/eda/cached_struct_size_test.exs.
@@ -97,16 +109,17 @@ defmodule EDA.Guild do
           owner_id: String.t() | nil,
           permissions: String.t() | nil,
           features: [String.t()] | nil,
-          premium_tier: non_neg_integer() | nil,
+          premium_tier: :none | :tier_1 | :tier_2 | :tier_3 | integer() | nil,
           premium_subscription_count: non_neg_integer() | nil,
           premium_progress_bar_enabled: boolean() | nil,
           vanity_url_code: String.t() | nil,
           preferred_locale: String.t() | nil,
-          verification_level: non_neg_integer() | nil,
-          default_message_notifications: non_neg_integer() | nil,
-          explicit_content_filter: non_neg_integer() | nil,
-          mfa_level: non_neg_integer() | nil,
-          nsfw_level: non_neg_integer() | nil,
+          verification_level: :none | :low | :medium | :high | :very_high | integer() | nil,
+          default_message_notifications: :all_messages | :only_mentions | integer() | nil,
+          explicit_content_filter:
+            :disabled | :members_without_roles | :all_members | integer() | nil,
+          mfa_level: :none | :elevated | integer() | nil,
+          nsfw_level: :default | :explicit | :safe | :age_restricted | integer() | nil,
           afk_channel_id: String.t() | nil,
           afk_timeout: non_neg_integer() | nil,
           widget_enabled: boolean() | nil,
@@ -123,12 +136,12 @@ defmodule EDA.Guild do
           max_stage_video_channel_users: non_neg_integer() | nil,
           approximate_member_count: non_neg_integer() | nil,
           approximate_presence_count: non_neg_integer() | nil,
-          welcome_screen: map() | nil,
-          incidents_data: map() | nil,
+          welcome_screen: EDA.Guild.WelcomeScreen.t() | nil,
+          incidents_data: EDA.Guild.IncidentsData.t() | nil,
           roles: [EDA.Role.t()] | nil,
           emojis: [EDA.Emoji.t()] | nil,
           stickers: [EDA.Sticker.t()] | nil,
-          joined_at: String.t() | nil,
+          joined_at: DateTime.t() | nil,
           large: boolean() | nil,
           unavailable: boolean() | nil,
           member_count: non_neg_integer() | nil,
@@ -136,9 +149,9 @@ defmodule EDA.Guild do
           threads: [EDA.Channel.t()] | nil,
           members: [EDA.Member.t()] | nil,
           voice_states: [EDA.VoiceState.t()] | nil,
-          presences: [map()] | nil,
-          stage_instances: [map()] | nil,
-          guild_scheduled_events: [map()] | nil,
+          presences: [EDA.Event.PresenceUpdate.t()] | nil,
+          stage_instances: [EDA.StageInstance.t()] | nil,
+          guild_scheduled_events: [EDA.ScheduledEvent.t()] | nil,
           soundboard_sounds: [EDA.SoundboardSound.t()] | nil
         }
 
@@ -157,17 +170,18 @@ defmodule EDA.Guild do
       owner_id: raw["owner_id"],
       permissions: raw["permissions"],
       features: raw["features"],
-      premium_tier: raw["premium_tier"],
+      premium_tier: EDA.Enum.name(@premium_tiers, raw["premium_tier"]),
       premium_subscription_count: raw["premium_subscription_count"],
       premium_progress_bar_enabled: raw["premium_progress_bar_enabled"],
       vanity_url_code: raw["vanity_url_code"],
       # The partial guild of an interaction names it `locale`.
       preferred_locale: raw["preferred_locale"] || raw["locale"],
-      verification_level: raw["verification_level"],
-      default_message_notifications: raw["default_message_notifications"],
-      explicit_content_filter: raw["explicit_content_filter"],
-      mfa_level: raw["mfa_level"],
-      nsfw_level: raw["nsfw_level"],
+      verification_level: EDA.Enum.name(@verification_levels, raw["verification_level"]),
+      default_message_notifications:
+        EDA.Enum.name(@notification_levels, raw["default_message_notifications"]),
+      explicit_content_filter: EDA.Enum.name(@content_filters, raw["explicit_content_filter"]),
+      mfa_level: EDA.Enum.name(@mfa_levels, raw["mfa_level"]),
+      nsfw_level: EDA.Enum.name(@nsfw_levels, raw["nsfw_level"]),
       afk_channel_id: raw["afk_channel_id"],
       afk_timeout: raw["afk_timeout"],
       widget_enabled: raw["widget_enabled"],
@@ -184,12 +198,12 @@ defmodule EDA.Guild do
       max_stage_video_channel_users: raw["max_stage_video_channel_users"],
       approximate_member_count: raw["approximate_member_count"],
       approximate_presence_count: raw["approximate_presence_count"],
-      welcome_screen: raw["welcome_screen"],
-      incidents_data: raw["incidents_data"],
-      roles: parse_list(raw["roles"], &EDA.Role.from_raw/1),
+      welcome_screen: EDA.Guild.WelcomeScreen.from_raw(raw["welcome_screen"]),
+      incidents_data: EDA.Guild.IncidentsData.from_raw(raw["incidents_data"]),
+      roles: parse_list(raw["roles"], &%{EDA.Role.from_raw(&1) | guild_id: raw["id"]}),
       emojis: parse_list(raw["emojis"], &EDA.Emoji.from_raw/1),
       stickers: parse_list(raw["stickers"], &EDA.Sticker.from_raw/1),
-      joined_at: raw["joined_at"],
+      joined_at: EDA.Timestamp.parse(raw["joined_at"]),
       large: raw["large"],
       unavailable: raw["unavailable"],
       member_count: raw["member_count"],
@@ -197,9 +211,10 @@ defmodule EDA.Guild do
       threads: parse_list(raw["threads"], &EDA.Channel.from_raw/1),
       members: parse_list(raw["members"], &EDA.Member.from_raw/1),
       voice_states: parse_list(raw["voice_states"], &EDA.VoiceState.from_raw/1),
-      presences: raw["presences"],
-      stage_instances: raw["stage_instances"],
-      guild_scheduled_events: raw["guild_scheduled_events"],
+      presences: parse_list(raw["presences"], &parse_presence(&1, raw["id"])),
+      stage_instances: parse_list(raw["stage_instances"], &EDA.StageInstance.from_raw/1),
+      guild_scheduled_events:
+        parse_list(raw["guild_scheduled_events"], &EDA.ScheduledEvent.from_raw/1),
       soundboard_sounds: parse_list(raw["soundboard_sounds"], &EDA.SoundboardSound.from_raw/1)
     }
   end
@@ -219,8 +234,44 @@ defmodule EDA.Guild do
     end
   end
 
+  # A guild's presences leave out the guild_id every PRESENCE_UPDATE carries.
+  defp parse_presence(raw, guild_id),
+    do: EDA.Event.PresenceUpdate.from_raw(Map.put_new(raw, "guild_id", guild_id))
+
   defp parse_list(nil, _parse), do: nil
   defp parse_list(list, parse) when is_list(list), do: Enum.map(list, parse)
+
+  @doc """
+  Which notices the system channel leaves out, from `system_channel_flags`, as
+  `EDA.Guild.SystemChannelFlags` names them. Accepts a struct or a raw map, and gives `[]` when
+  Discord sent none.
+
+      iex> EDA.Guild.system_channel_flags(%EDA.Guild{system_channel_flags: 3})
+      [:suppress_join_notifications, :suppress_premium_subscriptions]
+  """
+  @spec system_channel_flags(t() | map()) :: [EDA.Guild.SystemChannelFlags.flag()]
+  def system_channel_flags(%__MODULE__{system_channel_flags: flags}),
+    do: EDA.Guild.SystemChannelFlags.to_list(flags)
+
+  def system_channel_flags(%{"system_channel_flags" => flags}),
+    do: EDA.Guild.SystemChannelFlags.to_list(flags)
+
+  def system_channel_flags(_), do: []
+
+  @doc """
+  Whether `system_channel_flags` carries a flag.
+
+      iex> EDA.Guild.system_channel_flag?(%EDA.Guild{system_channel_flags: 3}, :suppress_join_notifications)
+      true
+  """
+  @spec system_channel_flag?(t() | map(), EDA.Guild.SystemChannelFlags.flag()) :: boolean()
+  def system_channel_flag?(%__MODULE__{system_channel_flags: flags}, flag),
+    do: EDA.Guild.SystemChannelFlags.has?(flags, flag)
+
+  def system_channel_flag?(%{"system_channel_flags" => flags}, flag),
+    do: EDA.Guild.SystemChannelFlags.has?(flags, flag)
+
+  def system_channel_flag?(_, _flag), do: false
 
   # ── Entity Manager ──
 
@@ -343,4 +394,31 @@ defmodule EDA.Guild do
 
   def icon_url(%__MODULE__{id: id, icon: icon}, opts),
     do: EDA.CDN.url("icons/#{id}/#{icon}", EDA.CDN.animated_hash?(icon), opts)
+
+  @doc """
+  The integer Discord uses for a verification level, from its atom or the integer itself.
+  """
+  @spec verification_level_value(atom() | integer()) :: integer()
+  def verification_level_value(value),
+    do: EDA.Enum.value!(@verification_levels, value, "verification level")
+
+  @doc """
+  The integer Discord uses for a notification level, from its atom or the integer itself.
+  """
+  @spec default_message_notifications_value(atom() | integer()) :: integer()
+  def default_message_notifications_value(value),
+    do: EDA.Enum.value!(@notification_levels, value, "notification level")
+
+  @doc """
+  The integer Discord uses for a explicit content filter, from its atom or the integer itself.
+  """
+  @spec explicit_content_filter_value(atom() | integer()) :: integer()
+  def explicit_content_filter_value(value),
+    do: EDA.Enum.value!(@content_filters, value, "explicit content filter")
+
+  @doc """
+  The integer Discord uses for a MFA level, from its atom or the integer itself.
+  """
+  @spec mfa_level_value(atom() | integer()) :: integer()
+  def mfa_level_value(value), do: EDA.Enum.value!(@mfa_levels, value, "MFA level")
 end

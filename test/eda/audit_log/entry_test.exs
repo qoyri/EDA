@@ -23,9 +23,9 @@ defmodule EDA.AuditLog.EntryTest do
       assert entry.id == "123"
       assert entry.target_id == "456"
       assert entry.user_id == "789"
-      assert entry.action_type == 22
+      assert entry.action_type == :member_ban_add
       assert entry.reason == "spamming"
-      assert entry.options == %{"count" => "1"}
+      assert entry.options == %EDA.AuditLog.Entry.Options{count: 1}
       assert [%Change{key: "name"}] = entry.changes
     end
 
@@ -46,7 +46,7 @@ defmodule EDA.AuditLog.EntryTest do
     test "supports Access protocol" do
       entry = Entry.from_raw(%{"id" => "123", "action_type" => 20})
       assert entry[:id] == "123"
-      assert entry["action_type"] == 20
+      assert entry["action_type"] == :member_kick
     end
   end
 end

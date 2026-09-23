@@ -5,9 +5,14 @@ defmodule EDA.Invite do
   The same struct covers both shapes Discord sends. The REST invite object nests `guild` and
   `channel` objects; the `INVITE_CREATE` gateway event sends flat `guild_id` and
   `channel_id` instead. `guild_id` and `channel_id` are filled in from the nested objects
-  when Discord did not send them, so they can be read either way.
+  when Discord did not send them, so they can be read either way. The nested objects are
+  partial: `guild` an `EDA.Guild` with its name, icon, banner, features and a few more,
+  `channel` an `EDA.Channel` with its id, name and type, `target_application` an `EDA.App`,
+  `guild_scheduled_event` an `EDA.ScheduledEvent`.
   """
   use EDA.Event.Access
+  @target_types %{1 => :stream, 2 => :embedded_application}
+  @invite_types %{0 => :guild, 1 => :group_dm, 2 => :friend}
 
   import Bitwise
 
@@ -38,23 +43,23 @@ defmodule EDA.Invite do
 
   @type t :: %__MODULE__{
           code: String.t() | nil,
-          type: integer() | nil,
-          guild: map() | nil,
+          type: :guild | :group_dm | :friend | integer() | nil,
+          guild: EDA.Guild.t() | nil,
           guild_id: String.t() | nil,
-          channel: map() | nil,
+          channel: EDA.Channel.t() | nil,
           channel_id: String.t() | nil,
           inviter: EDA.User.t() | nil,
           target_user: EDA.User.t() | nil,
-          target_type: integer() | nil,
-          target_application: map() | nil,
+          target_type: :stream | :embedded_application | integer() | nil,
+          target_application: EDA.App.t() | nil,
           roles: [EDA.Role.t()] | nil,
           role_ids: [String.t()] | nil,
           flags: integer() | nil,
-          expires_at: String.t() | nil,
-          created_at: String.t() | nil,
+          expires_at: DateTime.t() | nil,
+          created_at: DateTime.t() | nil,
           approximate_member_count: integer() | nil,
           approximate_presence_count: integer() | nil,
-          guild_scheduled_event: map() | nil,
+          guild_scheduled_event: EDA.ScheduledEvent.t() | nil,
           max_age: integer() | nil,
           max_uses: integer() | nil,
           uses: integer() | nil,
@@ -68,23 +73,25 @@ defmodule EDA.Invite do
 
     %__MODULE__{
       code: raw["code"],
-      type: raw["type"],
-      guild: guild,
+      type: EDA.Enum.name(@invite_types, raw["type"]),
+      guild: guild && EDA.Guild.from_raw(guild),
       guild_id: raw["guild_id"] || nested_id(guild),
-      channel: channel,
+      channel: channel && EDA.Channel.from_raw(channel),
       channel_id: raw["channel_id"] || nested_id(channel),
       inviter: parse_user(raw["inviter"]),
       target_user: parse_user(raw["target_user"]),
-      target_type: raw["target_type"],
-      target_application: raw["target_application"],
+      target_type: EDA.Enum.name(@target_types, raw["target_type"]),
+      target_application:
+        raw["target_application"] && EDA.App.from_raw(raw["target_application"]),
       roles: parse_roles(raw["roles"]),
       role_ids: raw["role_ids"] || role_ids(raw["roles"]),
       flags: raw["flags"],
-      expires_at: raw["expires_at"],
-      created_at: raw["created_at"],
+      expires_at: EDA.Timestamp.parse(raw["expires_at"]),
+      created_at: EDA.Timestamp.parse(raw["created_at"]),
       approximate_member_count: raw["approximate_member_count"],
       approximate_presence_count: raw["approximate_presence_count"],
-      guild_scheduled_event: raw["guild_scheduled_event"],
+      guild_scheduled_event:
+        raw["guild_scheduled_event"] && EDA.ScheduledEvent.from_raw(raw["guild_scheduled_event"]),
       max_age: raw["max_age"],
       max_uses: raw["max_uses"],
       uses: raw["uses"],
@@ -107,9 +114,6 @@ defmodule EDA.Invite do
   defp parse_roles(list) when is_list(list), do: Enum.map(list, &EDA.Role.from_raw/1)
 
   # ── Types and flags ──
-
-  @invite_types %{0 => :guild, 1 => :group_dm, 2 => :friend}
-  @target_types %{1 => :stream, 2 => :embedded_application}
 
   @flag_guest_invite 1 <<< 0
   @flag_has_target_users 1 <<< 4
@@ -146,6 +150,7 @@ defmodule EDA.Invite do
   def type(%{"type" => type}), do: type(type)
   # Discord omits `type` on the gateway event, where it is always a guild invite.
   def type(nil), do: :guild
+  def type(value) when is_atom(value), do: value
   def type(value) when is_integer(value), do: Map.get(@invite_types, value, :unknown)
 
   @doc """
@@ -164,6 +169,7 @@ defmodule EDA.Invite do
   def target_type(%__MODULE__{target_type: value}), do: target_type(value)
   def target_type(%{"target_type" => value}), do: target_type(value)
   def target_type(nil), do: nil
+  def target_type(value) when is_atom(value), do: value
   def target_type(value) when is_integer(value), do: Map.get(@target_types, value, :unknown)
 
   @doc """

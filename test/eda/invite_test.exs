@@ -20,7 +20,7 @@ defmodule EDA.InviteTest do
       assert invite.channel_id == "ch1"
       assert invite.guild["name"] == "A guild"
       assert invite.channel["name"] == "general"
-      assert invite.expires_at == "2026-09-26T12:00:00Z"
+      assert invite.expires_at == ~U[2026-09-26 12:00:00Z]
     end
 
     test "the gateway event sends flat ids and no nested objects" do
@@ -147,7 +147,7 @@ defmodule EDA.InviteTest do
   describe "created_at" do
     test "is parsed — Discord sends it although the object table omits it" do
       invite = Invite.from_raw(%{"code" => "a", "created_at" => "2026-09-19T19:55:22+00:00"})
-      assert invite.created_at == "2026-09-19T19:55:22+00:00"
+      assert invite.created_at == ~U[2026-09-19 19:55:22Z]
     end
   end
 

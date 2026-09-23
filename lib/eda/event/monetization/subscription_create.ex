@@ -1,13 +1,13 @@
 defmodule EDA.Event.SubscriptionCreate do
-  @moduledoc "Dispatched when a premium app subscription is created. Its status may still be inactive: grant perks on entitlements, not here."
-  use EDA.Event.Access
+  @moduledoc """
+  Sent when a premium app subscription is created. Its status may still be inactive: grant perks
+  on entitlements, not here. Delivers an `EDA.Subscription`, not a struct of its own.
 
-  defstruct [:subscription]
+  The consumer receives `{:SUBSCRIPTION_CREATE, %EDA.Subscription{}}`. This module only parses the
+  payload.
+  """
 
-  @type t :: %__MODULE__{subscription: EDA.Subscription.t()}
-
-  @doc "Converts a raw Discord payload into this event struct."
-  @spec from_raw(map()) :: t()
-  def from_raw(raw) when is_map(raw),
-    do: %__MODULE__{subscription: EDA.Subscription.from_raw(raw)}
+  @doc "Parses the `SUBSCRIPTION_CREATE` payload into an `EDA.Subscription`."
+  @spec from_raw(map()) :: EDA.Subscription.t()
+  def from_raw(raw) when is_map(raw), do: EDA.Subscription.from_raw(raw)
 end

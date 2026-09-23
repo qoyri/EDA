@@ -3,7 +3,29 @@ defmodule EDA.RoleTest do
 
   alias EDA.Role
 
+  doctest EDA.Role.Tags
+
   describe "from_raw/1" do
+    test "a managed role's tags, the keys Discord sends as null read as true" do
+      role =
+        Role.from_raw(%{
+          "id" => "r9",
+          "tags" => %{
+            "integration_id" => "5",
+            "subscription_listing_id" => "6",
+            "available_for_purchase" => nil
+          }
+        })
+
+      assert role.tags == %Role.Tags{
+               integration_id: "5",
+               subscription_listing_id: "6",
+               available_for_purchase: true
+             }
+
+      assert Role.from_raw(%{"id" => "r10"}).tags == nil
+    end
+
     test "parses all fields" do
       raw = %{
         "id" => "r1",

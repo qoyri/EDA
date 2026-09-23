@@ -17,19 +17,19 @@ defmodule EDA.Event.StageInstanceTest do
     test "parses all fields" do
       event = StageInstanceCreate.from_raw(@raw)
 
-      assert %StageInstanceCreate{} = event
+      assert %EDA.StageInstance{} = event
       assert event.id == "stage1"
       assert event.guild_id == "guild1"
       assert event.channel_id == "channel1"
       assert event.topic == "Q&A Session"
-      assert event.privacy_level == 2
+      assert event.privacy_level == :guild_only
       assert event.discoverable_disabled == false
       assert event.guild_scheduled_event_id == "event1"
     end
 
     test "routes via Event.from_raw/2" do
       result = EDA.Event.from_raw("STAGE_INSTANCE_CREATE", @raw)
-      assert %StageInstanceCreate{} = result
+      assert %EDA.StageInstance{} = result
     end
   end
 
@@ -37,14 +37,14 @@ defmodule EDA.Event.StageInstanceTest do
     test "parses all fields" do
       event = StageInstanceUpdate.from_raw(@raw)
 
-      assert %StageInstanceUpdate{} = event
+      assert %EDA.StageInstance{} = event
       assert event.id == "stage1"
       assert event.topic == "Q&A Session"
     end
 
     test "routes via Event.from_raw/2" do
       result = EDA.Event.from_raw("STAGE_INSTANCE_UPDATE", @raw)
-      assert %StageInstanceUpdate{} = result
+      assert %EDA.StageInstance{} = result
     end
   end
 
@@ -52,14 +52,14 @@ defmodule EDA.Event.StageInstanceTest do
     test "parses all fields" do
       event = StageInstanceDelete.from_raw(@raw)
 
-      assert %StageInstanceDelete{} = event
+      assert %EDA.StageInstance{} = event
       assert event.id == "stage1"
       assert event.guild_id == "guild1"
     end
 
     test "routes via Event.from_raw/2" do
       result = EDA.Event.from_raw("STAGE_INSTANCE_DELETE", @raw)
-      assert %StageInstanceDelete{} = result
+      assert %EDA.StageInstance{} = result
     end
   end
 end

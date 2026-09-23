@@ -16,8 +16,8 @@ defmodule EDA.GuildTemplate do
   | `usage_count` | integer | Times this template has been used |
   | `creator_id` | snowflake | ID of the template creator |
   | `creator` | `EDA.User` | The template's creator |
-  | `created_at` | string | ISO8601 creation timestamp |
-  | `updated_at` | string | ISO8601 last sync timestamp |
+  | `created_at` | `DateTime` | When the template was created |
+  | `updated_at` | `DateTime` | When it was last synced |
   | `source_guild_id` | snowflake | ID of the source guild |
   | `serialized_source_guild` | SourceGuild.t() | Guild snapshot |
   | `is_dirty` | boolean \| nil | Has unsynced changes |
@@ -51,8 +51,8 @@ defmodule EDA.GuildTemplate do
           usage_count: integer() | nil,
           creator_id: String.t() | nil,
           creator: EDA.User.t() | nil,
-          created_at: String.t() | nil,
-          updated_at: String.t() | nil,
+          created_at: DateTime.t() | nil,
+          updated_at: DateTime.t() | nil,
           source_guild_id: String.t() | nil,
           serialized_source_guild: EDA.GuildTemplate.SourceGuild.t() | nil,
           is_dirty: boolean() | nil
@@ -85,8 +85,8 @@ defmodule EDA.GuildTemplate do
       usage_count: raw["usage_count"],
       creator_id: raw["creator_id"],
       creator: parse_creator(raw["creator"]),
-      created_at: raw["created_at"],
-      updated_at: raw["updated_at"],
+      created_at: EDA.Timestamp.parse(raw["created_at"]),
+      updated_at: EDA.Timestamp.parse(raw["updated_at"]),
       source_guild_id: raw["source_guild_id"],
       serialized_source_guild: parse_source_guild(raw["serialized_source_guild"]),
       is_dirty: raw["is_dirty"]
@@ -109,8 +109,10 @@ defmodule EDA.GuildTemplate.SourceGuild do
 
   Note: All IDs in this struct are **placeholder integers**, not real snowflakes.
   For example, `@everyone` has id `0`, categories start at `1`, etc.
-  Roles and channels are kept as plain maps since their IDs are placeholders
-  and they contain only a subset of normal guild role/channel fields.
+
+  `roles` and `channels` are `EDA.Role` and `EDA.Channel` structs holding the subset of fields a
+  template keeps, with those placeholder integers as ids (`parent_id` and the overwrites' ids
+  included). The levels are atoms, as on `EDA.Guild`.
   """
 
   use EDA.Event.Access
@@ -136,23 +138,21 @@ defmodule EDA.GuildTemplate.SourceGuild do
           name: String.t() | nil,
           description: String.t() | nil,
           region: String.t() | nil,
-          verification_level: integer() | nil,
-          default_message_notifications: integer() | nil,
-          explicit_content_filter: integer() | nil,
+          verification_level: atom() | integer() | nil,
+          default_message_notifications: atom() | integer() | nil,
+          explicit_content_filter: atom() | integer() | nil,
           preferred_locale: String.t() | nil,
           afk_timeout: integer() | nil,
           afk_channel_id: integer() | nil,
           system_channel_id: integer() | nil,
           system_channel_flags: integer() | nil,
           icon_hash: String.t() | nil,
-          roles: [map()] | nil,
-          channels: [map()] | nil
+          roles: [EDA.Role.t()] | nil,
+          channels: [EDA.Channel.t()] | nil
         }
 
   @doc """
   Converts a raw serialized source guild map into this struct.
-
-  Roles and channels are kept as plain maps.
 
   ## Examples
 
@@ -161,21 +161,24 @@ defmodule EDA.GuildTemplate.SourceGuild do
   """
   @spec from_raw(map()) :: t()
   def from_raw(raw) when is_map(raw) do
+    # The levels are read by EDA.Guild, whose tables they share.
+    guild = EDA.Guild.from_raw(raw)
+
     %__MODULE__{
       name: raw["name"],
       description: raw["description"],
       region: raw["region"],
-      verification_level: raw["verification_level"],
-      default_message_notifications: raw["default_message_notifications"],
-      explicit_content_filter: raw["explicit_content_filter"],
+      verification_level: guild.verification_level,
+      default_message_notifications: guild.default_message_notifications,
+      explicit_content_filter: guild.explicit_content_filter,
       preferred_locale: raw["preferred_locale"],
       afk_timeout: raw["afk_timeout"],
       afk_channel_id: raw["afk_channel_id"],
       system_channel_id: raw["system_channel_id"],
       system_channel_flags: raw["system_channel_flags"],
       icon_hash: raw["icon_hash"],
-      roles: raw["roles"],
-      channels: raw["channels"]
+      roles: raw["roles"] && Enum.map(raw["roles"], &EDA.Role.from_raw/1),
+      channels: raw["channels"] && Enum.map(raw["channels"], &EDA.Channel.from_raw/1)
     }
   end
 end

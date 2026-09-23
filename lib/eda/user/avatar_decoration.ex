@@ -73,19 +73,8 @@ defmodule EDA.User.AvatarDecoration do
   # Undocumented, so tolerate both an ISO8601 string and a unix timestamp.
   defp parse_expiry(nil), do: nil
 
-  defp parse_expiry(value) when is_binary(value) do
-    case DateTime.from_iso8601(value) do
-      {:ok, datetime, _offset} -> datetime
-      {:error, _reason} -> nil
-    end
-  end
-
-  defp parse_expiry(value) when is_integer(value) do
-    case DateTime.from_unix(value) do
-      {:ok, datetime} -> datetime
-      {:error, _reason} -> nil
-    end
-  end
+  defp parse_expiry(value) when is_binary(value), do: EDA.Timestamp.parse(value)
+  defp parse_expiry(value) when is_integer(value), do: EDA.Timestamp.from_unix(value)
 
   defp parse_expiry(%DateTime{} = value), do: value
   defp parse_expiry(_value), do: nil

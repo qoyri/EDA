@@ -70,8 +70,8 @@ defmodule EDA.Attachment do
           waveform: String.t() | nil,
           flags: integer() | nil,
           clip_participants: [EDA.User.t()] | nil,
-          clip_created_at: String.t() | nil,
-          application: map() | nil
+          clip_created_at: DateTime.t() | nil,
+          application: EDA.App.t() | nil
         }
 
   @max_description_length 1024
@@ -96,8 +96,8 @@ defmodule EDA.Attachment do
       waveform: raw["waveform"],
       flags: raw["flags"],
       clip_participants: parse_users(raw["clip_participants"]),
-      clip_created_at: raw["clip_created_at"],
-      application: raw["application"]
+      clip_created_at: EDA.Timestamp.parse(raw["clip_created_at"]),
+      application: raw["application"] && EDA.App.from_raw(raw["application"])
     }
   end
 

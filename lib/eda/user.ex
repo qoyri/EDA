@@ -1,6 +1,13 @@
 defmodule EDA.User do
-  @moduledoc "Represents a Discord user."
+  @moduledoc """
+  Represents a Discord user.
+
+  `member` is set only on the users a guild message mentions, where Discord attaches their
+  partial member (nickname, roles, join date…) as an `EDA.Member` with the message's
+  `guild_id`; it is `nil` anywhere else.
+  """
   use EDA.Event.Access
+  @premium_types %{0 => :none, 1 => :nitro_classic, 2 => :nitro, 3 => :nitro_basic}
 
   defstruct [
     :id,
@@ -22,7 +29,8 @@ defmodule EDA.User do
     :email,
     :avatar_decoration_data,
     :collectibles,
-    :display_name_styles
+    :display_name_styles,
+    :member
   ]
 
   @type t :: %__MODULE__{
@@ -38,14 +46,15 @@ defmodule EDA.User do
           banner: String.t() | nil,
           global_name: String.t() | nil,
           primary_guild: EDA.User.PrimaryGuild.t() | nil,
-          premium_type: integer() | nil,
+          premium_type: :none | :nitro_classic | :nitro | :nitro_basic | integer() | nil,
           mfa_enabled: boolean() | nil,
           locale: String.t() | nil,
           verified: boolean() | nil,
           email: String.t() | nil,
           avatar_decoration_data: EDA.User.AvatarDecoration.t() | nil,
           collectibles: EDA.User.Collectibles.t() | nil,
-          display_name_styles: EDA.User.DisplayNameStyles.t() | nil
+          display_name_styles: EDA.User.DisplayNameStyles.t() | nil,
+          member: EDA.Member.t() | nil
         }
 
   @spec from_raw(map()) :: t()
@@ -63,18 +72,17 @@ defmodule EDA.User do
       banner: raw["banner"],
       global_name: raw["global_name"],
       primary_guild: EDA.User.PrimaryGuild.from_raw(raw["primary_guild"]),
-      premium_type: raw["premium_type"],
+      premium_type: EDA.Enum.name(@premium_types, raw["premium_type"]),
       mfa_enabled: raw["mfa_enabled"],
       locale: raw["locale"],
       verified: raw["verified"],
       email: raw["email"],
       avatar_decoration_data: EDA.User.AvatarDecoration.from_raw(raw["avatar_decoration_data"]),
       collectibles: EDA.User.Collectibles.from_raw(raw["collectibles"]),
-      display_name_styles: EDA.User.DisplayNameStyles.from_raw(raw["display_name_styles"])
+      display_name_styles: EDA.User.DisplayNameStyles.from_raw(raw["display_name_styles"]),
+      member: raw["member"] && EDA.Member.from_raw(raw["member"])
     }
   end
-
-  @premium_types %{0 => :none, 1 => :nitro_classic, 2 => :nitro, 3 => :nitro_basic}
 
   @typedoc "A Nitro tier name."
   @type premium_type :: :none | :nitro_classic | :nitro | :nitro_basic | :unknown | nil
@@ -92,10 +100,10 @@ defmodule EDA.User do
 
   ## Examples
 
-      iex> EDA.User.premium_type(%EDA.User{premium_type: 2})
+      iex> EDA.User.premium_type(%EDA.User{premium_type: :nitro})
       :nitro
 
-      iex> EDA.User.premium_type(%EDA.User{premium_type: 0})
+      iex> EDA.User.premium_type(%EDA.User{premium_type: :none})
       :none
 
       iex> EDA.User.premium_type(%EDA.User{})
@@ -109,6 +117,10 @@ defmodule EDA.User do
   def premium_type(%{"premium_type" => value}), do: premium_type(value)
   def premium_type(nil), do: nil
   def premium_type(value) when is_integer(value), do: Map.get(@premium_types, value, :unknown)
+
+  def premium_type(value) when value in [:none, :nitro_classic, :nitro, :nitro_basic],
+    do: value
+
   def premium_type(_other), do: nil
 
   @doc """
@@ -119,10 +131,10 @@ defmodule EDA.User do
 
   ## Examples
 
-      iex> EDA.User.nitro?(%EDA.User{premium_type: 3})
+      iex> EDA.User.nitro?(%EDA.User{premium_type: :nitro_basic})
       true
 
-      iex> EDA.User.nitro?(%EDA.User{premium_type: 0})
+      iex> EDA.User.nitro?(%EDA.User{premium_type: :none})
       false
 
       iex> EDA.User.nitro?(%EDA.User{})

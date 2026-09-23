@@ -1,24 +1,14 @@
 defmodule EDA.Event.ThreadMemberUpdate do
-  @moduledoc "Dispatched when the thread member object for the current user is updated."
-  use EDA.Event.Access
-  defstruct [:id, :guild_id, :user_id, :join_timestamp, :flags]
+  @moduledoc """
+  Sent when the bot's own membership of a thread changes. Delivers an `EDA.Channel.ThreadMember`
+  with its `guild_id`, not a struct of its own.
 
-  @type t :: %__MODULE__{
-          id: String.t() | nil,
-          guild_id: String.t() | nil,
-          user_id: String.t() | nil,
-          join_timestamp: String.t() | nil,
-          flags: integer() | nil
-        }
-  @doc "Converts a raw Discord payload into this event struct."
-  @spec from_raw(map()) :: t()
-  def from_raw(raw) when is_map(raw) do
-    %__MODULE__{
-      id: raw["id"],
-      guild_id: raw["guild_id"],
-      user_id: raw["user_id"],
-      join_timestamp: raw["join_timestamp"],
-      flags: raw["flags"]
-    }
-  end
+  The consumer receives `{:THREAD_MEMBER_UPDATE, %EDA.Channel.ThreadMember{}}`. This module only
+  parses the payload.
+  """
+
+  @doc "Parses the `THREAD_MEMBER_UPDATE` payload into an `EDA.Channel.ThreadMember`."
+  @spec from_raw(map()) :: EDA.Channel.ThreadMember.t()
+  def from_raw(raw) when is_map(raw),
+    do: %{EDA.Channel.ThreadMember.from_raw(raw) | guild_id: raw["guild_id"]}
 end

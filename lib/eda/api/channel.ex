@@ -28,6 +28,7 @@ defmodule EDA.API.Channel do
   @doc "Creates a channel in a guild."
   @spec create(String.t() | integer(), map(), keyword()) :: {:ok, map()} | {:error, term()}
   def create(guild_id, payload, opts \\ []) do
+    payload = EDA.Enum.encode(Map.new(payload), type: &EDA.Channel.type_value/1)
     post("/guilds/#{guild_id}/channels", payload, opts)
   end
 
@@ -47,6 +48,7 @@ defmodule EDA.API.Channel do
     body = Map.new(opts)
     # `alow:` would be dropped by Discord, leaving an overwrite that grants nothing.
     check_options!(body, [:allow, :deny, :type], "EDA.API.Channel.edit_permissions/3")
+    body = EDA.Enum.encode(body, type: &EDA.PermissionOverwrite.type_value/1)
 
     case put("/channels/#{channel_id}/permissions/#{overwrite_id}", body) do
       {:ok, _} -> :ok

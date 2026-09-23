@@ -9,7 +9,7 @@ defmodule EDA.PermissionOverwriteTest do
       po = PermissionOverwrite.from_raw(raw)
       assert %PermissionOverwrite{} = po
       assert po.id == "123"
-      assert po.type == 0
+      assert po.type == :role
       assert po.allow == "104320"
       assert po.deny == "8192"
     end

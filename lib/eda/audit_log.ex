@@ -77,6 +77,8 @@ defmodule EDA.AuditLog do
 
   @doc "Converts an integer action type to an atom. Returns `:unknown` for unrecognized types."
   @spec action_name(integer()) :: atom()
+  def action_name(name) when is_atom(name) and not is_nil(name), do: name
+
   def action_name(type) when is_integer(type) do
     Map.get(@action_types, type, :unknown)
   end

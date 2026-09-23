@@ -408,15 +408,15 @@ defmodule EDA.Modal do
       # => %{"subject" => "Bug report", "platform" => ["windows"], "agree" => true}
   """
   @spec get_values(map()) :: %{String.t() => term()}
-  def get_values(%{data: %{"components" => components}}) when is_list(components) do
-    extract_values(components)
-  end
+  def get_values(interaction) do
+    case EDA.Interaction.data(interaction) do
+      %EDA.Interaction.ModalSubmitData{components: components} when is_list(components) ->
+        extract_values(components)
 
-  def get_values(%{"data" => %{"components" => components}}) when is_list(components) do
-    extract_values(components)
+      _ ->
+        %{}
+    end
   end
-
-  def get_values(_), do: %{}
 
   @doc """
   Extracts a single value from a MODAL_SUBMIT interaction by custom_id.
@@ -446,46 +446,36 @@ defmodule EDA.Modal do
   """
   @spec get_attachments(map(), String.t()) :: [EDA.Attachment.t()]
   def get_attachments(interaction, custom_id) do
-    resolved = resolved_attachments(interaction)
-
     case get_value(interaction, custom_id) do
       ids when is_list(ids) ->
-        for id <- ids, raw = resolved[id], do: EDA.Attachment.from_raw(raw)
+        for id <- ids, file = EDA.Interaction.resolved(interaction, :attachments, id), do: file
 
       _ ->
         []
     end
   end
 
-  defp resolved_attachments(%{data: %{"resolved" => %{"attachments" => a}}}) when is_map(a), do: a
-
-  defp resolved_attachments(%{"data" => %{"resolved" => %{"attachments" => a}}}) when is_map(a),
-    do: a
-
-  defp resolved_attachments(_), do: %{}
-
   defp extract_values(components) do
     components
     |> Enum.flat_map(&interactive_children/1)
-    |> Map.new(fn %{"custom_id" => id} = component -> {id, submitted_value(component)} end)
+    |> Map.new(&{&1.custom_id, submitted_value(&1)})
   end
 
   # A submission nests each input in a label (`component`) or, in the earlier form, an action row
-  # (`components`). Text displays carry no value.
-  defp interactive_children(%{"component" => %{"custom_id" => _} = child}), do: [child]
+  # (`components`). Text displays carry no value; a kind EDA does not know is left out.
+  defp interactive_children(%EDA.Component.Label{component: child}),
+    do: interactive_children(child)
 
-  defp interactive_children(%{"components" => children}) when is_list(children),
-    do: Enum.filter(children, &match?(%{"custom_id" => _}, &1))
+  defp interactive_children(%EDA.Component.ActionRow{components: children}),
+    do: Enum.flat_map(children || [], &interactive_children/1)
 
-  defp interactive_children(%{"custom_id" => _} = child), do: [child]
+  defp interactive_children(%{custom_id: id} = child) when is_binary(id), do: [child]
   defp interactive_children(_), do: []
 
-  defp submitted_value(%{"values" => values}), do: values
-  defp submitted_value(%{"value" => value}), do: value
-
-  defp submitted_value(%{"type" => type}) when type in [@checkbox_group_type, 19 | @select_types],
-    do: []
-
+  # Several choices come back as a list, empty when none was made; one choice as its value.
+  defp submitted_value(%{values: values}) when is_list(values), do: values
+  defp submitted_value(%{values: nil}), do: []
+  defp submitted_value(%{value: value}), do: value
   defp submitted_value(_), do: nil
 
   # ── Private ───────────────────────────────────────────────────────

@@ -61,23 +61,23 @@ defmodule EDA.GuildCompleteTest do
       guild = EDA.Guild.from_raw(@guild_create)
 
       assert guild.features == ["COMMUNITY", "ANIMATED_ICON"]
-      assert guild.premium_tier == 2
+      assert guild.premium_tier == :tier_2
       assert guild.premium_subscription_count == 9
       assert guild.banner == "banner_hash"
       assert guild.vanity_url_code == "test"
       assert guild.preferred_locale == "fr"
       assert guild.system_channel_id == "7700000000000001010"
       assert guild.rules_channel_id == "7700000000000001011"
-      assert guild.mfa_level == 1
+      assert guild.mfa_level == :elevated
       assert guild.max_members == 500_000
-      assert guild.incidents_data == %{"invites_disabled_until" => nil}
+      assert guild.incidents_data == %EDA.Guild.IncidentsData{}
       assert [%EDA.Emoji{name: "blob"}] = guild.emojis
     end
 
     test "GUILD_CREATE is an EDA.Guild, with the lists that only it carries, typed" do
       guild = EDA.Event.from_raw("GUILD_CREATE", @guild_create)
 
-      assert %EDA.Guild{joined_at: "2026-09-23T10:00:00.000000+00:00"} = guild
+      assert %EDA.Guild{joined_at: ~U[2026-09-23 10:00:00.000000Z]} = guild
       assert [%EDA.Channel{name: "general"}] = guild.channels
       assert [%EDA.Channel{thread: %EDA.Channel.Thread{archived: false}}] = guild.threads
       assert [%EDA.Member{}] = guild.members
@@ -85,7 +85,7 @@ defmodule EDA.GuildCompleteTest do
     end
 
     test "GUILD_UPDATE is an EDA.Guild too" do
-      assert %EDA.Guild{premium_tier: 3} =
+      assert %EDA.Guild{premium_tier: :tier_3} =
                EDA.Event.from_raw("GUILD_UPDATE", %{"id" => @guild_id, "premium_tier" => 3})
     end
   end

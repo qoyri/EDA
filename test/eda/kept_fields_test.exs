@@ -37,8 +37,8 @@ defmodule EDA.KeptFieldsTest do
       })
 
     assert [%EDA.User{username: "streamer"}] = attachment.clip_participants
-    assert attachment.clip_created_at == "2026-09-23T10:00:00.000000+00:00"
-    assert %{"name" => "Some Game"} = attachment.application
+    assert attachment.clip_created_at == ~U[2026-09-23 10:00:00.000000Z]
+    assert %EDA.App{name: "Some Game"} = attachment.application
   end
 
   test "an activity keeps its status display type and its links" do
@@ -51,7 +51,7 @@ defmodule EDA.KeptFieldsTest do
         "state_url" => "https://example.com/artist"
       })
 
-    assert activity.status_display_type == 1
+    assert activity.status_display_type == :state
     assert activity.details_url == "https://example.com/track"
     assert activity.state_url == "https://example.com/artist"
   end
@@ -66,8 +66,8 @@ defmodule EDA.KeptFieldsTest do
         "url" => "https://discord.com/api/webhooks/1/token"
       })
 
-    assert %{"name" => "Announcements HQ"} = webhook.source_guild
-    assert %{"name" => "news"} = webhook.source_channel
+    assert %EDA.Guild{name: "Announcements HQ"} = webhook.source_guild
+    assert %EDA.Channel{name: "news"} = webhook.source_channel
     assert webhook.url == "https://discord.com/api/webhooks/1/token"
   end
 

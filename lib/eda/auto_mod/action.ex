@@ -24,10 +24,23 @@ defmodule EDA.AutoMod.Action do
 
   use EDA.Event.Access
 
+  @types %{
+    1 => :block_message,
+    2 => :send_alert_message,
+    3 => :timeout,
+    4 => :block_member_interaction
+  }
+
   defstruct [:type, :metadata]
 
   @type t :: %__MODULE__{
-          type: integer() | nil,
+          type:
+            :block_message
+            | :send_alert_message
+            | :timeout
+            | :block_member_interaction
+            | integer()
+            | nil,
           metadata: ActionMetadata.t() | nil
         }
 
@@ -35,7 +48,7 @@ defmodule EDA.AutoMod.Action do
   @spec from_raw(map()) :: t()
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
-      type: raw["type"],
+      type: EDA.Enum.name(@types, raw["type"]),
       metadata: ActionMetadata.from_raw(raw["metadata"])
     }
   end
@@ -43,7 +56,7 @@ defmodule EDA.AutoMod.Action do
   @doc "Converts this struct to a map for API serialization."
   @spec to_map(t()) :: map()
   def to_map(%__MODULE__{} = action) do
-    map = %{type: action.type}
+    map = %{type: type_value(action.type)}
 
     if action.metadata do
       Map.put(map, :metadata, ActionMetadata.to_map(action.metadata))
@@ -56,27 +69,33 @@ defmodule EDA.AutoMod.Action do
 
   @doc "Creates a block_message action (type 1) with no custom message."
   @spec block_message() :: t()
-  def block_message, do: %__MODULE__{type: 1, metadata: nil}
+  def block_message, do: %__MODULE__{type: :block_message, metadata: nil}
 
   @doc "Creates a block_message action (type 1) with a custom response message."
   @spec block_message(String.t()) :: t()
   def block_message(custom_message) when is_binary(custom_message) do
-    %__MODULE__{type: 1, metadata: %ActionMetadata{custom_message: custom_message}}
+    %__MODULE__{type: :block_message, metadata: %ActionMetadata{custom_message: custom_message}}
   end
 
   @doc "Creates a send_alert action (type 2) targeting the given channel."
   @spec send_alert(String.t()) :: t()
   def send_alert(channel_id) when is_binary(channel_id) do
-    %__MODULE__{type: 2, metadata: %ActionMetadata{channel_id: channel_id}}
+    %__MODULE__{type: :send_alert_message, metadata: %ActionMetadata{channel_id: channel_id}}
   end
 
   @doc "Creates a timeout action (type 3) with the given duration in seconds."
   @spec timeout(integer()) :: t()
   def timeout(duration_seconds) when is_integer(duration_seconds) do
-    %__MODULE__{type: 3, metadata: %ActionMetadata{duration_seconds: duration_seconds}}
+    %__MODULE__{type: :timeout, metadata: %ActionMetadata{duration_seconds: duration_seconds}}
   end
 
   @doc "Creates a block_member_interaction action (type 4)."
   @spec block_member_interaction() :: t()
-  def block_member_interaction, do: %__MODULE__{type: 4, metadata: nil}
+  def block_member_interaction, do: %__MODULE__{type: :block_member_interaction, metadata: nil}
+
+  @doc """
+  The integer Discord uses for an action type, from its atom or the integer itself.
+  """
+  @spec type_value(atom() | integer()) :: integer()
+  def type_value(value), do: EDA.Enum.value!(@types, value, "AutoMod action type")
 end

@@ -1,13 +1,13 @@
 defmodule EDA.Event.IntegrationUpdate do
-  @moduledoc "Dispatched when an integration changes. Needs the `:guild_integrations` intent."
-  use EDA.Event.Access
+  @moduledoc """
+  Sent when an integration changes. Needs the `:guild_integrations` intent. Delivers an
+  `EDA.Integration`, not a struct of its own.
 
-  defstruct [:guild_id, :integration]
+  The consumer receives `{:INTEGRATION_UPDATE, %EDA.Integration{}}`. This module only parses the
+  payload.
+  """
 
-  @type t :: %__MODULE__{guild_id: String.t() | nil, integration: EDA.Integration.t()}
-
-  @doc "Converts a raw Discord payload into this event struct."
-  @spec from_raw(map()) :: t()
-  def from_raw(raw) when is_map(raw),
-    do: %__MODULE__{guild_id: raw["guild_id"], integration: EDA.Integration.from_raw(raw)}
+  @doc "Parses the `INTEGRATION_UPDATE` payload into an `EDA.Integration`."
+  @spec from_raw(map()) :: EDA.Integration.t()
+  def from_raw(raw) when is_map(raw), do: EDA.Integration.from_raw(raw)
 end
