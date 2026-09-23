@@ -89,4 +89,27 @@ defmodule EDA.Activity do
 
   defp parse_emoji(nil), do: nil
   defp parse_emoji(raw) when is_map(raw), do: EDA.Emoji.from_raw(raw)
+
+  @doc """
+  What the activity supports — joining, spectating, syncing…, from `flags`, as `EDA.Activity.Flags` names them. Accepts a struct or a raw map, and gives `[]`
+  when Discord sent none.
+
+      iex> EDA.Activity.flags(%EDA.Activity{flags: 18})
+      [:join, :sync]
+  """
+  @spec flags(t() | map()) :: [EDA.Activity.Flags.flag()]
+  def flags(%__MODULE__{flags: flags}), do: EDA.Activity.Flags.to_list(flags)
+  def flags(%{"flags" => flags}), do: EDA.Activity.Flags.to_list(flags)
+  def flags(_), do: []
+
+  @doc """
+  Whether `flags` carries a flag.
+
+      iex> EDA.Activity.flag?(%EDA.Activity{flags: 18}, :sync)
+      true
+  """
+  @spec flag?(t() | map(), EDA.Activity.Flags.flag()) :: boolean()
+  def flag?(%__MODULE__{flags: flags}, flag), do: EDA.Activity.Flags.has?(flags, flag)
+  def flag?(%{"flags" => flags}, flag), do: EDA.Activity.Flags.has?(flags, flag)
+  def flag?(_, _flag), do: false
 end

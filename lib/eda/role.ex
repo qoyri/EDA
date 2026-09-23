@@ -175,6 +175,29 @@ defmodule EDA.Role do
   @spec mention(t()) :: String.t()
   def mention(%__MODULE__{id: id}), do: "<@&#{id}>"
 
+  @doc """
+  The role's flags, from `flags`, as `EDA.Role.Flags` names them. Accepts a struct or a raw map, and gives `[]`
+  when Discord sent none.
+
+      iex> EDA.Role.flags(%EDA.Role{flags: 1})
+      [:in_prompt]
+  """
+  @spec flags(t() | map()) :: [EDA.Role.Flags.flag()]
+  def flags(%__MODULE__{flags: flags}), do: EDA.Role.Flags.to_list(flags)
+  def flags(%{"flags" => flags}), do: EDA.Role.Flags.to_list(flags)
+  def flags(_), do: []
+
+  @doc """
+  Whether `flags` carries a flag.
+
+      iex> EDA.Role.flag?(%EDA.Role{flags: 1}, :in_prompt)
+      true
+  """
+  @spec flag?(t() | map(), EDA.Role.Flags.flag()) :: boolean()
+  def flag?(%__MODULE__{flags: flags}, flag), do: EDA.Role.Flags.has?(flags, flag)
+  def flag?(%{"flags" => flags}, flag), do: EDA.Role.Flags.has?(flags, flag)
+  def flag?(_, _flag), do: false
+
   # ── Entity Manager ──
 
   use EDA.Entity

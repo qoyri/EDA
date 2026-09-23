@@ -49,6 +49,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `display_name_styles` on users and members: the font, effect and colours of the name. Discord
   sends it on about one user in eight but does not document it; its colours arrive as integers
   or strings, and are integers in `EDA.User.DisplayNameStyles`.
+- The other bitfields Discord sends get the same treatment: `EDA.Message.Flags` (crossposted,
+  ephemeral, voice message, forwarded snapshot, components v2…), `EDA.Role.Flags`,
+  `EDA.Guild.SystemChannelFlags` (which notices the system channel suppresses) and
+  `EDA.Activity.Flags`, read off their entity by `EDA.Message.flags/1` and `flag?/2`,
+  `EDA.Role.flags/1` and `flag?/2`, `EDA.Guild.system_channel_flags/1` and
+  `system_channel_flag?/2`, `EDA.Activity.flags/1` and `flag?/2`. The integer stays in the
+  struct, so a bit Discord adds later is not lost.
 
 ### Changed
 

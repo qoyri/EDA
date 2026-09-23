@@ -236,6 +236,37 @@ defmodule EDA.Guild do
   defp parse_list(nil, _parse), do: nil
   defp parse_list(list, parse) when is_list(list), do: Enum.map(list, parse)
 
+  @doc """
+  Which notices the system channel leaves out, from `system_channel_flags`, as `EDA.Guild.SystemChannelFlags` names them. Accepts a struct or a raw map, and gives `[]`
+  when Discord sent none.
+
+      iex> EDA.Guild.system_channel_flags(%EDA.Guild{system_channel_flags: 3})
+      [:suppress_join_notifications, :suppress_premium_subscriptions]
+  """
+  @spec system_channel_flags(t() | map()) :: [EDA.Guild.SystemChannelFlags.flag()]
+  def system_channel_flags(%__MODULE__{system_channel_flags: flags}),
+    do: EDA.Guild.SystemChannelFlags.to_list(flags)
+
+  def system_channel_flags(%{"system_channel_flags" => flags}),
+    do: EDA.Guild.SystemChannelFlags.to_list(flags)
+
+  def system_channel_flags(_), do: []
+
+  @doc """
+  Whether `system_channel_flags` carries a flag.
+
+      iex> EDA.Guild.system_channel_flag?(%EDA.Guild{system_channel_flags: 3}, :suppress_join_notifications)
+      true
+  """
+  @spec system_channel_flag?(t() | map(), EDA.Guild.SystemChannelFlags.flag()) :: boolean()
+  def system_channel_flag?(%__MODULE__{system_channel_flags: flags}, flag),
+    do: EDA.Guild.SystemChannelFlags.has?(flags, flag)
+
+  def system_channel_flag?(%{"system_channel_flags" => flags}, flag),
+    do: EDA.Guild.SystemChannelFlags.has?(flags, flag)
+
+  def system_channel_flag?(_, _flag), do: false
+
   # ── Entity Manager ──
 
   use EDA.Entity
