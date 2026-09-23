@@ -29,4 +29,17 @@ defmodule EDA.Team do
       members: raw["members"] && Enum.map(raw["members"], &EDA.Team.Member.from_raw/1)
     }
   end
+
+  @doc """
+  The URL of the team's icon, or `nil`. Takes `:format` and `:size`.
+
+      iex> EDA.Team.icon_url(%EDA.Team{id: "2", icon: "t"})
+      "https://cdn.discordapp.com/team-icons/2/t.png"
+  """
+  @spec icon_url(t(), keyword()) :: String.t() | nil
+  def icon_url(team, opts \\ [])
+  def icon_url(%__MODULE__{icon: nil}, _opts), do: nil
+
+  def icon_url(%__MODULE__{id: id, icon: icon}, opts),
+    do: EDA.CDN.url("team-icons/#{id}/#{icon}", false, opts)
 end

@@ -396,6 +396,44 @@ defmodule EDA.Guild do
     do: EDA.CDN.url("icons/#{id}/#{icon}", EDA.CDN.animated_hash?(icon), opts)
 
   @doc """
+  The URL of the guild's banner, or `nil`. Takes the options of `icon_url/2`.
+
+      iex> EDA.Guild.banner_url(%EDA.Guild{id: "1", banner: "b"}, size: 1024)
+      "https://cdn.discordapp.com/banners/1/b.png?size=1024"
+  """
+  @spec banner_url(t(), keyword()) :: String.t() | nil
+  def banner_url(guild, opts \\ [])
+  def banner_url(%__MODULE__{banner: nil}, _opts), do: nil
+
+  def banner_url(%__MODULE__{id: id, banner: banner}, opts),
+    do: EDA.CDN.url("banners/#{id}/#{banner}", EDA.CDN.animated_hash?(banner), opts)
+
+  @doc """
+  The URL of the invite splash, the background of the guild's invite page, or `nil`.
+  Takes `:format` and `:size`.
+
+      iex> EDA.Guild.splash_url(%EDA.Guild{id: "1", splash: "s"})
+      "https://cdn.discordapp.com/splashes/1/s.png"
+  """
+  @spec splash_url(t(), keyword()) :: String.t() | nil
+  def splash_url(guild, opts \\ [])
+  def splash_url(%__MODULE__{splash: nil}, _opts), do: nil
+
+  def splash_url(%__MODULE__{id: id, splash: s}, opts),
+    do: EDA.CDN.url("splashes/#{id}/#{s}", false, opts)
+
+  @doc """
+  The URL of the discovery splash, shown in Server Discovery, or `nil`. Takes `:format` and
+  `:size`.
+  """
+  @spec discovery_splash_url(t(), keyword()) :: String.t() | nil
+  def discovery_splash_url(guild, opts \\ [])
+  def discovery_splash_url(%__MODULE__{discovery_splash: nil}, _opts), do: nil
+
+  def discovery_splash_url(%__MODULE__{id: id, discovery_splash: s}, opts),
+    do: EDA.CDN.url("discovery-splashes/#{id}/#{s}", false, opts)
+
+  @doc """
   The integer Discord uses for a verification level, from its atom or the integer itself.
   """
   @spec verification_level_value(atom() | integer()) :: integer()

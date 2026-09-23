@@ -181,6 +181,20 @@ defmodule EDA.Role do
     |> put_guild(guild_id)
   end
 
+  @doc """
+  The URL of the role's icon, or `nil` for a role without one (or with a Unicode emoji, in
+  `unicode_emoji`). Takes `:format` and `:size`.
+
+      iex> EDA.Role.icon_url(%EDA.Role{id: "5", icon: "i"}, size: 64)
+      "https://cdn.discordapp.com/role-icons/5/i.png?size=64"
+  """
+  @spec icon_url(t(), keyword()) :: String.t() | nil
+  def icon_url(role, opts \\ [])
+  def icon_url(%__MODULE__{icon: nil}, _opts), do: nil
+
+  def icon_url(%__MODULE__{id: id, icon: icon}, opts),
+    do: EDA.CDN.url("role-icons/#{id}/#{icon}", false, opts)
+
   @doc "Returns a mention string like `<@&id>`."
   @spec mention(t()) :: String.t()
   def mention(%__MODULE__{id: id}), do: "<@&#{id}>"

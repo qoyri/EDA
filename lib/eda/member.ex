@@ -163,6 +163,61 @@ defmodule EDA.Member do
   defp parse_timestamp(value), do: EDA.Timestamp.parse(value)
 
   @doc """
+  The URL of the member's avatar in this guild, or `nil` when they use their account's. Needs
+  `guild_id`, which members from EDA's calls and events carry. Takes the options of
+  `EDA.User.avatar_url/2`.
+
+      iex> EDA.Member.avatar_url(%EDA.Member{guild_id: "1", avatar: "g", user: %EDA.User{id: "2"}})
+      "https://cdn.discordapp.com/guilds/1/users/2/avatars/g.png"
+  """
+  @spec avatar_url(t(), keyword()) :: String.t() | nil
+  def avatar_url(member, opts \\ [])
+
+  def avatar_url(%__MODULE__{avatar: hash, guild_id: guild_id, user: %{id: user_id}}, opts)
+      when is_binary(hash) and is_binary(guild_id),
+      do:
+        EDA.CDN.url(
+          "guilds/#{guild_id}/users/#{user_id}/avatars/#{hash}",
+          EDA.CDN.animated_hash?(hash),
+          opts
+        )
+
+  def avatar_url(%__MODULE__{}, _opts), do: nil
+
+  @doc """
+  The avatar Discord shows for the member here: their guild avatar, else their account's, else
+  the default one.
+
+      iex> EDA.Member.display_avatar_url(%EDA.Member{guild_id: "1", user: %EDA.User{id: "2", avatar: "u"}})
+      "https://cdn.discordapp.com/avatars/2/u.png"
+  """
+  @spec display_avatar_url(t(), keyword()) :: String.t() | nil
+  def display_avatar_url(member, opts \\ [])
+
+  def display_avatar_url(%__MODULE__{user: %EDA.User{} = user} = member, opts),
+    do: avatar_url(member, opts) || EDA.User.display_avatar_url(user, opts)
+
+  def display_avatar_url(%__MODULE__{} = member, opts), do: avatar_url(member, opts)
+
+  @doc """
+  The URL of the member's banner in this guild, or `nil`. Takes the options of
+  `EDA.User.avatar_url/2`.
+  """
+  @spec banner_url(t(), keyword()) :: String.t() | nil
+  def banner_url(member, opts \\ [])
+
+  def banner_url(%__MODULE__{banner: hash, guild_id: guild_id, user: %{id: user_id}}, opts)
+      when is_binary(hash) and is_binary(guild_id),
+      do:
+        EDA.CDN.url(
+          "guilds/#{guild_id}/users/#{user_id}/banners/#{hash}",
+          EDA.CDN.animated_hash?(hash),
+          opts
+        )
+
+  def banner_url(%__MODULE__{}, _opts), do: nil
+
+  @doc """
   The member's highest role in a guild, as the cached role map, or `nil` when they have none
   beyond `@everyone` (or their roles are not cached).
 

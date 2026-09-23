@@ -10,6 +10,10 @@ defmodule EDA.CDNTest do
   doctest EDA.User
   doctest EDA.Guild
   doctest EDA.Emoji
+  doctest EDA.Role, only: [icon_url: 2]
+  doctest EDA.Member, only: [avatar_url: 2, display_avatar_url: 2]
+  doctest EDA.ScheduledEvent, only: [cover_url: 2]
+  doctest EDA.Team
 
   test "an animated avatar is a GIF, and its still can be asked for" do
     user = %EDA.User{id: "1", avatar: "a_abc"}
@@ -50,5 +54,25 @@ defmodule EDA.CDNTest do
     assert_raise ArgumentError, ~r/:png, :jpg, :webp or :gif/, fn ->
       EDA.User.avatar_url(%EDA.User{id: "1", avatar: "abc"}, format: :bmp)
     end
+  end
+
+  test "the default avatar of an account that still has a discriminator comes from it" do
+    assert EDA.User.default_avatar_url(%EDA.User{id: "1", discriminator: "1337"}) ==
+             "https://cdn.discordapp.com/embed/avatars/2.png"
+
+    assert EDA.User.default_avatar_url(%{"id" => "80351110224678912", "discriminator" => "0"}) ==
+             "https://cdn.discordapp.com/embed/avatars/5.png"
+  end
+
+  test "a member without a guild avatar shows their account's, and without either the default" do
+    member = %EDA.Member{
+      guild_id: "1",
+      user: %EDA.User{id: "80351110224678912", discriminator: "0"}
+    }
+
+    assert EDA.Member.avatar_url(member) == nil
+
+    assert EDA.Member.display_avatar_url(member) ==
+             "https://cdn.discordapp.com/embed/avatars/5.png"
   end
 end

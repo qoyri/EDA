@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Image URLs for everything that has one, with the `:format`, `:size` and `:animated` options
+  of `EDA.User.avatar_url/2`: `EDA.User.default_avatar_url/1`, `display_avatar_url/2` and
+  `banner_url/2`; `EDA.Member.avatar_url/2` and `banner_url/2` (the guild's own) and
+  `display_avatar_url/2` (guild avatar, then account, then default); `EDA.Guild.banner_url/2`,
+  `splash_url/2` and `discovery_splash_url/2`; `EDA.Role.icon_url/2`;
+  `EDA.ScheduledEvent.cover_url/2`; `EDA.Team.icon_url/2`.
+
 - `EDA.Ban`, a banned user and the reason, with `list/2`, `stream/2`, `fetch_ban/2`,
   `create/3`, `remove/2` and `bulk/3`.
 - More typed calls: `EDA.Channel.create/3`, `start_thread/2` (from a message or not),
