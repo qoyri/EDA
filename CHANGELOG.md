@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- How a member shows, and what the bot may do to them: `EDA.Member.display_name/1` (nickname,
+  display name, username), `boosting?/1`, `roles/2` (their roles as structs, highest first) and
+  `color/2`; `owner?/2`, `can_interact?/3` (Discord's hierarchy: the owner above all, then the
+  highest role, against a member or a role), and the bot's `manageable?/2`, `kickable?/2`,
+  `bannable?/2` and `moderatable?/2`, which add its permissions (an administrator is never
+  moderatable). `EDA.Role.compare/2`, `above?/2`, `hex_color/1` and `editable?/1`. They read
+  the guild, roles and members from the cache, and answer `false` when what they need is not
+  there.
+
 - Image URLs for everything that has one, with the `:format`, `:size` and `:animated` options
   of `EDA.User.avatar_url/2`: `EDA.User.default_avatar_url/1`, `display_avatar_url/2` and
   `banner_url/2`; `EDA.Member.avatar_url/2` and `banner_url/2` (the guild's own) and

@@ -246,6 +246,163 @@ defmodule EDA.Member do
     end
   end
 
+  # ── Display ──
+
+  @doc """
+  The name Discord shows for the member here: their nickname, else their display name, else
+  their username.
+
+      iex> EDA.Member.display_name(%EDA.Member{nick: "Annie", user: %EDA.User{username: "ann"}})
+      "Annie"
+      iex> EDA.Member.display_name(%EDA.Member{user: %EDA.User{username: "ann", global_name: "Ann"}})
+      "Ann"
+  """
+  @spec display_name(t()) :: String.t() | nil
+  def display_name(%__MODULE__{nick: nick}) when is_binary(nick), do: nick
+  def display_name(%__MODULE__{user: %EDA.User{} = user}), do: EDA.User.display_name(user)
+  def display_name(%__MODULE__{}), do: nil
+
+  @doc "Whether the member boosts the guild."
+  @spec boosting?(t()) :: boolean()
+  def boosting?(%__MODULE__{premium_since: since}), do: since != nil
+
+  @doc """
+  The member's roles as `EDA.Role` structs, highest first, from the role cache. Roles not in
+  the cache are left out; `@everyone` is not among them.
+  """
+  @spec roles(t() | map(), String.t() | integer()) :: [EDA.Role.t()]
+  def roles(member, guild_id) do
+    guild_id = to_string(guild_id)
+
+    member
+    |> role_ids()
+    |> Enum.map(&EDA.Cache.Role.get(guild_id, &1))
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map(&%{EDA.Role.from_raw(&1) | guild_id: guild_id})
+    |> Enum.sort_by(&EDA.Role.rank/1, :desc)
+  end
+
+  @doc """
+  The colour of the member's name: that of their highest role with one, or `nil`.
+  """
+  @spec color(t() | map(), String.t() | integer()) :: non_neg_integer() | nil
+  def color(member, guild_id) do
+    member
+    |> roles(guild_id)
+    |> Enum.map(&EDA.Role.color_value/1)
+    |> Enum.find(&(&1 != 0))
+  end
+
+  # ── Hierarchy and moderation ──
+
+  @doc """
+  Whether the member owns the guild. Takes the guild, or its id to read the owner from the
+  cache.
+  """
+  @spec owner?(t() | map(), EDA.Guild.t() | String.t() | integer()) :: boolean()
+  def owner?(member, %EDA.Guild{owner_id: owner_id}), do: user_id(member) == owner_id
+
+  def owner?(member, guild_id) do
+    case EDA.Cache.get_guild(guild_id) do
+      %{"owner_id" => owner_id} -> user_id(member) == owner_id
+      _ -> false
+    end
+  end
+
+  @doc """
+  Whether `actor` can act on `target` — a member or a role — as Discord's hierarchy allows:
+  the owner can act on anyone but can be acted on by no one; otherwise the actor's highest role
+  must be above the target's (or above the role). Reads the roles from the cache.
+
+  It says nothing of permissions; `kickable?/2` and the others add those.
+  """
+  @spec can_interact?(t(), t() | EDA.Role.t(), String.t() | integer()) :: boolean()
+  def can_interact?(actor, %EDA.Role{} = role, guild_id) do
+    owner?(actor, guild_id) or
+      case roles(actor, guild_id) do
+        [top | _] -> EDA.Role.above?(top, role)
+        [] -> false
+      end
+  end
+
+  def can_interact?(actor, %__MODULE__{} = target, guild_id) do
+    cond do
+      owner?(target, guild_id) -> false
+      owner?(actor, guild_id) -> true
+      true -> top_rank(actor, guild_id) > top_rank(target, guild_id)
+    end
+  end
+
+  @doc """
+  Whether the bot can manage the member: it is not the bot itself, and the bot is above them.
+  Needs the bot's member and the roles in the cache; `false` when they are not.
+  """
+  @spec manageable?(t(), String.t() | integer()) :: boolean()
+  def manageable?(%__MODULE__{} = member, guild_id) do
+    case bot_member(guild_id) do
+      %__MODULE__{} = bot ->
+        user_id(bot) != user_id(member) and can_interact?(bot, member, guild_id)
+
+      nil ->
+        false
+    end
+  end
+
+  @doc "Whether the bot can kick the member: `manageable?/2` and `KICK_MEMBERS`."
+  @spec kickable?(t(), String.t() | integer()) :: boolean()
+  def kickable?(member, guild_id), do: manageable_with?(member, guild_id, :kick_members)
+
+  @doc "Whether the bot can ban the member: `manageable?/2` and `BAN_MEMBERS`."
+  @spec bannable?(t(), String.t() | integer()) :: boolean()
+  def bannable?(member, guild_id), do: manageable_with?(member, guild_id, :ban_members)
+
+  @doc """
+  Whether the bot can time the member out: `manageable?/2`, `MODERATE_MEMBERS`, and the member
+  is not an administrator, whom Discord never times out.
+  """
+  @spec moderatable?(t(), String.t() | integer()) :: boolean()
+  def moderatable?(member, guild_id) do
+    manageable_with?(member, guild_id, :moderate_members) and
+      not permission?(member, guild_id, :administrator)
+  end
+
+  defp manageable_with?(member, guild_id, flag) do
+    manageable?(member, guild_id) and permission?(bot_member(guild_id), guild_id, flag)
+  end
+
+  @doc false
+  # The bot's own member in a guild, from the cache.
+  def bot_member(guild_id) do
+    with %EDA.User{id: id} <- EDA.Cache.me(),
+         raw when is_map(raw) <- EDA.Cache.get_member(guild_id, id) do
+      %{from_raw(raw) | guild_id: to_string(guild_id)}
+    else
+      _ -> nil
+    end
+  end
+
+  @doc false
+  # Whether the member holds a permission in the guild, as computed from the cached roles.
+  def permission?(nil, _guild_id, _flag), do: false
+
+  def permission?(member, guild_id, flag) do
+    case EDA.Permission.for_member(member, guild_id) do
+      {:ok, bitset} -> EDA.Permission.has?(bitset, flag)
+      {:error, _} -> false
+    end
+  end
+
+  defp top_rank(member, guild_id) do
+    case roles(member, guild_id) do
+      [top | _] -> EDA.Role.rank(top)
+      [] -> {-1, 0}
+    end
+  end
+
+  defp user_id(%__MODULE__{user: %{id: id}}), do: id
+  defp user_id(%{"user" => %{"id" => id}}), do: id
+  defp user_id(_), do: nil
+
   defp role_ids(%__MODULE__{roles: roles}), do: roles || []
   defp role_ids(%{"roles" => roles}), do: roles || []
   defp role_ids(_member), do: []

@@ -195,6 +195,83 @@ defmodule EDA.Role do
   def icon_url(%__MODULE__{id: id, icon: icon}, opts),
     do: EDA.CDN.url("role-icons/#{id}/#{icon}", false, opts)
 
+  @doc """
+  Orders two roles as Discord does: the higher `position` is above, and between roles at the
+  same position, the one created first (the lower id). Returns `:gt` when `a` is above `b`.
+
+      iex> EDA.Role.compare(%EDA.Role{id: "2", position: 3}, %EDA.Role{id: "1", position: 1})
+      :gt
+      iex> EDA.Role.compare(%EDA.Role{id: "2", position: 1}, %EDA.Role{id: "1", position: 1})
+      :lt
+  """
+  @spec compare(t(), t()) :: :gt | :lt | :eq
+  def compare(%__MODULE__{} = a, %__MODULE__{} = b) do
+    case {rank(a), rank(b)} do
+      {same, same} -> :eq
+      {ra, rb} when ra > rb -> :gt
+      _ -> :lt
+    end
+  end
+
+  @doc "Whether role `a` is above role `b`. See `compare/2`."
+  @spec above?(t(), t()) :: boolean()
+  def above?(a, b), do: compare(a, b) == :gt
+
+  @doc false
+  # The key roles sort by, highest first when compared descending.
+  def rank(%__MODULE__{position: position, id: id}),
+    do: {position || 0, -String.to_integer(id || "0")}
+
+  @doc """
+  The role's colour as a hex string, `"#5865f2"`, or `nil` for a role with no colour. For a
+  gradient or holographic role, the primary colour.
+
+      iex> EDA.Role.hex_color(%EDA.Role{color: 5_793_266})
+      "#5865f2"
+      iex> EDA.Role.hex_color(%EDA.Role{color: 0})
+      nil
+  """
+  @spec hex_color(t()) :: String.t() | nil
+  def hex_color(%__MODULE__{} = role) do
+    case color_value(role) do
+      0 ->
+        nil
+
+      value ->
+        "#" <> (value |> Integer.to_string(16) |> String.pad_leading(6, "0") |> String.downcase())
+    end
+  end
+
+  @doc false
+  def color_value(%__MODULE__{colors: %EDA.Role.Colors{primary_color: c}}) when is_integer(c),
+    do: c
+
+  def color_value(%__MODULE__{color: c}) when is_integer(c), do: c
+  def color_value(%__MODULE__{}), do: 0
+
+  @doc """
+  Whether the bot can edit or delete the role: it holds `MANAGE_ROLES`, its highest role is
+  above this one, and the role is not managed by an integration. Needs the role's `guild_id`,
+  and the guild, the bot's member and its roles in the cache; `false` when they are not.
+  """
+  @spec editable?(t()) :: boolean()
+  def editable?(%__MODULE__{managed: true}), do: false
+
+  def editable?(%__MODULE__{guild_id: guild_id} = role) when is_binary(guild_id) do
+    with %EDA.Member{} = bot <- EDA.Member.bot_member(guild_id),
+         true <- EDA.Member.permission?(bot, guild_id, :manage_roles) do
+      EDA.Member.owner?(bot, guild_id) or
+        case EDA.Member.roles(bot, guild_id) do
+          [top | _] -> above?(top, role)
+          [] -> false
+        end
+    else
+      _ -> false
+    end
+  end
+
+  def editable?(%__MODULE__{}), do: false
+
   @doc "Returns a mention string like `<@&id>`."
   @spec mention(t()) :: String.t()
   def mention(%__MODULE__{id: id}), do: "<@&#{id}>"
