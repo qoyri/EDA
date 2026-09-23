@@ -1,59 +1,14 @@
 defmodule EDA.Event.GuildMemberUpdate do
-  @moduledoc "Dispatched when a guild member is updated."
-  use EDA.Event.Access
+  @moduledoc """
+  Sent when a guild member is updated. Delivers an `EDA.Member`, not a struct of its own.
 
-  defstruct [
-    :guild_id,
-    :user,
-    :nick,
-    :roles,
-    :joined_at,
-    :premium_since,
-    :pending,
-    :avatar,
-    :banner,
-    :deaf,
-    :mute,
-    :flags,
-    :communication_disabled_until
-  ]
+  The consumer receives `{:GUILD_MEMBER_UPDATE, %EDA.Member{}}` with every field Discord sent — `flags`,
+  `premium_since`, `communication_disabled_until`, the member's decoration and nameplate — and
+  `guild_id` set, so `EDA.Member.flags/1`, `EDA.Permission.for_member/2` and the rest take it as
+  is. This module only parses the payload.
+  """
 
-  @type t :: %__MODULE__{
-          guild_id: String.t() | nil,
-          user: EDA.User.t() | nil,
-          nick: String.t() | nil,
-          roles: [String.t()] | nil,
-          joined_at: String.t() | nil,
-          premium_since: String.t() | nil,
-          pending: boolean() | nil,
-          avatar: String.t() | nil,
-          banner: String.t() | nil,
-          deaf: boolean() | nil,
-          mute: boolean() | nil,
-          flags: integer() | nil,
-          communication_disabled_until: String.t() | nil
-        }
-
-  @doc "Converts a raw Discord payload into this event struct."
-  @spec from_raw(map()) :: t()
-  def from_raw(raw) when is_map(raw) do
-    %__MODULE__{
-      guild_id: raw["guild_id"],
-      user: parse_user(raw["user"]),
-      nick: raw["nick"],
-      roles: raw["roles"],
-      joined_at: raw["joined_at"],
-      premium_since: raw["premium_since"],
-      pending: raw["pending"],
-      avatar: raw["avatar"],
-      banner: raw["banner"],
-      deaf: raw["deaf"],
-      mute: raw["mute"],
-      flags: raw["flags"],
-      communication_disabled_until: raw["communication_disabled_until"]
-    }
-  end
-
-  defp parse_user(nil), do: nil
-  defp parse_user(raw) when is_map(raw), do: EDA.User.from_raw(raw)
+  @doc "Parses the `GUILD_MEMBER_UPDATE` payload into an `EDA.Member`."
+  @spec from_raw(map()) :: EDA.Member.t()
+  def from_raw(raw) when is_map(raw), do: EDA.Member.from_raw(raw)
 end

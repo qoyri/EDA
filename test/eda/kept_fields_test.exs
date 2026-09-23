@@ -70,4 +70,24 @@ defmodule EDA.KeptFieldsTest do
     assert %{"name" => "news"} = webhook.source_channel
     assert webhook.url == "https://discord.com/api/webhooks/1/token"
   end
+
+  test "a member fetched from the cache knows its guild" do
+    guild_id = "7700000000000002001"
+
+    EDA.Cache.Member.create(guild_id, %{"user" => %{"id" => "7700000000000002002"}, "roles" => []})
+
+    assert {:ok, %EDA.Member{guild_id: ^guild_id}} =
+             EDA.Member.fetch_member(guild_id, "7700000000000002002")
+  end
+
+  test "name styles keep their colours as integers, whatever Discord sent" do
+    user =
+      EDA.User.from_raw(%{
+        "id" => "1",
+        "display_name_styles" => %{"font_id" => 12, "effect_id" => 4, "colors" => ["16752459"]}
+      })
+
+    assert %EDA.User.DisplayNameStyles{font_id: 12, effect_id: 4, colors: [16_752_459]} =
+             user.display_name_styles
+  end
 end

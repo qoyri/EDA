@@ -31,12 +31,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `guild_tag_badge_url/2`. A decoration is PNG only, animated ones included; a nameplate has an
   animation (`.webm`, the default) and a still (`format: :static`), neither of which Discord
   lists in its CDN endpoints — both were checked against a live profile.
-- `EDA.Member` carries `flags`, `avatar_decoration_data` and `collectibles`; `GUILD_MEMBER_ADD`
-  carries `flags`, `premium_since`, `communication_disabled_until` and `banner`, with
-  `EDA.Event.GuildMemberAdd.member/1` to get an `EDA.Member` from it; `GUILD_MEMBER_UPDATE`
-  carries `flags`, `communication_disabled_until`, `banner`, `deaf` and `mute`.
+- `EDA.Member` carries `flags`, `avatar_decoration_data`, `collectibles`, and the guild it
+  belongs to in `guild_id`, set by `EDA.Member.fetch_member/2` and by the member events.
+- `display_name_styles` on users and members: the font, effect and colours of the name. Discord
+  sends it on about one user in eight but does not document it; its colours arrive as integers
+  or strings, and are integers in `EDA.User.DisplayNameStyles`.
 
 ### Changed
+
+- **`GUILD_MEMBER_ADD` and `GUILD_MEMBER_UPDATE` deliver an `EDA.Member`**, with `guild_id` set,
+  instead of structs of their own that dropped `flags`, `premium_since` (on a join), the member's
+  decoration and nameplate. `EDA.Member.flags/1`, `EDA.Permission.for_member/2` and the rest take
+  the event as is.
 
 - **`GUILD_CREATE`, `GUILD_AVAILABLE` and `GUILD_UPDATE` deliver an `EDA.Guild`**, instead of
   structs of their own. The lists only `GUILD_CREATE` carries — `channels`, `threads`, `members`,

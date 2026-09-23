@@ -18,7 +18,9 @@ defmodule EDA.Member do
     :communication_disabled_until,
     :flags,
     :avatar_decoration_data,
-    :collectibles
+    :collectibles,
+    :display_name_styles,
+    :guild_id
   ]
 
   @type t :: %__MODULE__{
@@ -37,7 +39,9 @@ defmodule EDA.Member do
           communication_disabled_until: String.t() | nil,
           flags: integer() | nil,
           avatar_decoration_data: EDA.User.AvatarDecoration.t() | nil,
-          collectibles: EDA.User.Collectibles.t() | nil
+          collectibles: EDA.User.Collectibles.t() | nil,
+          display_name_styles: EDA.User.DisplayNameStyles.t() | nil,
+          guild_id: String.t() | nil
         }
 
   @spec from_raw(map()) :: t()
@@ -58,7 +62,9 @@ defmodule EDA.Member do
       communication_disabled_until: raw["communication_disabled_until"],
       flags: raw["flags"],
       avatar_decoration_data: EDA.User.AvatarDecoration.from_raw(raw["avatar_decoration_data"]),
-      collectibles: EDA.User.Collectibles.from_raw(raw["collectibles"])
+      collectibles: EDA.User.Collectibles.from_raw(raw["collectibles"]),
+      display_name_styles: EDA.User.DisplayNameStyles.from_raw(raw["display_name_styles"]),
+      guild_id: raw["guild_id"]
     }
   end
 
@@ -209,10 +215,16 @@ defmodule EDA.Member do
           {:ok, t()} | {:error, term()}
   def fetch_member(guild_id, user_id) do
     case EDA.Cache.get_member(guild_id, user_id) do
-      nil -> EDA.API.Member.get(guild_id, user_id) |> parse_response()
-      raw -> {:ok, from_raw(raw)}
+      nil -> EDA.API.Member.get(guild_id, user_id) |> parse_response() |> put_guild(guild_id)
+      raw -> {:ok, from_raw(raw) |> Map.put(:guild_id, to_string(guild_id))}
     end
   end
+
+  # Discord's member object does not say which guild it belongs to; the caller does.
+  defp put_guild({:ok, %__MODULE__{} = member}, guild_id),
+    do: {:ok, %{member | guild_id: to_string(guild_id)}}
+
+  defp put_guild(other, _guild_id), do: other
 
   @doc """
   Modifies a guild member.

@@ -23,7 +23,8 @@ defmodule EDA.User do
     :verified,
     :email,
     :avatar_decoration_data,
-    :collectibles
+    :collectibles,
+    :display_name_styles
   ]
 
   @type t :: %__MODULE__{
@@ -45,7 +46,8 @@ defmodule EDA.User do
           verified: boolean() | nil,
           email: String.t() | nil,
           avatar_decoration_data: EDA.User.AvatarDecoration.t() | nil,
-          collectibles: EDA.User.Collectibles.t() | nil
+          collectibles: EDA.User.Collectibles.t() | nil,
+          display_name_styles: EDA.User.DisplayNameStyles.t() | nil
         }
 
   @spec from_raw(map()) :: t()
@@ -69,7 +71,8 @@ defmodule EDA.User do
       verified: raw["verified"],
       email: raw["email"],
       avatar_decoration_data: EDA.User.AvatarDecoration.from_raw(raw["avatar_decoration_data"]),
-      collectibles: EDA.User.Collectibles.from_raw(raw["collectibles"])
+      collectibles: EDA.User.Collectibles.from_raw(raw["collectibles"]),
+      display_name_styles: EDA.User.DisplayNameStyles.from_raw(raw["display_name_styles"])
     }
   end
 
