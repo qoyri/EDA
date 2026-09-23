@@ -59,6 +59,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A message's components are structs**, one per kind: `EDA.Component.ActionRow`, `Button`,
+  `SelectMenu` (with its `SelectOption`s), `Section`, `TextDisplay`, `Thumbnail`,
+  `MediaGallery`, `File`, `Separator` and `Container`, their images an `EDA.Component.Media`.
+  Each has its `type` as an atom and the `id` Discord gives it; a button's `style`, a
+  separator's `spacing`, a select's `channel_types` are atoms, its `default_values`
+  `{:user, id}`-style tuples. A kind EDA does not know yet stays the raw map. They encode to
+  JSON as Discord takes them, so `EDA.Component.disable_all/1`, which now reaches a section's
+  accessory, can take a received message's components and send them back.
+  `EDA.Component.from_raw/1` and `to_raw/1` are public.
+
 - **A message's embeds are `EDA.Embed` structs**, down to their parts: `EDA.Embed.Footer`,
   `Author`, `Field`, `Media` (image, thumbnail and video, with the size, content type and
   placeholder Discord adds) and `Provider`. `EDA.Embed` gained `type` (`:rich`, `:video`,
