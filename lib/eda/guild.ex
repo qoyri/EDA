@@ -22,6 +22,10 @@ defmodule EDA.Guild do
   """
   use EDA.Event.Access
 
+  # There is one guild struct per guild, so a map past its compact form costs nothing held in
+  # bulk; its fields stay flat, as Discord sends them. The limit matters for what the cache holds by the
+  # thousand; see test/eda/cached_struct_size_test.exs.
+  # credo:disable-for-next-line Credo.Check.Warning.StructFieldAmount
   defstruct [
     :id,
     :name,

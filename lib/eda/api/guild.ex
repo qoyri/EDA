@@ -80,6 +80,10 @@ defmodule EDA.API.Guild do
     EDA.HTTP.Client.get("/guilds/#{guild_id}/invites")
   end
 
+  # What an audit log response carries besides its entries: the objects they point at.
+  @audit_log_lists ~w(users webhooks application_commands auto_moderation_rules
+                      guild_scheduled_events integrations threads)
+
   @doc """
   Gets the audit log for a guild.
 
@@ -124,17 +128,8 @@ defmodule EDA.API.Guild do
           (data["audit_log_entries"] || [])
           |> Enum.map(&EDA.AuditLog.Entry.from_raw/1)
 
-        {:ok,
-         %{
-           entries: entries,
-           users: data["users"] || [],
-           webhooks: data["webhooks"] || [],
-           application_commands: data["application_commands"] || [],
-           auto_moderation_rules: data["auto_moderation_rules"] || [],
-           guild_scheduled_events: data["guild_scheduled_events"] || [],
-           integrations: data["integrations"] || [],
-           threads: data["threads"] || []
-         }}
+        referenced = Map.new(@audit_log_lists, &{String.to_atom(&1), data[&1] || []})
+        {:ok, Map.put(referenced, :entries, entries)}
 
       error ->
         error

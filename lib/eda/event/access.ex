@@ -11,7 +11,7 @@ defmodule EDA.Event.Access do
   # The fields are read from the definition of `__struct__/0` (`Module.get_definition/2`): the
   # `@__struct__` attribute this used to read is gone at this point from Elixir 1.20 on, which
   # made EDA fail to compile there. Should that definition ever take another shape, the generic
-  # clauses at the end still answer correctly, only without the speed-up.
+  # clauses still answer correctly, only without the speed-up.
 
   defmacro __using__(_opts) do
     quote do
@@ -23,77 +23,39 @@ defmodule EDA.Event.Access do
   defmacro __before_compile__(env) do
     fields = struct_fields(env.module)
 
-    fetch_clauses =
-      for field <- fields do
-        name = Atom.to_string(field)
-
-        quote do
-          def fetch(%{unquote(field) => value}, unquote(name)), do: {:ok, value}
-        end
-      end
-
-    key_clauses =
-      for field <- fields do
-        name = Atom.to_string(field)
-
-        quote do
-          defp __access_key__(_struct, unquote(name)), do: unquote(field)
-          defp __access_key__(_struct, unquote(field)), do: unquote(field)
-        end
-      end
-
     quote do
       @impl Access
       def fetch(struct, key) when is_atom(key), do: Map.fetch(struct, key)
-      unquote_splicing(fetch_clauses)
+      unquote_splicing(Enum.map(fields, &fetch_clause/1))
 
-      def fetch(struct, key) when is_binary(key) do
-        case __access_key__(struct, key) do
-          nil -> :error
-          field -> Map.fetch(struct, field)
-        end
-      end
+      def fetch(struct, key) when is_binary(key),
+        do: EDA.Event.Access.fetch_field(struct, __access_key__(struct, key))
 
       @impl Access
-      def get_and_update(struct, key, fun) do
-        case __access_key__(struct, key) do
-          nil ->
-            raise KeyError, key: key, term: struct
-
-          field ->
-            case fun.(Map.fetch!(struct, field)) do
-              {current, new} -> {current, Map.put(struct, field, new)}
-              # Popping a field of a struct cannot remove it: it goes back to nil.
-              :pop -> {Map.fetch!(struct, field), Map.put(struct, field, nil)}
-            end
-        end
-      end
+      def get_and_update(struct, key, fun),
+        do: EDA.Event.Access.get_and_update_field(struct, key, __access_key__(struct, key), fun)
 
       @impl Access
-      def pop(struct, key) do
-        case __access_key__(struct, key) do
-          nil -> {nil, struct}
-          field -> {Map.fetch!(struct, field), Map.put(struct, field, nil)}
-        end
-      end
+      def pop(struct, key), do: EDA.Event.Access.pop_field(struct, __access_key__(struct, key))
 
-      unquote_splicing(key_clauses)
-
-      # Reached only when the fields could not be read at compile time, or for a key that is
-      # not a field: checked against the struct itself, never creating an atom.
-      defp __access_key__(struct, key) when is_atom(key) and key != :__struct__ do
-        if Map.has_key?(struct, key), do: key
-      end
-
-      defp __access_key__(struct, key) when is_binary(key) do
-        atom = String.to_existing_atom(key)
-        if atom != :__struct__ and Map.has_key?(struct, atom), do: atom
-      rescue
-        ArgumentError -> nil
-      end
-
-      defp __access_key__(_struct, _key), do: nil
+      unquote_splicing(Enum.flat_map(fields, &key_clauses/1))
+      defp __access_key__(struct, key), do: EDA.Event.Access.runtime_key(struct, key)
     end
+  end
+
+  defp fetch_clause(field) do
+    quote do
+      def fetch(%{unquote(field) => value}, unquote(Atom.to_string(field))), do: {:ok, value}
+    end
+  end
+
+  defp key_clauses(field) do
+    name = Atom.to_string(field)
+
+    [
+      quote(do: defp(__access_key__(_struct, unquote(name)), do: unquote(field))),
+      quote(do: defp(__access_key__(_struct, unquote(field)), do: unquote(field)))
+    ]
   end
 
   @doc false
@@ -108,4 +70,42 @@ defmodule EDA.Event.Access do
       _ -> []
     end
   end
+
+  # What the generated functions call once the key is resolved to a field, or to nil when it is
+  # not one.
+
+  @doc false
+  def fetch_field(_struct, nil), do: :error
+  def fetch_field(struct, field), do: Map.fetch(struct, field)
+
+  @doc false
+  def get_and_update_field(struct, key, nil, _fun), do: raise(KeyError, key: key, term: struct)
+
+  def get_and_update_field(struct, _key, field, fun) do
+    case fun.(Map.fetch!(struct, field)) do
+      {current, new} -> {current, Map.put(struct, field, new)}
+      # Popping a field of a struct cannot remove it: it goes back to nil.
+      :pop -> pop_field(struct, field)
+    end
+  end
+
+  @doc false
+  def pop_field(struct, nil), do: {nil, struct}
+  def pop_field(struct, field), do: {Map.fetch!(struct, field), Map.put(struct, field, nil)}
+
+  @doc false
+  # For a key the generated clauses did not recognise: checked against the struct itself, and a
+  # string never creates an atom.
+  def runtime_key(struct, key) when is_atom(key) and key != :__struct__ do
+    if Map.has_key?(struct, key), do: key
+  end
+
+  def runtime_key(struct, key) when is_binary(key) do
+    atom = String.to_existing_atom(key)
+    if atom != :__struct__ and Map.has_key?(struct, atom), do: atom
+  rescue
+    ArgumentError -> nil
+  end
+
+  def runtime_key(_struct, _key), do: nil
 end

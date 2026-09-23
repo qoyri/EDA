@@ -17,6 +17,10 @@ defmodule EDA.Message do
   """
   use EDA.Event.Access
 
+  # A message is not cached, so a map past its compact form costs nothing held in bulk; its
+  # fields stay flat, as Discord sends them. The limit matters for what the cache holds by the
+  # thousand; see test/eda/cached_struct_size_test.exs.
+  # credo:disable-for-next-line Credo.Check.Warning.StructFieldAmount
   defstruct [
     :id,
     :channel_id,
