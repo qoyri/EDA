@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0-beta.3] - 2026-09-23
+
+The third beta reworks EDA's model of Discord from end to end, and breaks a lot on purpose, before
+0.5.0 settles it. Everything Discord sends is typed down to the leaves, with dates as `DateTime`,
+enumerations as atoms and flags decoded, and no documented field is dropped. An event whose
+payload is an entity delivers that entity. The builders make the same structs a bot receives.
+`EDA.API.*` is the raw layer everywhere, and every endpoint has a typed call on its entity. The
+caches hold structs: a cached member is read five times faster. Over a hundred helpers cover
+moderation, images, messages, guild limits and markdown.
+
+### Installation
+
+```elixir
+def deps do
+  [
+    {:eda, "~> 0.5.0-beta.3"}
+  ]
+end
+```
+
+### Upgrading from 0.4 or an earlier beta
+
+Most of what a bot touches changed shape. The list below is what to look for in your code; the
+sections after it give every detail.
+
+- **Events deliver the entity.** Match `{:MESSAGE_CREATE, %EDA.Message{}}`,
+  `{:GUILD_CREATE, %EDA.Guild{}}`, `{:GUILD_MEMBER_UPDATE, %EDA.Member{}}`,
+  `{:CHANNEL_UPDATE, %EDA.Channel{}}`, `{:GUILD_ROLE_CREATE, %EDA.Role{}}` (with `guild_id`),
+  `{:USER_UPDATE, %EDA.User{}}`, `{:VOICE_STATE_UPDATE, %EDA.VoiceState{}}`,
+  `{:ENTITLEMENT_CREATE, %EDA.Entitlement{}}` and the like, instead of a wrapper such as
+  `%EDA.Event.UserUpdate{user: user}`.
+- **Dates are `DateTime`s** (`joined_at`, `timestamp`, `expires_at`, `created_at`…), not strings
+  or Unix integers. `EDA.Timestamp.parse/1` reads a date from a raw payload.
+- **Integer enumerations are atoms**, Discord's name in lowercase: a channel `type` is
+  `:guild_text`, a message `type` `:reply`, a component `:button`, a button style `:primary`, a
+  command `type` `:slash`. A value EDA does not know yet stays the integer. Calls that send one
+  take the atom or the integer.
+- **Nested objects are structs**: embeds (`EDA.Embed.Footer`…), components (one struct per
+  kind), a message's reference, stickers, interaction metadata, an interaction's `data`
+  (`EDA.Interaction.CommandData`, `ComponentData`, `ModalSubmitData`), role tags, activity
+  parts, invite and webhook partial guilds and channels. A channel's kind-specific fields live
+  in `thread`, `forum`, `voice` and `dm`.
+- **`x["field"]` still reads any struct**, but returns what the struct holds: an atom, a
+  `DateTime`, a nested struct. `%{"field" => _}` patterns on EDA's values no longer match.
+- **The builders return structs**: `EDA.Component.button/2` an `EDA.Component.Button` with
+  `style: :primary`, `EDA.Command.slash/2` an `EDA.Command` with `type: :slash`,
+  `EDA.Embed.footer/3` an `EDA.Embed.Footer`. What is sent to Discord is unchanged.
+- **`EDA.API.*` returns Discord's maps everywhere**; use the entity for structs.
+  `EDA.API.Emoji`, `Sticker`, `AutoMod` and `GuildTemplate` used to return structs: call
+  `EDA.Emoji.list/1`, `EDA.Sticker.fetch/1`, `EDA.AutoMod.list/1`, `EDA.GuildTemplate.fetch/1`.
+  `EDA.API.Guild.audit_log/2` returns the raw log; `EDA.AuditLog.fetch_log/2` the struct.
+- **The caches return structs**: `EDA.Cache.get_member/2` an `EDA.Member`, and so on. An
+  admission policy receives the struct.
+- **Interaction helpers**: `EDA.Interaction.component_type/1` returns an atom,
+  `resolved/3` a struct, `edit_response/2` and `followup/2` an `EDA.Message`.
+- **A presence's `status` is an atom** (`:online`…), and `client_status` is keyed by platform
+  atoms.
+
+
 ### Added
 
 - `EDA.Permission.missing/2`, the required flags a bitset lacks, and `any?/2`;
