@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `EDA.Markdown`: `escape/1` for user text, `bold/1`, `italic/1`, `underline/1`,
+  `strikethrough/1`, `spoiler/1`, `code/1`, `code_block/2`, `quote_text/1`, `block_quote/1`,
+  `header/2`, `subtext/1`, `masked_link/3` and `list/2`, and `split/2`, which cuts a long text
+  into messages of at most 2000 characters at line breaks, then words.
+- `EDA.Mention.slash_command/2..4`, a clickable command mention (`</name sub:id>`), and
+  `message_link/3`.
+
 - A guild's features and limits: `EDA.Guild.feature?/2` (`:community` or `"COMMUNITY"`),
   `max_file_size/1`, `max_bitrate/1`, `max_emojis/1` and `max_stickers/1`, from the boost level
   and the features that raise them (`VIP_REGIONS`, `MORE_EMOJI`, `MORE_STICKERS`);
