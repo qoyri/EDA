@@ -59,6 +59,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`GUILD_AUDIT_LOG_ENTRY_CREATE` delivers an `EDA.AuditLog.Entry`**, which gained
+  `guild_id`, instead of a struct of its own. An entry's `options` is an
+  `EDA.AuditLog.Entry.Options`: the counts Discord sends as strings are integers, the
+  overwrite `type` is `:role` or `:member`, the AutoMod trigger type an atom.
+
 - **A scheduled event's `recurrence_rule` and `entity_metadata` are structs.**
   `EDA.ScheduledEvent.RecurrenceRule` names the frequency (`:weekly`…), weekdays (`:friday`)
   and months (`:july`), holds "the n-th weekday" as `{1, :friday}`, and its `start` and `end`

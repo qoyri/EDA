@@ -137,7 +137,7 @@ defmodule EDA.Event do
           | EDA.Event.GuildSoundboardSoundDelete.t()
           | EDA.Event.GuildSoundboardSoundsUpdate.t()
           | EDA.Event.SoundboardSounds.t()
-          | EDA.Event.GuildAuditLogEntryCreate.t()
+          | EDA.AuditLog.Entry.t()
           | EDA.StageInstance.t()
           | EDA.Event.AutoModRuleCreate.t()
           | EDA.Event.AutoModRuleUpdate.t()

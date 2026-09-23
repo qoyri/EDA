@@ -25,7 +25,7 @@ defmodule EDA.AuditLog.EntryTest do
       assert entry.user_id == "789"
       assert entry.action_type == :member_ban_add
       assert entry.reason == "spamming"
-      assert entry.options == %{"count" => "1"}
+      assert entry.options == %EDA.AuditLog.Entry.Options{count: 1}
       assert [%Change{key: "name"}] = entry.changes
     end
 
