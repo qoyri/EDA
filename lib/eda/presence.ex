@@ -105,6 +105,134 @@ defmodule EDA.Presence do
     }
   end
 
+  # ── Reading someone else's presence ────────────────────────────────
+
+  @platform_order [:desktop, :mobile, :web, :vr, :embedded]
+  @platform_names Map.new(@platform_order, &{to_string(&1), &1})
+
+  @typedoc """
+  A platform a user has a session on.
+
+  Discord documents `:desktop`, `:mobile`, `:web` and `:vr`. `:embedded` is not documented but
+  is sent — a console or embedded session, seen live on 2026-09-23. A platform Discord adds
+  later comes back as the string it sent, rather than being dropped.
+  """
+  @type platform :: :desktop | :mobile | :web | :vr | :embedded | String.t()
+
+  @typedoc "The status of one session: what Discord sends per platform, never `:invisible`."
+  @type session_status :: :online | :idle | :dnd
+
+  @doc """
+  The platforms a user has an active session on, in a stable order.
+
+  Reads `client_status` from a `EDA.Event.PresenceUpdate`, a presence from `EDA.Cache`, or the
+  `client_status` map itself. Discord sends one key per active session, so a user on two
+  platforms gives two, and a user who is offline or invisible gives `[]` — invisibility is
+  indistinguishable from being offline here, by design.
+
+  A bot counts as a web session, which is why most of them show `[:web]`.
+
+  ## Examples
+
+      iex> EDA.Presence.platforms(%{"client_status" => %{"mobile" => "online", "desktop" => "idle"}})
+      [:desktop, :mobile]
+
+      iex> EDA.Presence.platforms(%EDA.Event.PresenceUpdate{client_status: %{"web" => "dnd"}})
+      [:web]
+
+      iex> EDA.Presence.platforms(%{"status" => "offline"})
+      []
+  """
+  @spec platforms(map() | EDA.Event.PresenceUpdate.t() | nil) :: [platform()]
+  def platforms(presence) do
+    case client_status(presence) do
+      nil ->
+        []
+
+      status ->
+        known = for p <- @platform_order, Map.has_key?(status, to_string(p)), do: p
+        known ++ Enum.sort(Map.keys(status) -- Enum.map(@platform_order, &to_string/1))
+    end
+  end
+
+  @doc """
+  The user's status on one platform, or `nil` when they have no session there.
+
+  ## Examples
+
+      iex> EDA.Presence.status_on(%{"client_status" => %{"mobile" => "dnd"}}, :mobile)
+      :dnd
+
+      iex> EDA.Presence.status_on(%{"client_status" => %{"mobile" => "dnd"}}, :desktop)
+      nil
+  """
+  @spec status_on(map() | EDA.Event.PresenceUpdate.t() | nil, platform()) ::
+          session_status() | nil
+  def status_on(presence, platform) do
+    with status when is_map(status) <- client_status(presence),
+         value when is_binary(value) <- Map.get(status, to_string(platform)) do
+      session_status(value)
+    else
+      _ -> nil
+    end
+  end
+
+  @doc """
+  Whether the user has a session on that platform.
+
+      iex> EDA.Presence.on?(%{"client_status" => %{"mobile" => "idle"}}, :mobile)
+      true
+
+      iex> EDA.Presence.on?(%{"client_status" => %{"mobile" => "idle"}}, :web)
+      false
+  """
+  @spec on?(map() | EDA.Event.PresenceUpdate.t() | nil, platform()) :: boolean()
+  def on?(presence, platform), do: status_on(presence, platform) != nil
+
+  @doc "Whether the user has a desktop session. See `on?/2`."
+  @spec desktop?(map() | EDA.Event.PresenceUpdate.t() | nil) :: boolean()
+  def desktop?(presence), do: on?(presence, :desktop)
+
+  @doc "Whether the user has a mobile session. See `on?/2`."
+  @spec mobile?(map() | EDA.Event.PresenceUpdate.t() | nil) :: boolean()
+  def mobile?(presence), do: on?(presence, :mobile)
+
+  @doc """
+  Whether the user has a web session. See `on?/2`.
+
+  True for most bots: Discord counts a bot's gateway connection as a web session.
+  """
+  @spec web?(map() | EDA.Event.PresenceUpdate.t() | nil) :: boolean()
+  def web?(presence), do: on?(presence, :web)
+
+  @doc """
+  Names a platform Discord sent, keeping an unknown one as its string.
+
+      iex> EDA.Presence.platform("embedded")
+      :embedded
+
+      iex> EDA.Presence.platform("watch")
+      "watch"
+  """
+  @spec platform(String.t()) :: platform()
+  def platform(name) when is_binary(name), do: Map.get(@platform_names, name, name)
+
+  defp client_status(%EDA.Event.PresenceUpdate{client_status: status}), do: status
+  defp client_status(%{"client_status" => status}) when is_map(status), do: status
+
+  # A presence without client_status: the user is offline or invisible. Anything else is taken
+  # for the client_status map itself, so a platform Discord adds later still reads.
+  defp client_status(%{"status" => _}), do: nil
+  defp client_status(%{"activities" => _}), do: nil
+  defp client_status(%{"user" => _}), do: nil
+  defp client_status(status) when is_map(status) and not is_struct(status), do: status
+  defp client_status(_presence), do: nil
+
+  defp session_status("online"), do: :online
+  defp session_status("idle"), do: :idle
+  defp session_status("dnd"), do: :dnd
+  defp session_status(_other), do: nil
+
   @doc false
   def activity_type_value(type), do: Map.fetch!(@activity_type_map, type)
 
