@@ -62,13 +62,13 @@ defmodule EDA.ChannelTest do
       assert channel.last_message_id == "msg1"
       assert channel.default_auto_archive_duration == 1440
       assert channel.flags == 0
-      assert channel.default_reaction_emoji == %{"emoji_id" => nil, "emoji_name" => "👍"}
+      assert channel.forum.default_reaction_emoji == %{"emoji_id" => nil, "emoji_name" => "👍"}
       assert channel.default_thread_rate_limit_per_user == 60
-      assert channel.default_sort_order == 0
-      assert channel.default_forum_layout == 1
+      assert channel.forum.default_sort_order == 0
+      assert channel.forum.default_forum_layout == 1
 
       assert [%EDA.ForumTag{id: "t1", name: "Bug"}, %EDA.ForumTag{id: "t2", name: "Feature"}] =
-               channel.available_tags
+               channel.forum.available_tags
     end
 
     test "parses applied_tags on a thread" do
@@ -88,35 +88,30 @@ defmodule EDA.ChannelTest do
       }
 
       channel = Channel.from_raw(raw)
-      assert channel.applied_tags == ["t1", "t2"]
+      assert channel.thread.applied_tags == ["t1", "t2"]
 
-      assert channel.thread_metadata == %{
-               "archived" => false,
-               "auto_archive_duration" => 1440,
-               "locked" => false
-             }
+      # thread_metadata is flattened into the thread part
+      assert %EDA.Channel.Thread{archived: false, auto_archive_duration: 1440, locked: false} =
+               channel.thread
 
       assert channel.owner_id == "u1"
-      assert channel.member_count == 5
-      assert channel.message_count == 42
-      assert channel.total_message_sent == 50
+      assert channel.thread.member_count == 5
+      assert channel.thread.message_count == 42
+      assert channel.thread.total_message_sent == 50
     end
 
-    test "forum fields default to nil when absent" do
+    test "a text channel has no thread, forum, voice or direct message part" do
       channel = Channel.from_raw(%{"id" => "ch1", "type" => 0})
-      assert channel.available_tags == nil
-      assert channel.applied_tags == nil
-      assert channel.default_reaction_emoji == nil
-      assert channel.default_forum_layout == nil
-      assert channel.default_sort_order == nil
-      assert channel.thread_metadata == nil
+      assert channel.thread == nil
+      assert channel.forum == nil
+      assert channel.voice == nil
+      assert channel.dm == nil
       assert channel.owner_id == nil
-      assert channel.status == nil
     end
 
     test "parses voice channel status" do
       channel = Channel.from_raw(%{"id" => "vc1", "type" => 2, "status" => "gaming"})
-      assert channel.status == "gaming"
+      assert channel.voice.status == "gaming"
     end
   end
 

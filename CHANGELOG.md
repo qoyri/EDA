@@ -38,6 +38,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`EDA.Channel` groups what only one kind of channel has** into `thread`, `forum`, `voice` and
+  `dm`, each `nil` on another kind:
+  - `channel.thread` — `EDA.Channel.Thread`, with `thread_metadata` flattened into it
+    (`channel.thread.archived`, `.locked`, `.invitable`, `.auto_archive_duration`…), the counters,
+    `applied_tags`, `newly_created` and the bot's membership as an `EDA.Channel.ThreadMember`;
+  - `channel.forum` — `EDA.Channel.Forum`: `available_tags`, `default_reaction_emoji`,
+    `default_sort_order`, `default_forum_layout`;
+  - `channel.voice` — `EDA.Channel.Voice`: `bitrate`, `user_limit`, `rtc_region`,
+    `video_quality_mode`, `status`;
+  - `channel.dm` — `EDA.Channel.DM`: `recipients` (as `EDA.User` structs), `icon`,
+    `application_id`, `managed`.
+
+  So `channel.bitrate` becomes `channel.voice.bitrate`, `channel.available_tags` becomes
+  `channel.forum.available_tags` and `channel.thread_metadata["archived"]` becomes
+  `channel.thread.archived`. Keeping every field flat would have taken the struct past 31 fields,
+  where a map leaves its compact form — about 3.5 times the memory for the struct, on the entity
+  the cache holds by the thousand. Measured on 372 real channels, a channel is now smaller than
+  before while holding more.
+- **`CHANNEL_CREATE`, `CHANNEL_UPDATE`, `CHANNEL_DELETE`, `THREAD_CREATE`, `THREAD_UPDATE` and
+  `THREAD_DELETE` deliver an `EDA.Channel`**, instead of structs of their own that kept 10 or 12
+  fields. `THREAD_LIST_SYNC` carries `EDA.Channel` and `EDA.Channel.ThreadMember` structs, and
+  `THREAD_MEMBERS_UPDATE` its added members as `EDA.Channel.ThreadMember`.
+
 - **`MESSAGE_CREATE` and `MESSAGE_UPDATE` deliver an `EDA.Message`**, instead of a struct of their
   own that copied part of it: match `{:MESSAGE_CREATE, %EDA.Message{} = msg}`. The message received
   can now be passed straight to `EDA.Message.reply/2`, `edit/2`, `react/2` and `delete/2`, which
@@ -62,6 +85,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with string keys keeps working, as on every other nested object.
 
 ### Fixed
+
+- A change to a forum's tags, a channel's flags or a voice channel's region was invisible in
+  `CHANNEL_UPDATE`, whose struct dropped them. `EDA.Channel` also gained what it never kept:
+  `rtc_region`, `video_quality_mode`, a DM's `recipients`, `icon`, `application_id` and `managed`,
+  a thread's `newly_created` and the bot's thread membership.
 
 - A message received through the gateway lost its poll and its reactions — a poll arrived without
   its poll. It now carries every field Discord documents: `webhook_id` (present on 23 % of the

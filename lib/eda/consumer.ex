@@ -63,7 +63,7 @@ defmodule EDA.Consumer do
   - `{:GUILD_UNAVAILABLE, %EDA.Event.GuildDelete{}}` - A guild went offline (Discord outage)
   - `{:SHARD_READY, %EDA.Event.ShardReady{}}` - A shard finished loading all its guilds
   - `{:ALL_SHARDS_READY, %EDA.Event.AllShardsReady{}}` - All shards are ready
-  - `{:CHANNEL_CREATE, %EDA.Event.ChannelCreate{}}` - A channel was created
+  - `{:CHANNEL_CREATE, %EDA.Channel{}}` - A channel was created
   - `{:INTERACTION_CREATE, %EDA.Event.InteractionCreate{}}` - A slash command or component interaction
   - `{:GATEWAY_CLOSE, %EDA.Event.GatewayClose{}}` - A shard disconnected from the gateway
   - `{:SESSION_RESUMED, %EDA.Event.SessionResumed{}}` - A shard resumed its previous session

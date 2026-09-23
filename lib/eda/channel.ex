@@ -54,6 +54,11 @@ defmodule EDA.Channel do
   @type_guild_forum 15
   @type_guild_media 16
 
+  @thread_types [@type_guild_news_thread, @type_guild_public_thread, @type_guild_private_thread]
+  @forum_types [@type_guild_forum, @type_guild_media]
+  @voice_types [@type_guild_voice, @type_guild_stage_voice]
+  @dm_types [@type_dm, @type_group_dm]
+
   # ── Forum layout ──
 
   @layout_not_set 0
@@ -74,8 +79,6 @@ defmodule EDA.Channel do
     :name,
     :topic,
     :nsfw,
-    :bitrate,
-    :user_limit,
     :rate_limit_per_user,
     :parent_id,
     :last_message_id,
@@ -83,19 +86,13 @@ defmodule EDA.Channel do
     :permissions,
     :app_permissions,
     :default_auto_archive_duration,
-    :flags,
-    :available_tags,
-    :applied_tags,
-    :default_reaction_emoji,
     :default_thread_rate_limit_per_user,
-    :default_sort_order,
-    :default_forum_layout,
-    :thread_metadata,
+    :flags,
     :owner_id,
-    :member_count,
-    :message_count,
-    :total_message_sent,
-    :status
+    :thread,
+    :forum,
+    :voice,
+    :dm
   ]
 
   @type t :: %__MODULE__{
@@ -107,8 +104,6 @@ defmodule EDA.Channel do
           name: String.t() | nil,
           topic: String.t() | nil,
           nsfw: boolean() | nil,
-          bitrate: integer() | nil,
-          user_limit: integer() | nil,
           rate_limit_per_user: integer() | nil,
           parent_id: String.t() | nil,
           last_message_id: String.t() | nil,
@@ -116,19 +111,13 @@ defmodule EDA.Channel do
           permissions: String.t() | nil,
           app_permissions: String.t() | nil,
           default_auto_archive_duration: integer() | nil,
-          flags: integer() | nil,
-          available_tags: [EDA.ForumTag.t()] | nil,
-          applied_tags: [String.t()] | nil,
-          default_reaction_emoji: map() | nil,
           default_thread_rate_limit_per_user: integer() | nil,
-          default_sort_order: integer() | nil,
-          default_forum_layout: integer() | nil,
-          thread_metadata: map() | nil,
+          flags: integer() | nil,
           owner_id: String.t() | nil,
-          member_count: integer() | nil,
-          message_count: integer() | nil,
-          total_message_sent: integer() | nil,
-          status: String.t() | nil
+          thread: EDA.Channel.Thread.t() | nil,
+          forum: EDA.Channel.Forum.t() | nil,
+          voice: EDA.Channel.Voice.t() | nil,
+          dm: EDA.Channel.DM.t() | nil
         }
 
   # ── Channel type accessors ──
@@ -399,8 +388,6 @@ defmodule EDA.Channel do
       name: raw["name"],
       topic: raw["topic"],
       nsfw: raw["nsfw"],
-      bitrate: raw["bitrate"],
-      user_limit: raw["user_limit"],
       rate_limit_per_user: raw["rate_limit_per_user"],
       parent_id: raw["parent_id"],
       last_message_id: raw["last_message_id"],
@@ -408,29 +395,30 @@ defmodule EDA.Channel do
       permissions: raw["permissions"],
       app_permissions: raw["app_permissions"],
       default_auto_archive_duration: raw["default_auto_archive_duration"],
-      flags: raw["flags"],
-      available_tags: parse_tags(raw["available_tags"]),
-      applied_tags: raw["applied_tags"],
-      default_reaction_emoji: raw["default_reaction_emoji"],
       default_thread_rate_limit_per_user: raw["default_thread_rate_limit_per_user"],
-      default_sort_order: raw["default_sort_order"],
-      default_forum_layout: raw["default_forum_layout"],
-      thread_metadata: raw["thread_metadata"],
+      flags: raw["flags"],
       owner_id: raw["owner_id"],
-      member_count: raw["member_count"],
-      message_count: raw["message_count"],
-      total_message_sent: raw["total_message_sent"],
-      status: raw["status"]
+      thread: kind(raw, @thread_types, EDA.Channel.Thread),
+      forum: kind(raw, @forum_types, EDA.Channel.Forum),
+      voice: kind(raw, @voice_types, EDA.Channel.Voice),
+      dm: kind(raw, @dm_types, EDA.Channel.DM)
     }
+  end
+
+  # A channel of the kind gets its part, as does one whose type is missing but whose payload
+  # carries that kind's fields — partial channels, such as a thread in a message, may lack a type.
+  defp kind(%{"type" => type} = raw, types, mod) when is_integer(type) do
+    if type in types, do: mod.from_raw(raw)
+  end
+
+  defp kind(raw, _types, mod) do
+    if Enum.any?(mod.raw_keys(), &Map.has_key?(raw, &1)), do: mod.from_raw(raw)
   end
 
   defp parse_overwrites(nil), do: nil
 
   defp parse_overwrites(list) when is_list(list),
     do: Enum.map(list, &EDA.PermissionOverwrite.from_raw/1)
-
-  defp parse_tags(nil), do: nil
-  defp parse_tags(list) when is_list(list), do: Enum.map(list, &EDA.ForumTag.from_raw/1)
 
   # ── Entity Manager ──
 
