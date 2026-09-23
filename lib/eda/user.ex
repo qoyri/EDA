@@ -1,5 +1,11 @@
 defmodule EDA.User do
-  @moduledoc "Represents a Discord user."
+  @moduledoc """
+  Represents a Discord user.
+
+  `member` is set only on the users a guild message mentions, where Discord attaches their
+  partial member (nickname, roles, join date…) as an `EDA.Member` with the message's
+  `guild_id`; it is `nil` anywhere else.
+  """
   use EDA.Event.Access
   @premium_types %{0 => :none, 1 => :nitro_classic, 2 => :nitro, 3 => :nitro_basic}
 
@@ -23,7 +29,8 @@ defmodule EDA.User do
     :email,
     :avatar_decoration_data,
     :collectibles,
-    :display_name_styles
+    :display_name_styles,
+    :member
   ]
 
   @type t :: %__MODULE__{
@@ -46,7 +53,8 @@ defmodule EDA.User do
           email: String.t() | nil,
           avatar_decoration_data: EDA.User.AvatarDecoration.t() | nil,
           collectibles: EDA.User.Collectibles.t() | nil,
-          display_name_styles: EDA.User.DisplayNameStyles.t() | nil
+          display_name_styles: EDA.User.DisplayNameStyles.t() | nil,
+          member: EDA.Member.t() | nil
         }
 
   @spec from_raw(map()) :: t()
@@ -71,7 +79,8 @@ defmodule EDA.User do
       email: raw["email"],
       avatar_decoration_data: EDA.User.AvatarDecoration.from_raw(raw["avatar_decoration_data"]),
       collectibles: EDA.User.Collectibles.from_raw(raw["collectibles"]),
-      display_name_styles: EDA.User.DisplayNameStyles.from_raw(raw["display_name_styles"])
+      display_name_styles: EDA.User.DisplayNameStyles.from_raw(raw["display_name_styles"]),
+      member: raw["member"] && EDA.Member.from_raw(raw["member"])
     }
   end
 

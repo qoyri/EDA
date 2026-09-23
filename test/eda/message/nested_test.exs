@@ -124,4 +124,18 @@ defmodule EDA.Message.NestedTest do
     assert [%Message.ChannelMention{type: :guild_announcement, name: "news"}] =
              msg.mention_channels
   end
+
+  test "a guild message's mentioned users carry their partial member, with the guild" do
+    msg =
+      Message.from_raw(%{
+        "guild_id" => "9",
+        "mentions" => [
+          %{"id" => "1", "username" => "ann", "member" => %{"nick" => "Annie", "roles" => ["5"]}},
+          %{"id" => "2", "username" => "bob"}
+        ]
+      })
+
+    assert [%EDA.User{username: "ann", member: member}, %EDA.User{member: nil}] = msg.mentions
+    assert %EDA.Member{nick: "Annie", roles: ["5"], guild_id: "9"} = member
+  end
 end

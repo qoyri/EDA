@@ -160,7 +160,7 @@ defmodule EDA.Message do
       edited_timestamp: EDA.Timestamp.parse(raw["edited_timestamp"]),
       tts: raw["tts"],
       mention_everyone: raw["mention_everyone"],
-      mentions: parse_users(raw["mentions"]),
+      mentions: parse_mentions(raw["mentions"], raw["guild_id"]),
       mention_roles: raw["mention_roles"],
       attachments: parse_attachments(raw["attachments"]),
       embeds: parse_list(raw["embeds"], &EDA.Embed.from_raw/1),
@@ -208,8 +208,20 @@ defmodule EDA.Message do
   defp parse_user(nil), do: nil
   defp parse_user(raw) when is_map(raw), do: EDA.User.from_raw(raw)
 
-  defp parse_users(nil), do: nil
-  defp parse_users(list) when is_list(list), do: Enum.map(list, &EDA.User.from_raw/1)
+  # In a guild, each mentioned user carries their partial member, which gets the guild's id.
+  defp parse_mentions(nil, _guild_id), do: nil
+
+  defp parse_mentions(list, guild_id) when is_list(list) do
+    Enum.map(list, fn raw ->
+      case EDA.User.from_raw(raw) do
+        %EDA.User{member: %EDA.Member{} = member} = user ->
+          %{user | member: %{member | guild_id: guild_id}}
+
+        user ->
+          user
+      end
+    end)
+  end
 
   defp parse_member(nil), do: nil
   defp parse_member(raw) when is_map(raw), do: EDA.Member.from_raw(raw)

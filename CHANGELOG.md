@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `EDA.User` has a `member` field, set on the users a guild message mentions: Discord attaches
+  their partial member to each, which EDA used to drop. It is an `EDA.Member` with the
+  message's `guild_id`, and `nil` on any other user.
+
 - `EDA.SKU`, what an app sells, with `list/0` returning structs, `type` as an atom and
   `EDA.SKU.Flags` read by `flags/1` and `flag?/2`.
 
