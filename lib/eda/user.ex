@@ -1,6 +1,7 @@
 defmodule EDA.User do
   @moduledoc "Represents a Discord user."
   use EDA.Event.Access
+  @premium_types %{0 => :none, 1 => :nitro_classic, 2 => :nitro, 3 => :nitro_basic}
 
   defstruct [
     :id,
@@ -38,7 +39,7 @@ defmodule EDA.User do
           banner: String.t() | nil,
           global_name: String.t() | nil,
           primary_guild: EDA.User.PrimaryGuild.t() | nil,
-          premium_type: integer() | nil,
+          premium_type: :none | :nitro_classic | :nitro | :nitro_basic | integer() | nil,
           mfa_enabled: boolean() | nil,
           locale: String.t() | nil,
           verified: boolean() | nil,
@@ -63,7 +64,7 @@ defmodule EDA.User do
       banner: raw["banner"],
       global_name: raw["global_name"],
       primary_guild: EDA.User.PrimaryGuild.from_raw(raw["primary_guild"]),
-      premium_type: raw["premium_type"],
+      premium_type: EDA.Enum.name(@premium_types, raw["premium_type"]),
       mfa_enabled: raw["mfa_enabled"],
       locale: raw["locale"],
       verified: raw["verified"],
@@ -73,8 +74,6 @@ defmodule EDA.User do
       display_name_styles: EDA.User.DisplayNameStyles.from_raw(raw["display_name_styles"])
     }
   end
-
-  @premium_types %{0 => :none, 1 => :nitro_classic, 2 => :nitro, 3 => :nitro_basic}
 
   @typedoc "A Nitro tier name."
   @type premium_type :: :none | :nitro_classic | :nitro | :nitro_basic | :unknown | nil
@@ -92,10 +91,10 @@ defmodule EDA.User do
 
   ## Examples
 
-      iex> EDA.User.premium_type(%EDA.User{premium_type: 2})
+      iex> EDA.User.premium_type(%EDA.User{premium_type: :nitro})
       :nitro
 
-      iex> EDA.User.premium_type(%EDA.User{premium_type: 0})
+      iex> EDA.User.premium_type(%EDA.User{premium_type: :none})
       :none
 
       iex> EDA.User.premium_type(%EDA.User{})
@@ -109,6 +108,10 @@ defmodule EDA.User do
   def premium_type(%{"premium_type" => value}), do: premium_type(value)
   def premium_type(nil), do: nil
   def premium_type(value) when is_integer(value), do: Map.get(@premium_types, value, :unknown)
+
+  def premium_type(value) when value in [:none, :nitro_classic, :nitro, :nitro_basic],
+    do: value
+
   def premium_type(_other), do: nil
 
   @doc """
@@ -119,10 +122,10 @@ defmodule EDA.User do
 
   ## Examples
 
-      iex> EDA.User.nitro?(%EDA.User{premium_type: 3})
+      iex> EDA.User.nitro?(%EDA.User{premium_type: :nitro_basic})
       true
 
-      iex> EDA.User.nitro?(%EDA.User{premium_type: 0})
+      iex> EDA.User.nitro?(%EDA.User{premium_type: :none})
       false
 
       iex> EDA.User.nitro?(%EDA.User{})

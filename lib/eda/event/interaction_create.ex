@@ -13,6 +13,10 @@ defmodule EDA.Event.InteractionCreate do
   """
   use EDA.Event.Access
 
+  # EDA's names for the interaction types, public since before the rule of using Discord's names;
+  # see EDA.Interaction.interaction_type/1.
+  @types %{1 => :ping, 2 => :command, 3 => :component, 4 => :autocomplete, 5 => :modal_submit}
+
   defstruct [
     :id,
     :application_id,
@@ -39,7 +43,7 @@ defmodule EDA.Event.InteractionCreate do
   @type t :: %__MODULE__{
           id: String.t() | nil,
           application_id: String.t() | nil,
-          type: integer() | nil,
+          type: :ping | :command | :component | :autocomplete | :modal_submit | integer() | nil,
           data: map() | nil,
           guild_id: String.t() | nil,
           channel_id: String.t() | nil,
@@ -64,7 +68,7 @@ defmodule EDA.Event.InteractionCreate do
     %__MODULE__{
       id: raw["id"],
       application_id: raw["application_id"],
-      type: raw["type"],
+      type: EDA.Enum.name(@types, raw["type"]),
       data: raw["data"],
       guild_id: raw["guild_id"],
       channel_id: raw["channel_id"],

@@ -24,7 +24,7 @@ defmodule EDA.Event.GuildAuditLogEntryCreateTest do
       assert %GuildAuditLogEntryCreate{} = event
       assert event.id == "entry1"
       assert event.guild_id == "guild1"
-      assert event.action_type == 22
+      assert event.action_type == :member_ban_add
       assert event.reason == "rule violation"
       assert [%Change{key: "nick"}] = event.changes
     end

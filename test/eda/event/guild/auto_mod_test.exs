@@ -80,7 +80,7 @@ defmodule EDA.Event.AutoModTest do
       assert %AutoModActionExecution{} = event
       assert event.guild_id == "g1"
       assert event.rule_id == "r1"
-      assert event.rule_trigger_type == 1
+      assert event.rule_trigger_type == :keyword
       assert event.user_id == "u1"
       assert event.channel_id == "c1"
       assert event.message_id == "m1"
@@ -88,7 +88,7 @@ defmodule EDA.Event.AutoModTest do
       assert event.content == "bad message"
       assert event.matched_keyword == "bad"
       assert event.matched_content == "bad"
-      assert %Action{type: 1} = event.action
+      assert %Action{type: :block_message} = event.action
       assert event.action.metadata.custom_message == "Blocked"
     end
 

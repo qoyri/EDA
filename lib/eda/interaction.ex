@@ -80,6 +80,7 @@ defmodule EDA.Interaction do
   - `:modal_submit` (5, MODAL_SUBMIT)
   """
   @spec interaction_type(interaction()) :: atom() | nil
+  def interaction_type(%{type: type}) when is_atom(type) and not is_nil(type), do: type
   def interaction_type(%{type: 1}), do: :ping
   def interaction_type(%{type: 2}), do: :command
   def interaction_type(%{type: 3}), do: :component

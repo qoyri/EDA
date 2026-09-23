@@ -8,6 +8,8 @@ defmodule EDA.Invite do
   when Discord did not send them, so they can be read either way.
   """
   use EDA.Event.Access
+  @target_types %{1 => :stream, 2 => :embedded_application}
+  @invite_types %{0 => :guild, 1 => :group_dm, 2 => :friend}
 
   import Bitwise
 
@@ -38,14 +40,14 @@ defmodule EDA.Invite do
 
   @type t :: %__MODULE__{
           code: String.t() | nil,
-          type: integer() | nil,
+          type: :guild | :group_dm | :friend | integer() | nil,
           guild: map() | nil,
           guild_id: String.t() | nil,
           channel: map() | nil,
           channel_id: String.t() | nil,
           inviter: EDA.User.t() | nil,
           target_user: EDA.User.t() | nil,
-          target_type: integer() | nil,
+          target_type: :stream | :embedded_application | integer() | nil,
           target_application: map() | nil,
           roles: [EDA.Role.t()] | nil,
           role_ids: [String.t()] | nil,
@@ -68,14 +70,14 @@ defmodule EDA.Invite do
 
     %__MODULE__{
       code: raw["code"],
-      type: raw["type"],
+      type: EDA.Enum.name(@invite_types, raw["type"]),
       guild: guild,
       guild_id: raw["guild_id"] || nested_id(guild),
       channel: channel,
       channel_id: raw["channel_id"] || nested_id(channel),
       inviter: parse_user(raw["inviter"]),
       target_user: parse_user(raw["target_user"]),
-      target_type: raw["target_type"],
+      target_type: EDA.Enum.name(@target_types, raw["target_type"]),
       target_application: raw["target_application"],
       roles: parse_roles(raw["roles"]),
       role_ids: raw["role_ids"] || role_ids(raw["roles"]),
@@ -107,9 +109,6 @@ defmodule EDA.Invite do
   defp parse_roles(list) when is_list(list), do: Enum.map(list, &EDA.Role.from_raw/1)
 
   # ── Types and flags ──
-
-  @invite_types %{0 => :guild, 1 => :group_dm, 2 => :friend}
-  @target_types %{1 => :stream, 2 => :embedded_application}
 
   @flag_guest_invite 1 <<< 0
   @flag_has_target_users 1 <<< 4
@@ -146,6 +145,7 @@ defmodule EDA.Invite do
   def type(%{"type" => type}), do: type(type)
   # Discord omits `type` on the gateway event, where it is always a guild invite.
   def type(nil), do: :guild
+  def type(value) when is_atom(value), do: value
   def type(value) when is_integer(value), do: Map.get(@invite_types, value, :unknown)
 
   @doc """
@@ -164,6 +164,7 @@ defmodule EDA.Invite do
   def target_type(%__MODULE__{target_type: value}), do: target_type(value)
   def target_type(%{"target_type" => value}), do: target_type(value)
   def target_type(nil), do: nil
+  def target_type(value) when is_atom(value), do: value
   def target_type(value) when is_integer(value), do: Map.get(@target_types, value, :unknown)
 
   @doc """

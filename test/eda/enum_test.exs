@@ -52,6 +52,29 @@ defmodule EDA.EnumTest do
       assert %EDA.Guild{premium_tier: 7} = EDA.Guild.from_raw(%{"premium_tier" => 7})
     end
 
+    test "the enumerations that already had a helper, whose helper now takes the atom too" do
+      invite = EDA.Invite.from_raw(%{"code" => "x", "type" => 1, "target_type" => 2})
+      assert {invite.type, invite.target_type} == {:group_dm, :embedded_application}
+      assert EDA.Invite.type(invite) == :group_dm
+
+      sub = EDA.Subscription.from_raw(%{"status" => 1})
+      assert sub.status == :inactive and EDA.Subscription.status(sub) == :inactive
+
+      user = EDA.User.from_raw(%{"id" => "1", "premium_type" => 3})
+      assert user.premium_type == :nitro_basic and EDA.User.nitro?(user)
+
+      interaction = EDA.Event.from_raw("INTERACTION_CREATE", %{"id" => "1", "type" => 5})
+      assert interaction.type == :modal_submit
+      assert EDA.Interaction.interaction_type(interaction) == :modal_submit
+
+      entry = EDA.AuditLog.Entry.from_raw(%{"action_type" => 22})
+      assert entry.action_type == :member_ban_add
+      assert EDA.AuditLog.action_name(entry.action_type) == :member_ban_add
+
+      rule = EDA.AutoMod.from_raw(%{"trigger_type" => 5, "event_type" => 1})
+      assert {rule.trigger_type, rule.event_type} == {:mention_spam, :message_send}
+    end
+
     test "STAGE_INSTANCE_* deliver an EDA.StageInstance" do
       for name <- ~w(STAGE_INSTANCE_CREATE STAGE_INSTANCE_UPDATE STAGE_INSTANCE_DELETE) do
         assert %EDA.StageInstance{topic: "Q&A"} =
@@ -107,6 +130,22 @@ defmodule EDA.EnumTest do
                    fn ->
                      EDA.API.Channel.create("1", %{name: "x", type: :guild_lounge})
                    end
+    end
+
+    test "an AutoMod rule built with atoms and structs is sent as Discord's integers and maps" do
+      EDA.API.AutoMod.create("1", %{
+        name: "no slurs",
+        event_type: :message_send,
+        trigger_type: :keyword_preset,
+        trigger_metadata: %EDA.AutoMod.TriggerMetadata{presets: [:slurs, :profanity]},
+        actions: [EDA.AutoMod.Action.block_message(), %{type: :send_alert_message}]
+      })
+
+      assert_receive {:body, "/guilds/1/auto-moderation/rules", body}
+      assert body["event_type"] == 1
+      assert body["trigger_type"] == 4
+      assert body["trigger_metadata"] == %{"presets" => [3, 1]}
+      assert [%{"type" => 1}, %{"type" => 2}] = body["actions"]
     end
 
     test "a poll sends its layout as the integer" do

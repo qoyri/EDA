@@ -52,6 +52,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The enumerations that had a helper are atoms in the struct too**, the helper taking the atom
+  as well: `EDA.Invite` `type` and `target_type`, `EDA.Subscription.status`,
+  `EDA.User.premium_type`, the `type` of `INTERACTION_CREATE` (with the names
+  `EDA.Interaction.interaction_type/1` already used: `:command`, `:component`, `:autocomplete`,
+  `:modal_submit`, `:ping`), and an audit log entry's `action_type`
+  (`EDA.AuditLog.action_name/1`'s names).
+- **AutoMod**: a rule's `event_type` (`:message_send`, `:member_update`) and `trigger_type`
+  (`:keyword`, `:spam`, `:keyword_preset`, `:mention_spam`, `:member_profile`), an action's `type`
+  (`:block_message`, `:send_alert_message`, `:timeout`, `:block_member_interaction`), the keyword
+  `presets` (`:profanity`, `:sexual_content`, `:slurs`) and the execution event's
+  `rule_trigger_type` are atoms. The action constructors build them, and `to_map/1` and
+  `EDA.API.AutoMod.create/2` and `modify/3` send Discord's integers, whether given atoms, integers,
+  structs or maps.
+
 - **More enumerations are atoms**, Discord's names in lowercase, an unknown value staying the
   integer: `EDA.Message.type` (`:default`, `:reply`, `:chat_input_command`, `:thread_created`…),
   `EDA.Webhook.type` (`:incoming`, `:channel_follower`, `:application`), `EDA.Activity` `type`

@@ -19,6 +19,7 @@ defmodule EDA.Subscription do
   treat the status as billing information.
   """
   use EDA.Event.Access
+  @statuses %{0 => :active, 1 => :inactive, 2 => :ending}
 
   defstruct [
     :id,
@@ -41,7 +42,7 @@ defmodule EDA.Subscription do
           renewal_sku_ids: [String.t()] | nil,
           current_period_start: DateTime.t() | nil,
           current_period_end: DateTime.t() | nil,
-          status: integer() | nil,
+          status: :active | :inactive | :ending | integer() | nil,
           canceled_at: DateTime.t() | nil,
           country: String.t() | nil
         }
@@ -56,15 +57,13 @@ defmodule EDA.Subscription do
       renewal_sku_ids: raw["renewal_sku_ids"],
       current_period_start: EDA.Timestamp.parse(raw["current_period_start"]),
       current_period_end: EDA.Timestamp.parse(raw["current_period_end"]),
-      status: raw["status"],
+      status: EDA.Enum.name(@statuses, raw["status"]),
       canceled_at: EDA.Timestamp.parse(raw["canceled_at"]),
       country: raw["country"]
     }
   end
 
   # ── Status ──
-
-  @statuses %{0 => :active, 1 => :inactive, 2 => :ending}
 
   @typedoc "A subscription status name."
   @type status :: :active | :inactive | :ending | :unknown
@@ -97,6 +96,7 @@ defmodule EDA.Subscription do
   def status(%__MODULE__{status: value}), do: status(value)
   def status(%{"status" => value}), do: status(value)
   def status(value) when is_integer(value), do: Map.get(@statuses, value, :unknown)
+  def status(value) when value in [:active, :inactive, :ending], do: value
   def status(_other), do: :unknown
 
   @doc """

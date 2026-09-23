@@ -60,7 +60,7 @@ defmodule EDA.API.AutoModTest do
         json(conn, @rule_json)
       end)
 
-      assert {:ok, %EDA.AutoMod{id: "r1", trigger_type: 1}} = AutoMod.get_rule("g1", "r1")
+      assert {:ok, %EDA.AutoMod{id: "r1", trigger_type: :keyword}} = AutoMod.get_rule("g1", "r1")
     end
   end
 

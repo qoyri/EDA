@@ -54,7 +54,7 @@ defmodule EDA.API.AutoMod do
   """
   @spec create(String.t() | integer(), map()) :: {:ok, EDA.AutoMod.t()} | {:error, term()}
   def create(guild_id, params) do
-    case post("/guilds/#{guild_id}/auto-moderation/rules", params) do
+    case post("/guilds/#{guild_id}/auto-moderation/rules", encode_rule(params)) do
       {:ok, data} -> {:ok, EDA.AutoMod.from_raw(data)}
       error -> error
     end
@@ -69,7 +69,7 @@ defmodule EDA.API.AutoMod do
   @spec modify(String.t() | integer(), String.t() | integer(), map()) ::
           {:ok, EDA.AutoMod.t()} | {:error, term()}
   def modify(guild_id, rule_id, params) do
-    case patch("/guilds/#{guild_id}/auto-moderation/rules/#{rule_id}", params) do
+    case patch("/guilds/#{guild_id}/auto-moderation/rules/#{rule_id}", encode_rule(params)) do
       {:ok, data} -> {:ok, EDA.AutoMod.from_raw(data)}
       error -> error
     end
@@ -82,5 +82,47 @@ defmodule EDA.API.AutoMod do
       {:ok, _} -> :ok
       error -> error
     end
+  end
+
+  # The rule's enumerations may be given as atoms, and its actions and trigger metadata as
+  # structs; Discord wants the integers and plain maps.
+  defp encode_rule(params) do
+    params
+    |> Map.new()
+    |> EDA.Enum.encode(
+      event_type: &EDA.AutoMod.event_type_value/1,
+      trigger_type: &EDA.AutoMod.trigger_type_value/1
+    )
+    |> update_present(:actions, &Enum.map(&1, fn action -> encode_action(action) end))
+    |> update_present(:trigger_metadata, &encode_trigger_metadata/1)
+  end
+
+  defp encode_action(%EDA.AutoMod.Action{} = action), do: EDA.AutoMod.Action.to_map(action)
+
+  defp encode_action(action) when is_map(action),
+    do: EDA.Enum.encode(action, type: &EDA.AutoMod.Action.type_value/1)
+
+  defp encode_trigger_metadata(%EDA.AutoMod.TriggerMetadata{} = meta),
+    do: EDA.AutoMod.TriggerMetadata.to_map(meta)
+
+  defp encode_trigger_metadata(%{} = meta) do
+    Enum.reduce([:presets, "presets"], meta, fn key, acc ->
+      case acc do
+        %{^key => presets} when is_list(presets) ->
+          Map.put(acc, key, Enum.map(presets, &EDA.AutoMod.TriggerMetadata.preset_value/1))
+
+        _ ->
+          acc
+      end
+    end)
+  end
+
+  defp update_present(map, key, fun) do
+    Enum.reduce([key, Atom.to_string(key)], map, fn k, acc ->
+      case acc do
+        %{^k => value} when not is_nil(value) -> Map.put(acc, k, fun.(value))
+        _ -> acc
+      end
+    end)
   end
 end

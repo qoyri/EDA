@@ -85,7 +85,7 @@ defmodule EDA.UserPremiumTest do
           "collectibles" => %{"nameplate" => %{"asset" => "np"}}
         })
 
-      assert user.premium_type == 2
+      assert user.premium_type == :nitro
       assert user.mfa_enabled == true
       assert user.locale == "fr"
       assert user.verified == true

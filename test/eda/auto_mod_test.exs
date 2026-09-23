@@ -80,8 +80,8 @@ defmodule EDA.AutoModTest do
       assert rule.guild_id == "g1"
       assert rule.name == "Block bad words"
       assert rule.creator_id == "u1"
-      assert rule.event_type == 1
-      assert rule.trigger_type == 1
+      assert rule.event_type == :message_send
+      assert rule.trigger_type == :keyword
       assert rule.enabled == true
       assert rule.exempt_roles == ["role1"]
       assert rule.exempt_channels == ["chan1"]
@@ -93,7 +93,7 @@ defmodule EDA.AutoModTest do
       assert rule.trigger_metadata.allow_list == ["badge"]
 
       # Nested Actions
-      assert [%Action{type: 1}, %Action{type: 2}] = rule.actions
+      assert [%Action{type: :block_message}, %Action{type: :send_alert_message}] = rule.actions
       assert %ActionMetadata{custom_message: "Blocked!"} = hd(rule.actions).metadata
       assert %ActionMetadata{channel_id: "c1"} = List.last(rule.actions).metadata
     end
@@ -128,7 +128,7 @@ defmodule EDA.AutoModTest do
       }
 
       rule = AutoMod.from_raw(raw)
-      assert rule.trigger_metadata.presets == [1, 2, 3]
+      assert rule.trigger_metadata.presets == [:profanity, :sexual_content, :slurs]
       assert rule.trigger_metadata.allow_list == ["allowed"]
     end
   end
@@ -180,31 +180,31 @@ defmodule EDA.AutoModTest do
   describe "Action helpers" do
     test "block_message/0 creates type 1 with no metadata" do
       action = Action.block_message()
-      assert action.type == 1
+      assert action.type == :block_message
       assert action.metadata == nil
     end
 
     test "block_message/1 creates type 1 with custom message" do
       action = Action.block_message("Not allowed")
-      assert action.type == 1
+      assert action.type == :block_message
       assert action.metadata.custom_message == "Not allowed"
     end
 
     test "send_alert/1 creates type 2 with channel_id" do
       action = Action.send_alert("c1")
-      assert action.type == 2
+      assert action.type == :send_alert_message
       assert action.metadata.channel_id == "c1"
     end
 
     test "timeout/1 creates type 3 with duration" do
       action = Action.timeout(60)
-      assert action.type == 3
+      assert action.type == :timeout
       assert action.metadata.duration_seconds == 60
     end
 
     test "block_member_interaction/0 creates type 4 with no metadata" do
       action = Action.block_member_interaction()
-      assert action.type == 4
+      assert action.type == :block_member_interaction
       assert action.metadata == nil
     end
   end
