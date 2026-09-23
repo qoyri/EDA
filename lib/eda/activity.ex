@@ -17,7 +17,10 @@ defmodule EDA.Activity do
     :secrets,
     :instance,
     :flags,
-    :buttons
+    :buttons,
+    :status_display_type,
+    :details_url,
+    :state_url
   ]
 
   @type t :: %__MODULE__{
@@ -35,7 +38,10 @@ defmodule EDA.Activity do
           secrets: map() | nil,
           instance: boolean() | nil,
           flags: integer() | nil,
-          buttons: [map()] | nil
+          buttons: [map()] | nil,
+          status_display_type: non_neg_integer() | nil,
+          details_url: String.t() | nil,
+          state_url: String.t() | nil
         }
 
   @spec from_raw(map()) :: t()
@@ -55,7 +61,10 @@ defmodule EDA.Activity do
       secrets: raw["secrets"],
       instance: raw["instance"],
       flags: raw["flags"],
-      buttons: raw["buttons"]
+      buttons: raw["buttons"],
+      status_display_type: raw["status_display_type"],
+      details_url: raw["details_url"],
+      state_url: raw["state_url"]
     }
   end
 

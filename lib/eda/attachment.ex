@@ -46,7 +46,10 @@ defmodule EDA.Attachment do
     :ephemeral,
     :duration_secs,
     :waveform,
-    :flags
+    :flags,
+    :clip_participants,
+    :clip_created_at,
+    :application
   ]
 
   @type t :: %__MODULE__{
@@ -65,7 +68,10 @@ defmodule EDA.Attachment do
           ephemeral: boolean() | nil,
           duration_secs: number() | nil,
           waveform: String.t() | nil,
-          flags: integer() | nil
+          flags: integer() | nil,
+          clip_participants: [EDA.User.t()] | nil,
+          clip_created_at: String.t() | nil,
+          application: map() | nil
         }
 
   @max_description_length 1024
@@ -88,7 +94,10 @@ defmodule EDA.Attachment do
       ephemeral: raw["ephemeral"],
       duration_secs: raw["duration_secs"],
       waveform: raw["waveform"],
-      flags: raw["flags"]
+      flags: raw["flags"],
+      clip_participants: parse_users(raw["clip_participants"]),
+      clip_created_at: raw["clip_created_at"],
+      application: raw["application"]
     }
   end
 
@@ -286,4 +295,7 @@ defmodule EDA.Attachment do
   defp put_spoiler(_entry, other) do
     raise ArgumentError, "attachment :is_spoiler must be a boolean, got: #{inspect(other)}"
   end
+
+  defp parse_users(nil), do: nil
+  defp parse_users(list) when is_list(list), do: Enum.map(list, &EDA.User.from_raw/1)
 end

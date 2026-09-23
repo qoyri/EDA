@@ -99,6 +99,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- More fields Discord documents were dropped: a role's `flags` (selectable in an onboarding
+  prompt); a reaction's `count_details` (`%{burst: _, normal: _}`), `me_burst` and
+  `burst_colors`, without which a super reaction looked like a normal one; a clip attachment's
+  `clip_participants` (as `EDA.User` structs), `clip_created_at` and `application`; an
+  activity's `status_display_type`, `details_url` and `state_url`; a follower webhook's
+  `source_guild` and `source_channel`, and a webhook's `url`.
+
 - `EDA.Guild` kept 12 of the guild object's fields. It now keeps all of them: `features`,
   `premium_tier`, `premium_subscription_count`, `premium_progress_bar_enabled`, `banner`,
   `splash`, `discovery_splash`, `icon_hash`, `description`, `vanity_url_code`,
