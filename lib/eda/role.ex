@@ -312,4 +312,19 @@ defmodule EDA.Role do
       {:ok, entity}
     end
   end
+
+  @doc """
+  Reorders a guild's roles. Takes `[%{id: role_id, position: n}]`; returns every role, as
+  structs.
+  """
+  @spec modify_positions(String.t() | integer(), [map()]) :: {:ok, [t()]} | {:error, term()}
+  def modify_positions(guild_id, positions) do
+    case EDA.API.Role.modify_positions(guild_id, positions) do
+      {:ok, list} when is_list(list) ->
+        {:ok, Enum.map(list, &%{from_raw(&1) | guild_id: to_string(guild_id)})}
+
+      {:error, _} = err ->
+        err
+    end
+  end
 end

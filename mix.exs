@@ -111,6 +111,7 @@ defmodule EDA.MixProject do
           EDA.AuditLog.Change,
           EDA.AuditLog.Entry,
           EDA.AuditLog.Entry.Options,
+          EDA.Ban,
           EDA.AutoMod,
           EDA.AutoMod.Action,
           EDA.AutoMod.ActionMetadata,

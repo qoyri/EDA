@@ -342,4 +342,42 @@ defmodule EDA.Member do
       {:ok, entity}
     end
   end
+
+  @doc """
+  Lists one page of a guild's members. Takes `:limit` (1–1000) and `:after`. Needs the
+  `:guild_members` intent.
+  """
+  @spec list(String.t() | integer(), keyword()) :: {:ok, [t()]} | {:error, term()}
+  def list(guild_id, opts \\ []),
+    do: EDA.API.Member.list(guild_id, opts) |> parse_members(guild_id)
+
+  @doc "Searches a guild's members whose username or nickname starts with `query`. Takes `:limit`."
+  @spec search(String.t() | integer(), String.t(), keyword()) :: {:ok, [t()]} | {:error, term()}
+  def search(guild_id, query, opts \\ []),
+    do: EDA.API.Member.search(guild_id, query, opts) |> parse_members(guild_id)
+
+  @doc "A lazy stream of every member of a guild. Takes the options of `EDA.API.Member.stream/2`."
+  @spec stream(String.t() | integer(), keyword()) :: Enumerable.t()
+  def stream(guild_id, opts \\ []) do
+    guild_id
+    |> EDA.API.Member.stream(opts)
+    |> Stream.map(&%{from_raw(&1) | guild_id: to_string(guild_id)})
+  end
+
+  @doc "Moves a member to another voice channel, or disconnects them with `nil`."
+  @spec move_voice(String.t() | integer(), t() | String.t() | integer(), String.t() | nil) ::
+          {:ok, t()} | {:error, term()}
+  def move_voice(guild_id, %__MODULE__{user: %{id: uid}}, channel_id),
+    do: move_voice(guild_id, uid, channel_id)
+
+  def move_voice(guild_id, user_id, channel_id) do
+    EDA.API.Member.move_voice(guild_id, user_id, channel_id)
+    |> parse_response()
+    |> put_guild(guild_id)
+  end
+
+  defp parse_members({:ok, list}, guild_id) when is_list(list),
+    do: {:ok, Enum.map(list, &%{from_raw(&1) | guild_id: to_string(guild_id)})}
+
+  defp parse_members({:error, _} = err, _guild_id), do: err
 end

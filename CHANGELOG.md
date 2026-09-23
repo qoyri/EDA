@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `EDA.Ban`, a banned user and the reason, with `list/2`, `stream/2`, `fetch_ban/2`,
+  `create/3`, `remove/2` and `bulk/3`.
+- More typed calls: `EDA.Channel.create/3`, `start_thread/2` (from a message or not),
+  `create_post/3`, `thread_member/2`, `thread_members/1`, `active_threads/1`,
+  `archived_threads/3` and `stream_archived_threads/3`; `EDA.Member.list/2`, `search/3`,
+  `stream/2` and `move_voice/3`, their members carrying `guild_id`; `EDA.Invite.list_channel/1`
+  and `list_guild/1`; `EDA.Guild.integrations/1`, `welcome_screen/1`,
+  `modify_welcome_screen/2`, `modify_incident_actions/2` and `preview/1`;
+  `EDA.Role.modify_positions/2`; `EDA.User.me/0`, `modify_me/1`, `guilds/1` and
+  `stream_guilds/1`; `EDA.VoiceState.fetch_state/2`.
+
 - Typed calls for webhooks, scheduled events, stages, entitlements and soundboard sounds:
   `EDA.Webhook` (`create/2`, `list_channel/1`, `list_guild/1`, `fetch/1`, `modify/2`,
   `delete/1`, and `execute/2`, `fetch_message/2`, `edit_message/3`, `delete_message/2` with the
