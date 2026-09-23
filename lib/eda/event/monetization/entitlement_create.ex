@@ -1,12 +1,13 @@
 defmodule EDA.Event.EntitlementCreate do
-  @moduledoc "Dispatched when a user or guild gains an entitlement to one of the app's SKUs."
-  use EDA.Event.Access
+  @moduledoc """
+  Sent when a user or guild gains an entitlement to one of the app's SKUs. Delivers an
+  `EDA.Entitlement`, not a struct of its own.
 
-  defstruct [:entitlement]
+  The consumer receives `{:ENTITLEMENT_CREATE, %EDA.Entitlement{}}`. This module only parses the
+  payload.
+  """
 
-  @type t :: %__MODULE__{entitlement: EDA.Entitlement.t()}
-
-  @doc "Converts a raw Discord payload into this event struct."
-  @spec from_raw(map()) :: t()
-  def from_raw(raw) when is_map(raw), do: %__MODULE__{entitlement: EDA.Entitlement.from_raw(raw)}
+  @doc "Parses the `ENTITLEMENT_CREATE` payload into an `EDA.Entitlement`."
+  @spec from_raw(map()) :: EDA.Entitlement.t()
+  def from_raw(raw) when is_map(raw), do: EDA.Entitlement.from_raw(raw)
 end

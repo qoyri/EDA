@@ -66,6 +66,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Every event whose payload is an entity delivers the entity**, not a struct wrapping it:
+  `GUILD_ROLE_CREATE` and `_UPDATE` an `EDA.Role` (which gained `guild_id`, also set by a
+  guild's `roles`, `fetch_role/2`, `create/3`, `modify/4` and `set_colors/4`),
+  `VOICE_STATE_UPDATE` an `EDA.VoiceState`, `GUILD_SOUNDBOARD_SOUND_CREATE` and `_UPDATE` an
+  `EDA.SoundboardSound`, `AUTO_MODERATION_RULE_*` an `EDA.AutoMod`, `USER_UPDATE` an
+  `EDA.User`, `ENTITLEMENT_*` an `EDA.Entitlement`, `SUBSCRIPTION_*` an `EDA.Subscription`,
+  `INTEGRATION_CREATE` and `_UPDATE` an `EDA.Integration`,
+  `APPLICATION_COMMAND_PERMISSIONS_UPDATE` an `EDA.Command.Permissions`, and
+  `THREAD_MEMBER_UPDATE` an `EDA.Channel.ThreadMember` (which gained `guild_id`). Match
+  `{:USER_UPDATE, %EDA.User{} = user}` where you matched `%EDA.Event.UserUpdate{user: user}`.
+
 - A guild template's source guild reads its `roles` and `channels` as `EDA.Role` and
   `EDA.Channel` structs (with the template's placeholder integer ids) and its levels as the
   atoms `EDA.Guild` uses.

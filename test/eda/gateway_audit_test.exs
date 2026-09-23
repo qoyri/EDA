@@ -25,7 +25,7 @@ defmodule EDA.GatewayAuditTest do
       }
 
       for type <- ~w(ENTITLEMENT_CREATE ENTITLEMENT_UPDATE ENTITLEMENT_DELETE) do
-        assert %{entitlement: %EDA.Entitlement{id: "1", type: :application_subscription}} =
+        assert %EDA.Entitlement{id: "1", type: :application_subscription} =
                  EDA.Event.from_raw(type, raw)
       end
 
@@ -38,7 +38,7 @@ defmodule EDA.GatewayAuditTest do
 
     test "subscriptions reuse EDA.Subscription" do
       for type <- ~w(SUBSCRIPTION_CREATE SUBSCRIPTION_UPDATE SUBSCRIPTION_DELETE) do
-        assert %{subscription: %EDA.Subscription{id: "9"}} =
+        assert %EDA.Subscription{id: "9"} =
                  EDA.Event.from_raw(type, %{"id" => "9", "user_id" => "4", "status" => 0})
       end
     end
@@ -56,14 +56,13 @@ defmodule EDA.GatewayAuditTest do
         "scopes" => ["bot"]
       }
 
-      assert %EDA.Event.IntegrationCreate{guild_id: "6", integration: integration} =
-               EDA.Event.from_raw("INTEGRATION_CREATE", raw)
+      assert %EDA.Integration{guild_id: "6"} =
+               integration = EDA.Event.from_raw("INTEGRATION_CREATE", raw)
 
       assert %EDA.Integration{expire_behavior: :kick, scopes: ["bot"]} = integration
       assert EDA.Integration.application?(integration)
 
-      assert %EDA.Event.IntegrationUpdate{integration: %EDA.Integration{id: "5"}} =
-               EDA.Event.from_raw("INTEGRATION_UPDATE", raw)
+      assert %EDA.Integration{id: "5"} = EDA.Event.from_raw("INTEGRATION_UPDATE", raw)
 
       assert %EDA.Event.IntegrationDelete{id: "5", guild_id: "6", application_id: "7"} =
                EDA.Event.from_raw("INTEGRATION_DELETE", %{
@@ -89,7 +88,7 @@ defmodule EDA.GatewayAuditTest do
           ]
         })
 
-      assert %EDA.Event.ApplicationCommandPermissionsUpdate{permissions: perms} = event
+      assert %EDA.Command.Permissions{} = perms = event
       assert EDA.Command.Permissions.app_wide?(perms)
       [everyone, channels, user] = perms.permissions
       assert EDA.Command.Permissions.everyone?(everyone, "10")
@@ -158,7 +157,7 @@ defmodule EDA.GatewayAuditTest do
     end
 
     test "is typed" do
-      assert %EDA.Event.UserUpdate{user: %EDA.User{id: "999"}} =
+      assert %EDA.User{id: "999"} =
                EDA.Event.from_raw("USER_UPDATE", %{"id" => "999", "username" => "x"})
     end
 

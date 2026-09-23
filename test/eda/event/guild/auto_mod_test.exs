@@ -32,9 +32,9 @@ defmodule EDA.Event.AutoModTest do
   describe "AutoModRuleCreate.from_raw/1" do
     test "wraps raw payload as AutoMod struct" do
       event = AutoModRuleCreate.from_raw(@rule_raw)
-      assert %AutoModRuleCreate{} = event
-      assert %AutoMod{id: "r1", name: "Block spam"} = event.rule
-      assert event.rule.trigger_metadata.keyword_filter == ["spam"]
+      assert %AutoMod{} = event
+      assert %AutoMod{id: "r1", name: "Block spam"} = event
+      assert event.trigger_metadata.keyword_filter == ["spam"]
     end
   end
 
@@ -43,8 +43,8 @@ defmodule EDA.Event.AutoModTest do
   describe "AutoModRuleUpdate.from_raw/1" do
     test "wraps raw payload as AutoMod struct" do
       event = AutoModRuleUpdate.from_raw(@rule_raw)
-      assert %AutoModRuleUpdate{} = event
-      assert %AutoMod{id: "r1"} = event.rule
+      assert %AutoMod{} = event
+      assert %AutoMod{id: "r1"} = event
     end
   end
 
@@ -53,8 +53,8 @@ defmodule EDA.Event.AutoModTest do
   describe "AutoModRuleDelete.from_raw/1" do
     test "wraps raw payload as AutoMod struct" do
       event = AutoModRuleDelete.from_raw(@rule_raw)
-      assert %AutoModRuleDelete{} = event
-      assert %AutoMod{id: "r1"} = event.rule
+      assert %AutoMod{} = event
+      assert %AutoMod{id: "r1"} = event
     end
   end
 
@@ -103,17 +103,17 @@ defmodule EDA.Event.AutoModTest do
   describe "Event.from_raw/2 routing" do
     test "AUTO_MODERATION_RULE_CREATE" do
       result = Event.from_raw("AUTO_MODERATION_RULE_CREATE", @rule_raw)
-      assert %AutoModRuleCreate{} = result
+      assert %AutoMod{} = result
     end
 
     test "AUTO_MODERATION_RULE_UPDATE" do
       result = Event.from_raw("AUTO_MODERATION_RULE_UPDATE", @rule_raw)
-      assert %AutoModRuleUpdate{} = result
+      assert %AutoMod{} = result
     end
 
     test "AUTO_MODERATION_RULE_DELETE" do
       result = Event.from_raw("AUTO_MODERATION_RULE_DELETE", @rule_raw)
-      assert %AutoModRuleDelete{} = result
+      assert %AutoMod{} = result
     end
 
     test "AUTO_MODERATION_ACTION_EXECUTION" do

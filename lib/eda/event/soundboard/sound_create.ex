@@ -1,14 +1,13 @@
 defmodule EDA.Event.GuildSoundboardSoundCreate do
-  @moduledoc "Dispatched when a guild soundboard sound is created. Needs the `:guild_expressions` intent."
-  use EDA.Event.Access
+  @moduledoc """
+  Sent when a guild soundboard sound is created. Needs the `:guild_expressions` intent. Delivers
+  an `EDA.SoundboardSound`, not a struct of its own.
 
-  defstruct [:guild_id, :sound]
+  The consumer receives `{:GUILD_SOUNDBOARD_SOUND_CREATE, %EDA.SoundboardSound{}}`. This module
+  only parses the payload.
+  """
 
-  @type t :: %__MODULE__{guild_id: String.t() | nil, sound: EDA.SoundboardSound.t()}
-
-  @doc "Converts a raw Discord payload into this event struct."
-  @spec from_raw(map()) :: t()
-  def from_raw(raw) when is_map(raw) do
-    %__MODULE__{guild_id: raw["guild_id"], sound: EDA.SoundboardSound.from_raw(raw)}
-  end
+  @doc "Parses the `GUILD_SOUNDBOARD_SOUND_CREATE` payload into an `EDA.SoundboardSound`."
+  @spec from_raw(map()) :: EDA.SoundboardSound.t()
+  def from_raw(raw) when is_map(raw), do: EDA.SoundboardSound.from_raw(raw)
 end

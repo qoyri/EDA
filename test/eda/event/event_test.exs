@@ -150,7 +150,7 @@ defmodule EDA.EventTest do
       }
 
       result = Event.from_raw("VOICE_STATE_UPDATE", data)
-      assert %Event.VoiceStateUpdate{} = result
+      assert %EDA.VoiceState{} = result
       assert result.self_mute == true
       assert result.self_video == true
       assert result.channel_id == "vc1"

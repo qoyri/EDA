@@ -200,7 +200,7 @@ defmodule EDA.Guild do
       approximate_presence_count: raw["approximate_presence_count"],
       welcome_screen: EDA.Guild.WelcomeScreen.from_raw(raw["welcome_screen"]),
       incidents_data: EDA.Guild.IncidentsData.from_raw(raw["incidents_data"]),
-      roles: parse_list(raw["roles"], &EDA.Role.from_raw/1),
+      roles: parse_list(raw["roles"], &%{EDA.Role.from_raw(&1) | guild_id: raw["id"]}),
       emojis: parse_list(raw["emojis"], &EDA.Emoji.from_raw/1),
       stickers: parse_list(raw["stickers"], &EDA.Sticker.from_raw/1),
       joined_at: EDA.Timestamp.parse(raw["joined_at"]),

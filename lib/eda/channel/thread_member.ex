@@ -12,10 +12,11 @@ defmodule EDA.Channel.ThreadMember do
 
   use EDA.Event.Access
 
-  defstruct [:id, :user_id, :join_timestamp, :flags, :member]
+  defstruct [:id, :guild_id, :user_id, :join_timestamp, :flags, :member]
 
   @type t :: %__MODULE__{
           id: String.t() | nil,
+          guild_id: String.t() | nil,
           user_id: String.t() | nil,
           join_timestamp: DateTime.t() | nil,
           flags: non_neg_integer() | nil,
