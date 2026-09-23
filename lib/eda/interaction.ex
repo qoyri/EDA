@@ -44,15 +44,20 @@ defmodule EDA.Interaction do
       defer(interaction, ephemeral: true)
   """
 
+  alias EDA.Interaction.{CommandData, ComponentData, ModalSubmitData, Option}
+
   @type interaction :: map()
 
   # ── Accessors ───────────────────────────────────────────────────────
 
   @doc "Returns the command name from the interaction data."
   @spec command_name(interaction()) :: String.t() | nil
-  def command_name(%{data: %{"name" => name}}), do: name
-  def command_name(%{"data" => %{"name" => name}}), do: name
-  def command_name(_), do: nil
+  def command_name(interaction) do
+    case data(interaction) do
+      %CommandData{name: name} -> name
+      _ -> nil
+    end
+  end
 
   @doc """
   Returns the command type as an atom.
@@ -60,15 +65,16 @@ defmodule EDA.Interaction do
   - `:slash` (type 1, CHAT_INPUT)
   - `:user` (type 2, USER context menu)
   - `:message` (type 3, MESSAGE context menu)
+  - `:primary_entry_point` (type 4, an activity's launch command)
   """
-  @spec command_type(interaction()) :: :slash | :user | :message | nil
-  def command_type(%{data: %{"type" => 1}}), do: :slash
-  def command_type(%{data: %{"type" => 2}}), do: :user
-  def command_type(%{data: %{"type" => 3}}), do: :message
-  def command_type(%{"data" => %{"type" => 1}}), do: :slash
-  def command_type(%{"data" => %{"type" => 2}}), do: :user
-  def command_type(%{"data" => %{"type" => 3}}), do: :message
-  def command_type(_), do: nil
+  @spec command_type(interaction()) ::
+          :slash | :user | :message | :primary_entry_point | integer() | nil
+  def command_type(interaction) do
+    case data(interaction) do
+      %CommandData{type: type} -> type
+      _ -> nil
+    end
+  end
 
   @doc """
   Returns the interaction type as an atom.
@@ -105,8 +111,8 @@ defmodule EDA.Interaction do
   def get_option(interaction, name, default \\ nil) do
     options = get_flat_options(interaction)
 
-    case Enum.find(options, fn opt -> opt["name"] == name end) do
-      %{"value" => value} -> value
+    case Enum.find(options, &(&1.name == name)) do
+      %Option{value: value} when not is_nil(value) -> value
       _ -> default
     end
   end
@@ -120,8 +126,8 @@ defmodule EDA.Interaction do
   def get_options(interaction) do
     interaction
     |> get_flat_options()
-    |> Enum.filter(&Map.has_key?(&1, "value"))
-    |> Map.new(fn opt -> {opt["name"], opt["value"]} end)
+    |> Enum.reject(&is_nil(&1.value))
+    |> Map.new(&{&1.name, &1.value})
   end
 
   @doc """
@@ -130,35 +136,21 @@ defmodule EDA.Interaction do
   For sub_command_groups, returns `{group_name, sub_command_name}`.
   """
   @spec sub_command_name(interaction()) :: String.t() | {String.t(), String.t()} | nil
-  def sub_command_name(%{
-        data: %{
-          "options" => [
-            %{"type" => 2, "name" => group, "options" => [%{"type" => 1, "name" => sub} | _]} | _
-          ]
-        }
-      }) do
-    {group, sub}
-  end
+  def sub_command_name(interaction) do
+    case data(interaction) do
+      %CommandData{options: [%Option{type: :sub_command_group} = group | _]} ->
+        case group.options do
+          [%Option{type: :sub_command, name: sub} | _] -> {group.name, sub}
+          _ -> nil
+        end
 
-  def sub_command_name(%{data: %{"options" => [%{"type" => 1, "name" => name} | _]}}) do
-    name
-  end
+      %CommandData{options: [%Option{type: :sub_command, name: name} | _]} ->
+        name
 
-  def sub_command_name(%{
-        "data" => %{
-          "options" => [
-            %{"type" => 2, "name" => group, "options" => [%{"type" => 1, "name" => sub} | _]} | _
-          ]
-        }
-      }) do
-    {group, sub}
+      _ ->
+        nil
+    end
   end
-
-  def sub_command_name(%{"data" => %{"options" => [%{"type" => 1, "name" => name} | _]}}) do
-    name
-  end
-
-  def sub_command_name(_), do: nil
 
   @doc "Returns the user who triggered the interaction (works in both guild and DM)."
   @spec user(interaction()) :: EDA.User.t() | map() | nil
@@ -196,20 +188,14 @@ defmodule EDA.Interaction do
   def token(_), do: nil
 
   @doc """
-  Returns a resolved object by type and ID.
+  Returns a resolved object by type and ID, as its struct (`EDA.User`, `EDA.Member`,
+  `EDA.Role`, `EDA.Channel`, `EDA.Message` or `EDA.Attachment`).
 
-  Types: `"users"`, `"members"`, `"roles"`, `"channels"`, `"messages"`, `"attachments"`.
+  Types: `:users`, `:members`, `:roles`, `:channels`, `:messages`, `:attachments`, or the
+  same as strings.
   """
-  @spec resolved(interaction(), String.t(), String.t()) :: map() | nil
-  def resolved(%{data: %{"resolved" => resolved}}, type, id) do
-    get_in(resolved, [type, id])
-  end
-
-  def resolved(%{"data" => %{"resolved" => resolved}}, type, id) do
-    get_in(resolved, [type, id])
-  end
-
-  def resolved(_, _, _), do: nil
+  @spec resolved(interaction(), atom() | String.t(), String.t()) :: struct() | nil
+  def resolved(interaction, type, id), do: interaction |> resolved_map(type) |> Map.get(id)
 
   @doc """
   Returns the resolved channel with this ID, as an `EDA.Channel` struct.
@@ -224,10 +210,7 @@ defmodule EDA.Interaction do
   """
   @spec resolved_channel(interaction(), String.t()) :: EDA.Channel.t() | nil
   def resolved_channel(interaction, channel_id) do
-    case resolved(interaction, "channels", channel_id) do
-      nil -> nil
-      raw -> EDA.Channel.from_raw(raw)
-    end
+    resolved(interaction, :channels, channel_id)
   end
 
   @doc """
@@ -237,10 +220,7 @@ defmodule EDA.Interaction do
   """
   @spec resolved_channels(interaction()) :: [EDA.Channel.t()]
   def resolved_channels(interaction) do
-    interaction
-    |> resolved_map("channels")
-    |> Map.values()
-    |> Enum.map(&EDA.Channel.from_raw/1)
+    interaction |> resolved_map(:channels) |> Map.values()
   end
 
   @doc """
@@ -372,13 +352,27 @@ defmodule EDA.Interaction do
   def permission_list(interaction, channel_id),
     do: list_of(app_permissions(interaction, channel_id))
 
-  defp resolved_map(%{data: %{"resolved" => resolved}}, key) when is_map(resolved),
-    do: Map.get(resolved, key) || %{}
+  @resolved_keys %{
+    "users" => :users,
+    "members" => :members,
+    "roles" => :roles,
+    "channels" => :channels,
+    "messages" => :messages,
+    "attachments" => :attachments
+  }
 
-  defp resolved_map(%{"data" => %{"resolved" => resolved}}, key) when is_map(resolved),
-    do: Map.get(resolved, key) || %{}
+  defp resolved_map(interaction, key) when is_binary(key),
+    do: resolved_map(interaction, Map.get(@resolved_keys, key))
 
-  defp resolved_map(_interaction, _key), do: %{}
+  defp resolved_map(interaction, key) do
+    case data(interaction) do
+      %{resolved: %EDA.Resolved{} = resolved} when is_atom(key) and not is_nil(key) ->
+        Map.get(resolved, key, %{})
+
+      _ ->
+        %{}
+    end
+  end
 
   defp extract_bitset(nil, _key), do: nil
   defp extract_bitset(raw, key) when is_map(raw), do: parse_bitset(raw[key])
@@ -406,15 +400,22 @@ defmodule EDA.Interaction do
   Returns the target ID for user/message context menu commands.
   """
   @spec target_id(interaction()) :: String.t() | nil
-  def target_id(%{data: %{"target_id" => id}}), do: id
-  def target_id(%{"data" => %{"target_id" => id}}), do: id
-  def target_id(_), do: nil
+  def target_id(interaction) do
+    case data(interaction) do
+      %CommandData{target_id: id} -> id
+      _ -> nil
+    end
+  end
 
   @doc "Returns the custom_id for component interactions and modal submits."
   @spec custom_id(interaction()) :: String.t() | nil
-  def custom_id(%{data: %{"custom_id" => id}}), do: id
-  def custom_id(%{"data" => %{"custom_id" => id}}), do: id
-  def custom_id(_), do: nil
+  def custom_id(interaction) do
+    case data(interaction) do
+      %ComponentData{custom_id: id} -> id
+      %ModalSubmitData{custom_id: id} -> id
+      _ -> nil
+    end
+  end
 
   @doc """
   Returns the selected values from a select menu interaction.
@@ -427,30 +428,36 @@ defmodule EDA.Interaction do
       # => ["option_1", "option_2"]
   """
   @spec selected_values(interaction()) :: [String.t()]
-  def selected_values(%{data: %{"values" => values}}) when is_list(values), do: values
-  def selected_values(%{"data" => %{"values" => values}}) when is_list(values), do: values
-  def selected_values(_), do: []
+  def selected_values(interaction) do
+    case data(interaction) do
+      %ComponentData{values: values} when is_list(values) -> values
+      _ -> []
+    end
+  end
 
   @doc """
   Returns the component type for a message component interaction.
 
   Returns `nil` if not a component interaction.
 
-  Common types: `2` = button, `3` = string select, `5` = user select,
-  `6` = role select, `7` = mentionable select, `8` = channel select.
+  The kind is named as in `EDA.Component`: `:button`, `:string_select`, `:user_select`,
+  `:role_select`, `:mentionable_select`, `:channel_select`.
 
   ## Examples
 
       case EDA.Interaction.component_type(interaction) do
-        2 -> handle_button(interaction)
-        3 -> handle_select(interaction)
+        :button -> handle_button(interaction)
+        :string_select -> handle_select(interaction)
         _ -> :ignore
       end
   """
-  @spec component_type(interaction()) :: non_neg_integer() | nil
-  def component_type(%{data: %{"component_type" => t}}), do: t
-  def component_type(%{"data" => %{"component_type" => t}}), do: t
-  def component_type(_), do: nil
+  @spec component_type(interaction()) :: EDA.Component.type() | nil
+  def component_type(interaction) do
+    case data(interaction) do
+      %ComponentData{component_type: type} -> type
+      _ -> nil
+    end
+  end
 
   # ── Response Helpers ────────────────────────────────────────────────
 
@@ -702,19 +709,38 @@ defmodule EDA.Interaction do
 
   # ── Private ─────────────────────────────────────────────────────────
 
-  defp get_flat_options(%{data: %{"options" => options}}) when is_list(options) do
-    flatten_options(options)
+  @doc false
+  # The interaction's data as its struct, from an INTERACTION_CREATE event or a raw interaction
+  # map. A raw map without a type has its data's kind told from its shape.
+  @spec data(interaction()) :: struct() | map() | nil
+  def data(%{data: %_{} = data}), do: data
+  def data(%{data: raw} = interaction) when is_map(raw), do: parse_data(interaction, raw)
+  def data(%{"data" => raw} = interaction) when is_map(raw), do: parse_data(interaction, raw)
+  def data(_interaction), do: nil
+
+  defp parse_data(interaction, raw) do
+    type =
+      interaction_type(interaction) ||
+        cond do
+          Map.has_key?(raw, "components") -> :modal_submit
+          Enum.any?(~w(custom_id component_type values), &Map.has_key?(raw, &1)) -> :component
+          true -> :command
+        end
+
+    EDA.Event.InteractionCreate.parse_data(type, raw)
   end
 
-  defp get_flat_options(%{"data" => %{"options" => options}}) when is_list(options) do
-    flatten_options(options)
+  defp get_flat_options(interaction) do
+    case data(interaction) do
+      %CommandData{options: options} when is_list(options) -> flatten_options(options)
+      _ -> []
+    end
   end
-
-  defp get_flat_options(_), do: []
 
   defp flatten_options(options) do
     Enum.flat_map(options, fn
-      %{"type" => type, "options" => nested} when type in [1, 2] and is_list(nested) ->
+      %Option{type: type, options: nested}
+      when type in [:sub_command, :sub_command_group] and is_list(nested) ->
         flatten_options(nested)
 
       opt ->

@@ -479,12 +479,12 @@ defmodule EDA.InteractionTest do
 
   describe "component_type/1" do
     test "returns component type from interaction" do
-      assert component_type(%{data: %{"component_type" => 2}}) == 2
-      assert component_type(%{data: %{"component_type" => 3}}) == 3
+      assert component_type(%{data: %{"component_type" => 2}}) == :button
+      assert component_type(%{data: %{"component_type" => 3}}) == :string_select
     end
 
     test "returns component type from raw map" do
-      assert component_type(%{"data" => %{"component_type" => 5}}) == 5
+      assert component_type(%{"data" => %{"component_type" => 5}}) == :user_select
     end
 
     test "returns nil when not a component interaction" do

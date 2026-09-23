@@ -10,6 +10,10 @@ defmodule EDA.Event.InteractionCreate do
   `%{guild_install: guild_id, user_install: user_id}`. A key is missing when that installation
   was not involved, and the guild installation's value is `"0"` in a DM with the bot.
   `attachment_size_limit` is the largest upload the response may carry, in bytes.
+
+  `data` is an `EDA.Interaction.CommandData` for a command or its autocomplete, an
+  `EDA.Interaction.ComponentData` for a button or a select, and an
+  `EDA.Interaction.ModalSubmitData` for a modal.
   """
   use EDA.Event.Access
 
@@ -44,7 +48,11 @@ defmodule EDA.Event.InteractionCreate do
           id: String.t() | nil,
           application_id: String.t() | nil,
           type: :ping | :command | :component | :autocomplete | :modal_submit | integer() | nil,
-          data: map() | nil,
+          data:
+            EDA.Interaction.CommandData.t()
+            | EDA.Interaction.ComponentData.t()
+            | EDA.Interaction.ModalSubmitData.t()
+            | nil,
           guild_id: String.t() | nil,
           channel_id: String.t() | nil,
           member: EDA.Member.t() | nil,
@@ -69,7 +77,7 @@ defmodule EDA.Event.InteractionCreate do
       id: raw["id"],
       application_id: raw["application_id"],
       type: EDA.Enum.name(@types, raw["type"]),
-      data: raw["data"],
+      data: parse_data(raw["type"], raw["data"]),
       guild_id: raw["guild_id"],
       channel_id: raw["channel_id"],
       member: parse_member(raw["member"]),
@@ -94,6 +102,23 @@ defmodule EDA.Event.InteractionCreate do
 
   defp parse_context(nil), do: nil
   defp parse_context(value), do: Map.get(@contexts, value, value)
+
+  @doc false
+  # The data of an interaction, by its type (Discord's integer or EDA's atom). Shared with
+  # EDA.Interaction, which also reads raw interaction maps.
+  def parse_data(_type, nil), do: nil
+  def parse_data(_type, %_{} = data), do: data
+
+  def parse_data(type, raw) when type in [2, 4, :command, :autocomplete],
+    do: EDA.Interaction.CommandData.from_raw(raw)
+
+  def parse_data(type, raw) when type in [3, :component],
+    do: EDA.Interaction.ComponentData.from_raw(raw)
+
+  def parse_data(type, raw) when type in [5, :modal_submit],
+    do: EDA.Interaction.ModalSubmitData.from_raw(raw)
+
+  def parse_data(_type, raw), do: raw
 
   @doc false
   # The interaction type as EDA names it, shared with EDA.Message.InteractionMetadata.

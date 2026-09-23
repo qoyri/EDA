@@ -33,6 +33,8 @@ defmodule EDA.Component do
   The components of a received message are structs, one per kind: `EDA.Component.ActionRow`,
   `Button`, `SelectMenu` (with its `SelectOption`s), `Section`, `TextDisplay`, `Thumbnail`,
   `MediaGallery`, `File`, `Separator` and `Container`, their images an `EDA.Component.Media`.
+  A submitted modal adds `Label`, `TextInput`, `FileUpload`, `RadioGroup`, `CheckboxGroup` and
+  `Checkbox`, each with the `value` or `values` the user gave.
   Each has its `type` as an atom, Discord's name lowercased (`:action_row`, `:string_select`…),
   and the `id` Discord numbers it with. A kind EDA does not know yet stays the raw map.
 
@@ -98,7 +100,13 @@ defmodule EDA.Component do
     12 => EDA.Component.MediaGallery,
     13 => EDA.Component.File,
     14 => EDA.Component.Separator,
-    17 => EDA.Component.Container
+    17 => EDA.Component.Container,
+    4 => EDA.Component.TextInput,
+    18 => EDA.Component.Label,
+    19 => EDA.Component.FileUpload,
+    21 => EDA.Component.RadioGroup,
+    22 => EDA.Component.CheckboxGroup,
+    23 => EDA.Component.Checkbox
   }
 
   @typedoc "A component's kind, Discord's name lowercased; a kind added later stays its integer."
@@ -139,6 +147,12 @@ defmodule EDA.Component do
           | EDA.Component.File.t()
           | EDA.Component.Separator.t()
           | EDA.Component.Container.t()
+          | EDA.Component.TextInput.t()
+          | EDA.Component.Label.t()
+          | EDA.Component.FileUpload.t()
+          | EDA.Component.RadioGroup.t()
+          | EDA.Component.CheckboxGroup.t()
+          | EDA.Component.Checkbox.t()
           | map()
 
   # ── Button Styles ──────────────────────────────────────────────────
@@ -191,6 +205,15 @@ defmodule EDA.Component do
   def parse_emoji(raw), do: EDA.Emoji.from_raw(raw)
 
   @doc false
+  def parse_options(nil), do: nil
+  def parse_options(list), do: Enum.map(list, &EDA.Component.SelectOption.from_raw/1)
+
+  @text_input_styles %{1 => :short, 2 => :paragraph}
+
+  @doc false
+  def text_input_style(style), do: EDA.Enum.name(@text_input_styles, style)
+
+  @doc false
   def type_name(type), do: EDA.Enum.name(@type_names, type)
 
   @doc false
@@ -212,7 +235,7 @@ defmodule EDA.Component do
     component
     |> Map.from_struct()
     |> Enum.reduce(%{}, fn {key, value}, acc ->
-      case encode_field(key, value) do
+      case encode_field(component, key, value) do
         nil -> acc
         encoded -> Map.put(acc, key, encoded)
       end
@@ -221,13 +244,18 @@ defmodule EDA.Component do
 
   def to_raw(map) when is_map(map), do: map
 
-  defp encode_field(_key, nil), do: nil
+  defp encode_field(_component, _key, nil), do: nil
 
-  defp encode_field(:type, type) when is_atom(type),
+  defp encode_field(_component, :type, type) when is_atom(type),
     do: EDA.Enum.value!(@type_names, type, "component type")
 
-  defp encode_field(:style, style) when is_atom(style),
+  defp encode_field(%EDA.Component.TextInput{}, :style, style) when is_atom(style),
+    do: EDA.Enum.value!(@text_input_styles, style, "text input style")
+
+  defp encode_field(_component, :style, style) when is_atom(style),
     do: EDA.Enum.value!(@button_style_names, style, "button style")
+
+  defp encode_field(_component, key, value), do: encode_field(key, value)
 
   defp encode_field(:spacing, spacing) when is_atom(spacing),
     do: EDA.Enum.value!(@separator_spacing_names, spacing, "separator spacing")

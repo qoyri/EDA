@@ -4,7 +4,8 @@ defmodule EDA.Component.SelectMenu do
   `:role_select`, `:mentionable_select` or `:channel_select`, which Discord fills itself.
 
   `default_values` are `{:user, id}`, `{:role, id}` or `{:channel, id}` tuples, the shape
-  `EDA.Component.mentionable_select/2` takes them in.
+  `EDA.Component.mentionable_select/2` takes them in. In a component interaction or a modal
+  submission, `values` are the choices made.
   """
 
   use EDA.Event.Access
@@ -22,7 +23,8 @@ defmodule EDA.Component.SelectMenu do
     :min_values,
     :max_values,
     :required,
-    :disabled
+    :disabled,
+    :values
   ]
 
   @type t :: %__MODULE__{
@@ -36,7 +38,8 @@ defmodule EDA.Component.SelectMenu do
           min_values: non_neg_integer() | nil,
           max_values: non_neg_integer() | nil,
           required: boolean() | nil,
-          disabled: boolean()
+          disabled: boolean(),
+          values: [String.t()] | nil
         }
 
   @doc false
@@ -46,19 +49,17 @@ defmodule EDA.Component.SelectMenu do
       type: Component.type_name(raw["type"]),
       id: raw["id"],
       custom_id: raw["custom_id"],
-      options: parse_options(raw["options"]),
+      options: Component.parse_options(raw["options"]),
       channel_types: parse_channel_types(raw["channel_types"]),
       placeholder: raw["placeholder"],
       default_values: parse_default_values(raw["default_values"]),
       min_values: raw["min_values"],
       max_values: raw["max_values"],
       required: raw["required"],
-      disabled: raw["disabled"] == true
+      disabled: raw["disabled"] == true,
+      values: raw["values"]
     }
   end
-
-  defp parse_options(nil), do: nil
-  defp parse_options(list), do: Enum.map(list, &EDA.Component.SelectOption.from_raw/1)
 
   defp parse_channel_types(nil), do: nil
   defp parse_channel_types(list), do: Enum.map(list, &EDA.Channel.type_name/1)

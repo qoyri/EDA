@@ -59,6 +59,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **An interaction's `data` is a struct**, one per shape: `EDA.Interaction.CommandData` for a
+  command or its autocomplete (`type` `:slash`, `:user`, `:message` or `:primary_entry_point`,
+  `options` as `EDA.Interaction.Option`s with their `type` an atom), `ComponentData` for a
+  button or a select, `ModalSubmitData` for a modal, whose components are `EDA.Component`
+  structs, now including the modal ones (`Label`, `TextInput`, `FileUpload`, `RadioGroup`,
+  `CheckboxGroup`, `Checkbox`). `resolved` is an `EDA.Resolved`. The `EDA.Interaction` and
+  `EDA.Modal` helpers read the event or a raw interaction map alike;
+  `EDA.Interaction.resolved/3` returns the struct and takes `:users`-style atoms as well as
+  strings, and `component_type/1` returns the atom (`:button`, `:string_select`…).
+
 - **A role's `tags` and an activity's parts are structs.** `EDA.Role.Tags` reads the keys
   Discord marks by sending them as `null` (`premium_subscriber`, `available_for_purchase`,
   `guild_connections`) as booleans. An activity's `timestamps` is an
