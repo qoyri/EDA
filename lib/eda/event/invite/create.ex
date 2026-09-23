@@ -1,33 +1,14 @@
 defmodule EDA.Event.InviteCreate do
-  @moduledoc "Dispatched when a new invite is created."
-  use EDA.Event.Access
-  defstruct [:channel_id, :code, :guild_id, :inviter, :max_age, :max_uses, :temporary, :uses]
+  @moduledoc """
+  Sent when an invite is created. Delivers an `EDA.Invite`, not a struct of its own.
 
-  @type t :: %__MODULE__{
-          channel_id: String.t() | nil,
-          code: String.t() | nil,
-          guild_id: String.t() | nil,
-          inviter: EDA.User.t() | nil,
-          max_age: integer() | nil,
-          max_uses: integer() | nil,
-          temporary: boolean() | nil,
-          uses: integer() | nil
-        }
-  @doc "Converts a raw Discord payload into this event struct."
-  @spec from_raw(map()) :: t()
-  def from_raw(raw) when is_map(raw) do
-    %__MODULE__{
-      channel_id: raw["channel_id"],
-      code: raw["code"],
-      guild_id: raw["guild_id"],
-      inviter: parse_user(raw["inviter"]),
-      max_age: raw["max_age"],
-      max_uses: raw["max_uses"],
-      temporary: raw["temporary"],
-      uses: raw["uses"]
-    }
-  end
+  The consumer receives `{:INVITE_CREATE, %EDA.Invite{}}` with every field Discord sent —
+  `expires_at`, `created_at`, the target and the roles it grants among them, which the event
+  used to drop — so `EDA.Invite.url/1` and the other invite functions take it as is. The roles
+  arrive as `role_ids`; `roles` is `nil`. This module only parses the payload.
+  """
 
-  defp parse_user(nil), do: nil
-  defp parse_user(raw) when is_map(raw), do: EDA.User.from_raw(raw)
+  @doc "Parses the `INVITE_CREATE` payload into an `EDA.Invite`."
+  @spec from_raw(map()) :: EDA.Invite.t()
+  def from_raw(raw) when is_map(raw), do: EDA.Invite.from_raw(raw)
 end

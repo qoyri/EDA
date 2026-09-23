@@ -38,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`INVITE_CREATE` delivers an `EDA.Invite`**, instead of a struct of its own. `EDA.Invite` gains
+  `role_ids`, filled from the event's `role_ids` or from the partial roles the REST routes send.
+
 - **`EDA.Channel` groups what only one kind of channel has** into `thread`, `forum`, `voice` and
   `dm`, each `nil` on another kind:
   - `channel.thread` — `EDA.Channel.Thread`, with `thread_metadata` flattened into it
@@ -85,6 +88,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with string keys keeps working, as on every other nested object.
 
 ### Fixed
+
+- `INVITE_CREATE` dropped `expires_at`, `created_at`, `target_type`, `target_user`,
+  `target_application` and the roles the invite grants, all of which a bot tracking its invites
+  needs.
 
 - A change to a forum's tags, a channel's flags or a voice channel's region was invisible in
   `CHANNEL_UPDATE`, whose struct dropped them. `EDA.Channel` also gained what it never kept:

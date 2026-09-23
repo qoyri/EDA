@@ -23,6 +23,7 @@ defmodule EDA.Invite do
     :target_type,
     :target_application,
     :roles,
+    :role_ids,
     :flags,
     :expires_at,
     :created_at,
@@ -47,6 +48,7 @@ defmodule EDA.Invite do
           target_type: integer() | nil,
           target_application: map() | nil,
           roles: [EDA.Role.t()] | nil,
+          role_ids: [String.t()] | nil,
           flags: integer() | nil,
           expires_at: String.t() | nil,
           created_at: String.t() | nil,
@@ -76,6 +78,7 @@ defmodule EDA.Invite do
       target_type: raw["target_type"],
       target_application: raw["target_application"],
       roles: parse_roles(raw["roles"]),
+      role_ids: raw["role_ids"] || role_ids(raw["roles"]),
       flags: raw["flags"],
       expires_at: raw["expires_at"],
       created_at: raw["created_at"],
@@ -94,6 +97,11 @@ defmodule EDA.Invite do
 
   defp parse_user(nil), do: nil
   defp parse_user(raw) when is_map(raw), do: EDA.User.from_raw(raw)
+
+  # INVITE_CREATE sends role_ids; the REST routes send partial roles instead. Either way the ids
+  # are in role_ids.
+  defp role_ids(nil), do: nil
+  defp role_ids(list) when is_list(list), do: Enum.map(list, & &1["id"])
 
   defp parse_roles(nil), do: nil
   defp parse_roles(list) when is_list(list), do: Enum.map(list, &EDA.Role.from_raw/1)

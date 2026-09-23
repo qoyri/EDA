@@ -121,7 +121,7 @@ defmodule EDA.Event do
           | EDA.Event.ChannelPinsUpdate.t()
           | EDA.Event.GuildBanAdd.t()
           | EDA.Event.GuildBanRemove.t()
-          | EDA.Event.InviteCreate.t()
+          | EDA.Invite.t()
           | EDA.Event.InviteDelete.t()
           | EDA.Event.ThreadListSync.t()
           | EDA.Event.ThreadMemberUpdate.t()
