@@ -273,6 +273,114 @@ defmodule EDA.Guild do
 
   def system_channel_flag?(_, _flag), do: false
 
+  # ── Features and limits ──
+
+  @doc """
+  Whether the guild has a feature, by Discord's name as an atom or a string.
+
+      iex> EDA.Guild.feature?(%EDA.Guild{features: ["COMMUNITY", "NEWS"]}, :community)
+      true
+      iex> EDA.Guild.feature?(%EDA.Guild{features: ["COMMUNITY"]}, "VANITY_URL")
+      false
+  """
+  @spec feature?(t(), atom() | String.t()) :: boolean()
+  def feature?(%__MODULE__{features: features}, feature) when is_atom(feature),
+    do: feature?(%__MODULE__{features: features}, feature |> Atom.to_string() |> String.upcase())
+
+  def feature?(%__MODULE__{features: features}, feature) when is_binary(feature),
+    do: feature in (features || [])
+
+  @tier_limits %{
+    none: %{file: 10, bitrate: 96_000, emojis: 50, stickers: 5},
+    tier_1: %{file: 10, bitrate: 128_000, emojis: 100, stickers: 15},
+    tier_2: %{file: 50, bitrate: 256_000, emojis: 150, stickers: 30},
+    tier_3: %{file: 100, bitrate: 384_000, emojis: 250, stickers: 60}
+  }
+
+  @doc """
+  The largest file members can upload, in bytes: 10 MiB, then 50 MiB at boost level 2 and
+  100 MiB at level 3. A user's Nitro can raise their own limit; an interaction carries the
+  exact one as `attachment_size_limit`.
+
+      iex> EDA.Guild.max_file_size(%EDA.Guild{premium_tier: :tier_2})
+      52_428_800
+  """
+  @spec max_file_size(t()) :: pos_integer()
+  def max_file_size(%__MODULE__{} = guild), do: limit(guild, :file) * 1024 * 1024
+
+  @doc """
+  The highest bitrate a voice channel can be set to, in bits per second: 96 kbps, then 128,
+  256 and 384 by boost level, or 384 with the `VIP_REGIONS` feature.
+  """
+  @spec max_bitrate(t()) :: pos_integer()
+  def max_bitrate(%__MODULE__{} = guild) do
+    if feature?(guild, :vip_regions), do: 384_000, else: limit(guild, :bitrate)
+  end
+
+  @doc """
+  How many custom emojis the guild can have, of each kind (static and animated): 50, then 100,
+  150 and 250 by boost level, and at least 200 with the `MORE_EMOJI` feature.
+  """
+  @spec max_emojis(t()) :: pos_integer()
+  def max_emojis(%__MODULE__{} = guild) do
+    if feature?(guild, :more_emoji),
+      do: max(200, limit(guild, :emojis)),
+      else: limit(guild, :emojis)
+  end
+
+  @doc """
+  How many stickers the guild can have: 5, then 15, 30 and 60 by boost level, or 60 with the
+  `MORE_STICKERS` feature.
+  """
+  @spec max_stickers(t()) :: pos_integer()
+  def max_stickers(%__MODULE__{} = guild) do
+    if feature?(guild, :more_stickers), do: 60, else: limit(guild, :stickers)
+  end
+
+  defp limit(%__MODULE__{premium_tier: tier}, key),
+    do: Map.get(@tier_limits, tier, @tier_limits.none) |> Map.fetch!(key)
+
+  # ── Roles and the bot ──
+
+  @doc """
+  The guild's `@everyone` role, whose id is the guild's: from the guild's `roles`, else the
+  role cache.
+  """
+  @spec everyone_role(t() | String.t()) :: EDA.Role.t() | nil
+  def everyone_role(%__MODULE__{id: id, roles: roles}) when is_list(roles),
+    do: Enum.find(roles, &(&1.id == id)) || everyone_role(id)
+
+  def everyone_role(%__MODULE__{id: id}), do: everyone_role(id)
+
+  def everyone_role(guild_id) when is_binary(guild_id) do
+    case EDA.Cache.Role.get(guild_id, guild_id) do
+      nil -> nil
+      raw -> %{EDA.Role.from_raw(raw) | guild_id: guild_id}
+    end
+  end
+
+  @doc """
+  The guild's roles, highest first as Discord orders them: from the guild's `roles`, else the
+  role cache.
+  """
+  @spec sorted_roles(t() | String.t()) :: [EDA.Role.t()]
+  def sorted_roles(%__MODULE__{roles: roles}) when is_list(roles),
+    do: Enum.sort_by(roles, &EDA.Role.rank/1, :desc)
+
+  def sorted_roles(%__MODULE__{id: id}), do: sorted_roles(id)
+
+  def sorted_roles(guild_id) when is_binary(guild_id) do
+    guild_id
+    |> EDA.Cache.roles()
+    |> Enum.map(&%{EDA.Role.from_raw(&1) | guild_id: guild_id})
+    |> Enum.sort_by(&EDA.Role.rank/1, :desc)
+  end
+
+  @doc "The bot's own member in the guild, from the cache, or `nil`."
+  @spec me(t() | String.t()) :: EDA.Member.t() | nil
+  def me(%__MODULE__{id: id}), do: me(id)
+  def me(guild_id) when is_binary(guild_id), do: EDA.Member.bot_member(guild_id)
+
   # ── Entity Manager ──
 
   use EDA.Entity

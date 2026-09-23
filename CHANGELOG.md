@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A guild's features and limits: `EDA.Guild.feature?/2` (`:community` or `"COMMUNITY"`),
+  `max_file_size/1`, `max_bitrate/1`, `max_emojis/1` and `max_stickers/1`, from the boost level
+  and the features that raise them (`VIP_REGIONS`, `MORE_EMOJI`, `MORE_STICKERS`);
+  `everyone_role/1`, `sorted_roles/1` (highest first) and `me/1`, the bot's member.
+
 - Reading a message: `EDA.Message.url/1` and `parse_link/1` (any of Discord's domains, `@me`
   for a DM), `mentions?/2` (a user, member, role or `:everyone`), `invites/1` (the invite codes
   it links to), `webhook?/1`, `system?/1`, `deletable?/1` (six system types cannot be deleted,
