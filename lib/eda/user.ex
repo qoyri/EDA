@@ -2,8 +2,6 @@ defmodule EDA.User do
   @moduledoc "Represents a Discord user."
   use EDA.Event.Access
 
-  @discord_cdn "https://cdn.discordapp.com"
-
   defstruct [
     :id,
     :username,
@@ -141,18 +139,40 @@ defmodule EDA.User do
   @doc """
   Returns the CDN URL for the user's avatar, or `nil` if none set.
 
-  Accepts both `%EDA.User{}` structs and raw maps (from cache).
+  An animated avatar (its hash starts with `a_`) comes as a GIF unless another format is asked
+  for. Accepts both `%EDA.User{}` structs and raw maps (from cache).
+
+  ## Options
+
+  - `:format` — `:png`, `:jpg`, `:webp` or `:gif`. Defaults to `:gif` when the image is animated
+    and `:png` otherwise; `:webp` of an animated image stays animated (Discord recommends it for
+    animated images). `:gif` of a still image raises, since Discord answers 415
+  - `:size` — a power of two from 16 to 4096
+  - `:animated` — `false` for the still of an animated image
+
+  ## Examples
+
+      iex> EDA.User.avatar_url(%EDA.User{id: "1", avatar: "abc"})
+      "https://cdn.discordapp.com/avatars/1/abc.png"
+
+      iex> EDA.User.avatar_url(%EDA.User{id: "1", avatar: "a_abc"}, size: 256)
+      "https://cdn.discordapp.com/avatars/1/a_abc.gif?size=256"
+
+      iex> EDA.User.avatar_url(%EDA.User{id: "1", avatar: "a_abc"}, format: :webp)
+      "https://cdn.discordapp.com/avatars/1/a_abc.webp?animated=true"
   """
-  @spec avatar_url(t() | map()) :: String.t() | nil
-  def avatar_url(%__MODULE__{avatar: nil}), do: nil
+  @spec avatar_url(t() | map(), keyword()) :: String.t() | nil
+  def avatar_url(user, opts \\ [])
 
-  def avatar_url(%__MODULE__{id: id, avatar: avatar}),
-    do: "#{@discord_cdn}/avatars/#{id}/#{avatar}.png"
+  def avatar_url(%__MODULE__{avatar: nil}, _opts), do: nil
 
-  def avatar_url(%{"avatar" => nil}), do: nil
+  def avatar_url(%__MODULE__{id: id, avatar: avatar}, opts),
+    do: EDA.CDN.url("avatars/#{id}/#{avatar}", EDA.CDN.animated_hash?(avatar), opts)
 
-  def avatar_url(%{"avatar" => a, "id" => id}) when is_binary(a),
-    do: "#{@discord_cdn}/avatars/#{id}/#{a}.png"
+  def avatar_url(%{"avatar" => nil}, _opts), do: nil
+
+  def avatar_url(%{"avatar" => a, "id" => id}, opts) when is_binary(a),
+    do: EDA.CDN.url("avatars/#{id}/#{a}", EDA.CDN.animated_hash?(a), opts)
 
   @doc """
   URL of the user's server tag badge, or `nil`.

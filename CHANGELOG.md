@@ -112,6 +112,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `EDA.User.avatar_url/1` returned `.png` for every avatar, animated ones included, and neither
+  it, `EDA.Guild.icon_url/1` nor `EDA.Emoji.image_url/1` took a size. All three now take options:
+  `:format` (`:png`, `:jpg`, `:webp`, `:gif`), `:size` (a power of two from 16 to 4096) and
+  `animated: false`. An animated image defaults to GIF, and `:webp` keeps it animated, as Discord
+  recommends. Asking for the GIF of a still image raises, since the CDN answers 415, as does an
+  invalid size or format. Every URL was checked against the CDN.
+
 - `EDA.API.Guild.audit_log/2` returned the entries with their `users` and `webhooks` only. It
   now also returns the `application_commands`, `auto_moderation_rules`,
   `guild_scheduled_events`, `integrations` and `threads` Discord sends alongside, so an entry's

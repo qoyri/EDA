@@ -24,8 +24,6 @@ defmodule EDA.Emoji do
           available: boolean() | nil
         }
 
-  @discord_cdn "https://cdn.discordapp.com"
-
   @doc """
   Converts a raw Discord emoji map into this struct.
 
@@ -122,7 +120,17 @@ defmodule EDA.Emoji do
   Returns the CDN URL for a custom emoji image.
 
   Returns `nil` for unicode emojis.
-  Animated emojis get a `.gif` extension, others get `.png`.
+  Animated emojis get a `.gif` extension, others get `.png`, unless another format is asked for.
+  Discord recommends `format: :webp` for emojis.
+
+  ## Options
+
+  - `:format` — `:png`, `:jpg`, `:webp` or `:gif`. Defaults to `:gif` when the image is animated
+    and `:png` otherwise; `:webp` of an animated image stays animated (Discord recommends it for
+    animated images). `:gif` of a still image raises, since Discord answers 415
+  - `:size` — a power of two from 16 to 4096
+  - `:animated` — `false` for the still of an animated image
+
 
   ## Examples
 
@@ -135,10 +143,12 @@ defmodule EDA.Emoji do
       iex> EDA.Emoji.image_url(%EDA.Emoji{id: nil, name: "👍"})
       nil
   """
-  @spec image_url(t()) :: String.t() | nil
-  def image_url(%__MODULE__{id: nil}), do: nil
-  def image_url(%__MODULE__{id: id, animated: true}), do: "#{@discord_cdn}/emojis/#{id}.gif"
-  def image_url(%__MODULE__{id: id}), do: "#{@discord_cdn}/emojis/#{id}.png"
+  @spec image_url(t(), keyword()) :: String.t() | nil
+  def image_url(emoji, opts \\ [])
+  def image_url(%__MODULE__{id: nil}, _opts), do: nil
+
+  def image_url(%__MODULE__{id: id, animated: animated}, opts),
+    do: EDA.CDN.url("emojis/#{id}", animated == true, opts)
 
   defp parse_user(nil), do: nil
   defp parse_user(raw) when is_map(raw), do: EDA.User.from_raw(raw)

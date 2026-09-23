@@ -312,17 +312,31 @@ defmodule EDA.Guild do
     end
   end
 
-  @discord_cdn "https://cdn.discordapp.com"
-
   @doc """
   Returns the CDN URL for the guild's icon, or `nil` if the guild has no icon.
 
+  An animated icon comes as a GIF unless another format is asked for.
+
+  ## Options
+
+  - `:format` — `:png`, `:jpg`, `:webp` or `:gif`. Defaults to `:gif` when the image is animated
+    and `:png` otherwise; `:webp` of an animated image stays animated (Discord recommends it for
+    animated images). `:gif` of a still image raises, since Discord answers 415
+  - `:size` — a power of two from 16 to 4096
+  - `:animated` — `false` for the still of an animated image
+
   ## Examples
 
-      EDA.Guild.icon_url(guild)
-      #=> "https://cdn.discordapp.com/icons/123/abc.png"
+      iex> EDA.Guild.icon_url(%EDA.Guild{id: "123", icon: "abc"})
+      "https://cdn.discordapp.com/icons/123/abc.png"
+
+      iex> EDA.Guild.icon_url(%EDA.Guild{id: "123", icon: "a_abc"}, format: :webp, size: 64)
+      "https://cdn.discordapp.com/icons/123/a_abc.webp?size=64&animated=true"
   """
-  @spec icon_url(t()) :: String.t() | nil
-  def icon_url(%__MODULE__{icon: nil}), do: nil
-  def icon_url(%__MODULE__{id: id, icon: icon}), do: "#{@discord_cdn}/icons/#{id}/#{icon}.png"
+  @spec icon_url(t(), keyword()) :: String.t() | nil
+  def icon_url(guild, opts \\ [])
+  def icon_url(%__MODULE__{icon: nil}, _opts), do: nil
+
+  def icon_url(%__MODULE__{id: id, icon: icon}, opts),
+    do: EDA.CDN.url("icons/#{id}/#{icon}", EDA.CDN.animated_hash?(icon), opts)
 end
