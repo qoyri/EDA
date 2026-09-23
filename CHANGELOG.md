@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the struct, where they used to parse the payload again: a `GUILD_CREATE` went from 1.24 ms to
   0.7 ms on real guilds. `EDA.Collector` now receives an event only when a collector awaits its
   type; every event used to be copied to the collector process whether or not one did.
+- **The consumer receives each event sooner.** Its handler runs in a process spawned directly,
+  where a call to `Task.Supervisor.start_child/2` on every event took 5 µs and made one
+  supervisor the queue of every shard. When the application stops, EDA still waits up to five
+  seconds for the handlers still running, as the supervisor did. Measured through the whole path on real events: a message dispatched in about
+  14 µs instead of 19, a presence in 7.5 instead of 12, a `GUILD_CREATE` in 0.63 ms instead of
+  1.24.
 
 ## [0.5.0-beta.3] - 2026-09-23
 

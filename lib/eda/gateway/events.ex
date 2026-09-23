@@ -106,7 +106,15 @@ defmodule EDA.Gateway.Events do
     else
       :counters.add(counter, 1, 1)
 
-      Task.Supervisor.start_child(EDA.Gateway.TaskSupervisor, fn ->
+      # A plain process rather than a Task.Supervisor child: no call to a supervisor on every event,
+      # which cost 5 µs and made one process the queue of every shard. EDA.Gateway.EventDrain waits
+      # for the running handlers when the application stops. $callers and $ancestors are set as a
+      # Task would, for tools that follow them (a database sandbox in tests, for instance).
+      callers = [self() | Process.get(:"$callers", [])]
+
+      :proc_lib.spawn(fn ->
+        Process.put(:"$callers", callers)
+
         try do
           consumer.handle_event(event)
         catch

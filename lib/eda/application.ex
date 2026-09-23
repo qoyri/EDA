@@ -46,8 +46,11 @@ defmodule EDA.Application do
       # Auto-delete message scheduler
       EDA.AutoDelete,
 
-      # Task supervisor for event dispatch
+      # Task supervisor for background jobs (auto-delete)
       {Task.Supervisor, name: EDA.Gateway.TaskSupervisor},
+
+      # Waits for the consumer's running handlers when the application stops
+      EDA.Gateway.EventDrain,
 
       # Member chunker for OP 8 (Request Guild Members)
       EDA.Gateway.MemberChunker,
