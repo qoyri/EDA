@@ -124,6 +124,7 @@ defmodule EDA.MixProject do
           EDA.Channel.Voice,
           EDA.Command,
           EDA.Command.Option,
+          EDA.Command.Option.Choice,
           EDA.Command.Permissions,
           EDA.Component,
           EDA.Component.ActionRow,

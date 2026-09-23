@@ -45,41 +45,89 @@ defmodule EDA.Command do
 
   alias EDA.Command.Option
 
-  @enforce_keys [:name, :type]
+  use EDA.Event.Access
+
   defstruct [
+    :id,
+    :application_id,
+    :guild_id,
+    :version,
     :name,
     :description,
-    type: 1,
+    :handler,
+    type: :slash,
     options: [],
     default_member_permissions: nil,
     nsfw: false,
     contexts: nil,
+    integration_types: nil,
     name_localizations: nil,
     description_localizations: nil
   ]
 
-  @type command_type :: :slash | :user | :message
+  @type command_type :: :slash | :user | :message | :primary_entry_point
   @type context :: :guild | :bot_dm | :private_channel
+  @type integration_type :: :guild_install | :user_install
 
   @type t :: %__MODULE__{
-          name: String.t(),
+          id: String.t() | nil,
+          application_id: String.t() | nil,
+          guild_id: String.t() | nil,
+          version: String.t() | nil,
+          name: String.t() | nil,
           description: String.t() | nil,
-          type: 1 | 2 | 3,
+          handler: :app_handler | :discord_launch_activity | integer() | nil,
+          type: command_type() | integer(),
           options: [Option.t()],
           default_member_permissions: String.t() | nil,
-          nsfw: boolean(),
-          contexts: [non_neg_integer()] | nil,
-          name_localizations: map() | nil,
-          description_localizations: map() | nil
+          nsfw: boolean() | nil,
+          contexts: [context() | integer()] | nil,
+          integration_types: [integration_type() | integer()] | nil,
+          name_localizations: %{String.t() => String.t()} | nil,
+          description_localizations: %{String.t() => String.t()} | nil
         }
 
-  @command_name_regex ~r/^[-_\p{L}\p{N}]{1,32}$/u
+  @types %{1 => :slash, 2 => :user, 3 => :message, 4 => :primary_entry_point}
+  @contexts %{0 => :guild, 1 => :bot_dm, 2 => :private_channel}
+  @integration_types %{0 => :guild_install, 1 => :user_install}
+  @handlers %{1 => :app_handler, 2 => :discord_launch_activity}
 
-  @context_map %{
-    guild: 0,
-    bot_dm: 1,
-    private_channel: 2
-  }
+  @doc """
+  A registered command as Discord sends it, from `list_global/0` and the other calls below.
+
+      iex> cmd = EDA.Command.from_raw(%{"id" => "1", "name" => "ping", "type" => 1,
+      ...>   "contexts" => [0, 1], "integration_types" => [0], "version" => "7"})
+      iex> {cmd.type, cmd.contexts, cmd.integration_types, cmd.options}
+      {:slash, [:guild, :bot_dm], [:guild_install], []}
+  """
+  @spec from_raw(map()) :: t()
+  def from_raw(raw) when is_map(raw) do
+    %__MODULE__{
+      id: raw["id"],
+      application_id: raw["application_id"],
+      guild_id: raw["guild_id"],
+      version: raw["version"],
+      name: raw["name"],
+      description: raw["description"],
+      handler: EDA.Enum.name(@handlers, raw["handler"]),
+      type: EDA.Enum.name(@types, raw["type"] || 1),
+      options: Enum.map(raw["options"] || [], &Option.from_raw/1),
+      default_member_permissions: raw["default_member_permissions"],
+      nsfw: raw["nsfw"],
+      contexts: names(raw["contexts"], @contexts),
+      integration_types: names(raw["integration_types"], @integration_types),
+      name_localizations: raw["name_localizations"],
+      description_localizations: raw["description_localizations"]
+    }
+  end
+
+  defp names(nil, _table), do: nil
+  defp names(list, table), do: Enum.map(list, &EDA.Enum.name(table, &1))
+
+  defp values(nil, _table, _what), do: nil
+  defp values(list, table, what), do: Enum.map(list, &EDA.Enum.value!(table, &1, what))
+
+  @command_name_regex ~r/^[-_\p{L}\p{N}]{1,32}$/u
 
   # ── Constructors ────────────────────────────────────────────────────
 
@@ -93,7 +141,7 @@ defmodule EDA.Command do
   def slash(name, description) when is_binary(name) and is_binary(description) do
     validate_slash_name!(name)
     validate_description!(description)
-    %__MODULE__{name: name, description: description, type: 1}
+    %__MODULE__{name: name, description: description, type: :slash}
   end
 
   @doc """
@@ -104,7 +152,7 @@ defmodule EDA.Command do
   @spec user_command(String.t()) :: t()
   def user_command(name) when is_binary(name) do
     validate_name!(name)
-    %__MODULE__{name: name, description: "", type: 2}
+    %__MODULE__{name: name, description: "", type: :user}
   end
 
   @doc """
@@ -115,7 +163,7 @@ defmodule EDA.Command do
   @spec message_command(String.t()) :: t()
   def message_command(name) when is_binary(name) do
     validate_name!(name)
-    %__MODULE__{name: name, description: "", type: 3}
+    %__MODULE__{name: name, description: "", type: :message}
   end
 
   # ── Modifiers ───────────────────────────────────────────────────────
@@ -126,7 +174,7 @@ defmodule EDA.Command do
   Only valid for slash commands (type 1).
   """
   @spec option(t(), Option.t()) :: t()
-  def option(%__MODULE__{type: 1} = cmd, %Option{} = opt) do
+  def option(%__MODULE__{type: :slash} = cmd, %Option{} = opt) do
     if length(cmd.options) >= 25 do
       raise ArgumentError, "command cannot have more than 25 options"
     end
@@ -135,8 +183,7 @@ defmodule EDA.Command do
   end
 
   def option(%__MODULE__{type: type}, %Option{}) do
-    type_name = if type == 2, do: "user", else: "message"
-    raise ArgumentError, "#{type_name} commands cannot have options"
+    raise ArgumentError, "#{type} commands cannot have options"
   end
 
   @doc """
@@ -167,19 +214,28 @@ defmodule EDA.Command do
   """
   @spec contexts(t(), [context()]) :: t()
   def contexts(%__MODULE__{} = cmd, ctx_list) when is_list(ctx_list) do
-    values =
-      Enum.map(ctx_list, fn ctx ->
-        case Map.fetch(@context_map, ctx) do
-          {:ok, v} ->
-            v
+    Enum.each(ctx_list, fn ctx ->
+      if ctx not in Map.values(@contexts) do
+        raise ArgumentError,
+              "unknown context #{inspect(ctx)}, expected :guild, :bot_dm, or :private_channel"
+      end
+    end)
 
-          :error ->
-            raise ArgumentError,
-                  "unknown context #{inspect(ctx)}, expected :guild, :bot_dm, or :private_channel"
-        end
-      end)
+    %{cmd | contexts: ctx_list}
+  end
 
-    %{cmd | contexts: values}
+  @doc """
+  Sets where the command can be installed: `:guild_install` (added to a guild) and/or
+  `:user_install` (added to a user's account, usable anywhere).
+
+  ## Example
+
+      slash("remind", "Set a reminder") |> integration_types([:guild_install, :user_install])
+  """
+  @spec integration_types(t(), [integration_type()]) :: t()
+  def integration_types(%__MODULE__{} = cmd, types) when is_list(types) do
+    Enum.each(types, &EDA.Enum.value!(@integration_types, &1, "integration type"))
+    %{cmd | integration_types: types}
   end
 
   @doc """
@@ -221,51 +277,111 @@ defmodule EDA.Command do
   @doc "Converts the command struct to a plain map for the Discord API."
   @spec to_map(t()) :: map()
   def to_map(%__MODULE__{} = cmd) do
-    map = %{name: cmd.name, type: cmd.type}
+    %{name: cmd.name, type: EDA.Enum.value!(@types, cmd.type, "command type")}
+    |> put_if(:id, cmd.id)
+    |> put_if(:description, if(cmd.description != "", do: cmd.description))
+    |> put_if(:options, if(cmd.options != [], do: Enum.map(cmd.options, &Option.to_map/1)))
+    |> put_if(:default_member_permissions, cmd.default_member_permissions)
+    |> put_if(:nsfw, if(cmd.nsfw, do: true))
+    |> put_if(:contexts, values(cmd.contexts, @contexts, "context"))
+    |> put_if(
+      :integration_types,
+      values(cmd.integration_types, @integration_types, "integration type")
+    )
+    |> put_if(:handler, cmd.handler && EDA.Enum.value!(@handlers, cmd.handler, "handler"))
+    |> put_if(:name_localizations, cmd.name_localizations)
+    |> put_if(:description_localizations, cmd.description_localizations)
+  end
 
-    map =
-      if cmd.description != "" do
-        Map.put(map, :description, cmd.description)
-      else
-        map
-      end
+  defp put_if(map, _key, nil), do: map
+  defp put_if(map, key, value), do: Map.put(map, key, value)
 
-    map =
-      if cmd.options != [] do
-        Map.put(map, :options, Enum.map(cmd.options, &Option.to_map/1))
-      else
-        map
-      end
+  # ── Entity Manager ──
 
-    map =
-      if cmd.default_member_permissions do
-        Map.put(map, :default_member_permissions, cmd.default_member_permissions)
-      else
-        map
-      end
+  @doc "Lists the app's global commands."
+  @spec list_global() :: {:ok, [t()]} | {:error, term()}
+  def list_global, do: EDA.API.Command.list_global() |> parse_list()
 
-    map = if cmd.nsfw, do: Map.put(map, :nsfw, true), else: map
+  @doc "Lists the app's commands registered in a guild."
+  @spec list_guild(String.t() | integer()) :: {:ok, [t()]} | {:error, term()}
+  def list_guild(guild_id), do: EDA.API.Command.list_guild(guild_id) |> parse_list()
 
-    map =
-      if cmd.contexts do
-        Map.put(map, :contexts, cmd.contexts)
-      else
-        map
-      end
+  @doc "Registers a global command, built with `slash/2` and the other constructors."
+  @spec create_global(t() | map()) :: {:ok, t()} | {:error, term()}
+  def create_global(command), do: EDA.API.Command.create_global(command) |> parse_one()
 
-    map =
-      if cmd.name_localizations do
-        Map.put(map, :name_localizations, cmd.name_localizations)
-      else
-        map
-      end
+  @doc "Registers a command in a guild."
+  @spec create_guild(String.t() | integer(), t() | map()) :: {:ok, t()} | {:error, term()}
+  def create_guild(guild_id, command),
+    do: EDA.API.Command.create_guild(guild_id, command) |> parse_one()
 
-    if cmd.description_localizations do
-      Map.put(map, :description_localizations, cmd.description_localizations)
-    else
-      map
+  @doc "Edits a global command. Takes the command, or its id and the new definition."
+  @spec edit_global(t() | String.t() | integer(), t() | map()) :: {:ok, t()} | {:error, term()}
+  def edit_global(%__MODULE__{id: id}, command), do: edit_global(id, command)
+
+  def edit_global(command_id, command),
+    do: EDA.API.Command.edit_global(command_id, command) |> parse_one()
+
+  @doc "Edits a command registered in a guild."
+  @spec edit_guild(String.t() | integer(), t() | String.t() | integer(), t() | map()) ::
+          {:ok, t()} | {:error, term()}
+  def edit_guild(guild_id, %__MODULE__{id: id}, command), do: edit_guild(guild_id, id, command)
+
+  def edit_guild(guild_id, command_id, command),
+    do: EDA.API.Command.edit_guild(guild_id, command_id, command) |> parse_one()
+
+  @doc "Deletes a global command."
+  @spec delete_global(t() | String.t() | integer()) :: :ok | {:error, term()}
+  def delete_global(%__MODULE__{id: id}), do: delete_global(id)
+  def delete_global(command_id), do: EDA.API.Command.delete_global(command_id)
+
+  @doc "Deletes a command registered in a guild."
+  @spec delete_guild(String.t() | integer(), t() | String.t() | integer()) ::
+          :ok | {:error, term()}
+  def delete_guild(guild_id, %__MODULE__{id: id}), do: delete_guild(guild_id, id)
+  def delete_guild(guild_id, command_id), do: EDA.API.Command.delete_guild(guild_id, command_id)
+
+  @doc """
+  Replaces every global command with `commands`, returning them as registered. A command not in
+  the list is deleted; one with the `id` of an existing command updates it.
+  """
+  @spec bulk_overwrite_global([t() | map()]) :: {:ok, [t()]} | {:error, term()}
+  def bulk_overwrite_global(commands),
+    do: EDA.API.Command.bulk_overwrite_global(commands) |> parse_list()
+
+  @doc "Replaces every command registered in a guild with `commands`."
+  @spec bulk_overwrite_guild(String.t() | integer(), [t() | map()]) ::
+          {:ok, [t()]} | {:error, term()}
+  def bulk_overwrite_guild(guild_id, commands),
+    do: EDA.API.Command.bulk_overwrite_guild(guild_id, commands) |> parse_list()
+
+  @doc "Who may use each of the app's commands in a guild, as `EDA.Command.Permissions` structs."
+  @spec permissions(String.t() | integer()) ::
+          {:ok, [EDA.Command.Permissions.t()]} | {:error, term()}
+  def permissions(guild_id) do
+    case EDA.API.Command.permissions(guild_id) do
+      {:ok, list} when is_list(list) -> {:ok, Enum.map(list, &EDA.Command.Permissions.from_raw/1)}
+      {:error, _} = err -> err
     end
   end
+
+  @doc "Who may use one command in a guild, as an `EDA.Command.Permissions`."
+  @spec permissions(String.t() | integer(), t() | String.t() | integer()) ::
+          {:ok, EDA.Command.Permissions.t()} | {:error, term()}
+  def permissions(guild_id, %__MODULE__{id: id}), do: permissions(guild_id, id)
+
+  def permissions(guild_id, command_id) do
+    case EDA.API.Command.permissions(guild_id, command_id) do
+      {:ok, raw} when is_map(raw) -> {:ok, EDA.Command.Permissions.from_raw(raw)}
+      {:error, _} = err -> err
+    end
+  end
+
+  defp parse_one({:ok, raw}) when is_map(raw), do: {:ok, from_raw(raw)}
+  defp parse_one({:error, _} = err), do: err
+
+  defp parse_list({:ok, list}) when is_list(list), do: {:ok, Enum.map(list, &from_raw/1)}
+  defp parse_list({:error, _} = err), do: err
 
   # ── Private ─────────────────────────────────────────────────────────
 

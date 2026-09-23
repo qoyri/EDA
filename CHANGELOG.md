@@ -66,6 +66,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`EDA.Command` is also a registered command**, read by `from_raw/1`: it gained `id`,
+  `application_id`, `guild_id`, `version`, `handler` and `integration_types`, and its `type`
+  (`:slash`, `:user`, `:message`, `:primary_entry_point`) and `contexts` (`:guild`, `:bot_dm`,
+  `:private_channel`) are atoms, in the builder too. `EDA.Command.Option` likewise: its `type`
+  is an atom (`:string`, `:sub_command`…), `channel_types` channel type atoms, and `choices`
+  `EDA.Command.Option.Choice` structs. `to_map/1` still sends Discord's integers.
+  `integration_types/2` sets where a command can be installed. The typed calls are new:
+  `list_global/0`, `list_guild/1`, `create_global/1`, `create_guild/2`, `edit_global/2`,
+  `edit_guild/3`, `delete_global/1`, `delete_guild/2`, `bulk_overwrite_global/1`,
+  `bulk_overwrite_guild/2` and `permissions/1,2`. An audit log's `application_commands` are
+  `EDA.Command` structs.
+
 - **`EDA.API.*` returns Discord's maps everywhere**, as its moduledocs said; the typed surface
   is the entity modules. `EDA.API.Emoji`, `Sticker`, `AutoMod` and `GuildTemplate` used to
   parse into structs, and `EDA.API.Guild.audit_log/2` into a hybrid map. Their typed

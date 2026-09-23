@@ -184,7 +184,7 @@ defmodule EDA.API.GuildTest do
       end)
 
       assert {:ok, log} = EDA.AuditLog.fetch_log("111")
-      assert [%{"name" => "ban"}] = log.application_commands
+      assert [%EDA.Command{name: "ban"}] = log.application_commands
       assert [%EDA.AutoMod{name: "no links"}] = log.auto_moderation_rules
       assert [%EDA.ScheduledEvent{name: "raid"}] = log.guild_scheduled_events
       assert [%EDA.Integration{name: "bot"}] = log.integrations

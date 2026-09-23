@@ -9,7 +9,7 @@ defmodule EDA.CommandTest do
       cmd = slash("ping", "Pings the bot")
       assert cmd.name == "ping"
       assert cmd.description == "Pings the bot"
-      assert cmd.type == 1
+      assert cmd.type == :slash
       assert cmd.options == []
     end
 
@@ -59,7 +59,7 @@ defmodule EDA.CommandTest do
     test "creates a user context menu command" do
       cmd = user_command("User Info")
       assert cmd.name == "User Info"
-      assert cmd.type == 2
+      assert cmd.type == :user
       assert cmd.description == ""
     end
 
@@ -79,7 +79,7 @@ defmodule EDA.CommandTest do
     test "creates a message context menu command" do
       cmd = message_command("Quote Message")
       assert cmd.name == "Quote Message"
-      assert cmd.type == 3
+      assert cmd.type == :message
     end
   end
 
@@ -149,12 +149,12 @@ defmodule EDA.CommandTest do
   describe "contexts/2" do
     test "sets context types" do
       cmd = slash("ping", "Pong") |> contexts([:guild, :bot_dm])
-      assert cmd.contexts == [0, 1]
+      assert cmd.contexts == [:guild, :bot_dm]
     end
 
     test "supports all context types" do
       cmd = slash("ping", "Pong") |> contexts([:guild, :bot_dm, :private_channel])
-      assert cmd.contexts == [0, 1, 2]
+      assert cmd.contexts == [:guild, :bot_dm, :private_channel]
     end
 
     test "raises on unknown context" do

@@ -35,26 +35,12 @@ defmodule EDA.Interaction.Option do
           focused: boolean()
         }
 
-  @types %{
-    1 => :sub_command,
-    2 => :sub_command_group,
-    3 => :string,
-    4 => :integer,
-    5 => :boolean,
-    6 => :user,
-    7 => :channel,
-    8 => :role,
-    9 => :mentionable,
-    10 => :number,
-    11 => :attachment
-  }
-
   @doc false
   @spec from_raw(map()) :: t()
   def from_raw(raw) when is_map(raw) do
     %__MODULE__{
       name: raw["name"],
-      type: EDA.Enum.name(@types, raw["type"]),
+      type: EDA.Command.Option.type_name(raw["type"]),
       value: raw["value"],
       options: parse(raw["options"]),
       focused: raw["focused"] == true

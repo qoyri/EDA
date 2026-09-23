@@ -2,8 +2,8 @@ defmodule EDA.AuditLog do
   @moduledoc """
   A guild's audit log: its `entries`, as `EDA.AuditLog.Entry` structs, and what they point at,
   so an entry's target can be named without another request — `users`, `webhooks`,
-  `auto_moderation_rules`, `guild_scheduled_events`, `integrations` and `threads` as their
-  structs, and `application_commands` as Discord sends them.
+  `application_commands`, `auto_moderation_rules`, `guild_scheduled_events`, `integrations` and
+  `threads` as their structs.
 
       {:ok, log} = EDA.AuditLog.fetch_log(guild_id, action_type: :member_ban_add, limit: 10)
 
@@ -26,7 +26,7 @@ defmodule EDA.AuditLog do
           entries: [EDA.AuditLog.Entry.t()],
           users: [EDA.User.t()],
           webhooks: [EDA.Webhook.t()],
-          application_commands: [map()],
+          application_commands: [EDA.Command.t()],
           auto_moderation_rules: [EDA.AutoMod.t()],
           guild_scheduled_events: [EDA.ScheduledEvent.t()],
           integrations: [EDA.Integration.t()],
@@ -134,7 +134,7 @@ defmodule EDA.AuditLog do
       entries: parse(raw["audit_log_entries"], &EDA.AuditLog.Entry.from_raw/1),
       users: parse(raw["users"], &EDA.User.from_raw/1),
       webhooks: parse(raw["webhooks"], &EDA.Webhook.from_raw/1),
-      application_commands: raw["application_commands"] || [],
+      application_commands: parse(raw["application_commands"], &EDA.Command.from_raw/1),
       auto_moderation_rules: parse(raw["auto_moderation_rules"], &EDA.AutoMod.from_raw/1),
       guild_scheduled_events:
         parse(raw["guild_scheduled_events"], &EDA.ScheduledEvent.from_raw/1),

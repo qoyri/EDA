@@ -8,7 +8,7 @@ defmodule EDA.Command.OptionTest do
   describe "string/3" do
     test "creates a string option" do
       opt = string("query", "Search query")
-      assert opt.type == 3
+      assert opt.type == :string
       assert opt.name == "query"
       assert opt.description == "Search query"
     end
@@ -70,7 +70,7 @@ defmodule EDA.Command.OptionTest do
   describe "integer/3" do
     test "creates an integer option" do
       opt = integer("count", "How many")
-      assert opt.type == 4
+      assert opt.type == :integer
     end
 
     test "accepts min_value and max_value" do
@@ -94,7 +94,7 @@ defmodule EDA.Command.OptionTest do
   describe "boolean/3" do
     test "creates a boolean option" do
       opt = boolean("ephemeral", "Only visible to you")
-      assert opt.type == 5
+      assert opt.type == :boolean
     end
 
     test "accepts required" do
@@ -112,19 +112,19 @@ defmodule EDA.Command.OptionTest do
   describe "user/3" do
     test "creates a user option" do
       opt = user("target", "Who to mention")
-      assert opt.type == 6
+      assert opt.type == :user
     end
   end
 
   describe "channel/3" do
     test "creates a channel option" do
       opt = channel("channel", "Where to post")
-      assert opt.type == 7
+      assert opt.type == :channel
     end
 
     test "accepts channel_types" do
       opt = channel("ch", "Channel", channel_types: [:guild_text, :guild_voice])
-      assert opt.channel_types == [0, 2]
+      assert opt.channel_types == [:guild_text, :guild_voice]
     end
 
     test "raises on unknown channel type" do
@@ -137,21 +137,21 @@ defmodule EDA.Command.OptionTest do
   describe "role/3" do
     test "creates a role option" do
       opt = role("role", "The role")
-      assert opt.type == 8
+      assert opt.type == :role
     end
   end
 
   describe "mentionable/3" do
     test "creates a mentionable option" do
       opt = mentionable("who", "User or role")
-      assert opt.type == 9
+      assert opt.type == :mentionable
     end
   end
 
   describe "number/3" do
     test "creates a number option" do
       opt = number("amount", "How much")
-      assert opt.type == 10
+      assert opt.type == :number
     end
 
     test "accepts float min/max values" do
@@ -164,7 +164,7 @@ defmodule EDA.Command.OptionTest do
   describe "attachment/3" do
     test "creates an attachment option" do
       opt = attachment("file", "Upload a file")
-      assert opt.type == 11
+      assert opt.type == :attachment
     end
 
     test "file_types narrows the picker and is normalised" do
@@ -215,7 +215,7 @@ defmodule EDA.Command.OptionTest do
   describe "sub_command/3" do
     test "creates a sub_command" do
       opt = sub_command("add", "Add something")
-      assert opt.type == 1
+      assert opt.type == :sub_command
       assert opt.name == "add"
       assert opt.options == nil
     end
@@ -228,7 +228,7 @@ defmodule EDA.Command.OptionTest do
         ])
 
       assert length(opt.options) == 2
-      assert hd(opt.options).type == 3
+      assert hd(opt.options).type == :string
     end
 
     test "raises on more than 25 nested options" do
@@ -248,7 +248,7 @@ defmodule EDA.Command.OptionTest do
           sub_command("remove", "Remove")
         ])
 
-      assert opt.type == 2
+      assert opt.type == :sub_command_group
       assert length(opt.options) == 2
     end
 
