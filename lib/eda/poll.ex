@@ -353,7 +353,7 @@ defmodule EDA.Poll do
   @doc """
   The integer Discord uses for a poll layout, from its atom or the integer itself.
   """
-  @spec layout_type_value(atom() | integer()) :: integer()
+  @spec layout_type_value(atom() | integer() | nil) :: integer() | nil
   def layout_type_value(value), do: EDA.Enum.value!(@layout_types, value, "poll layout")
 
   @doc """

@@ -56,6 +56,7 @@ defmodule EDA.Onboarding.Prompt do
     }
   end
 
+  defp type_value!(nil), do: nil
   defp type_value!(:multiple_choice), do: 0
   defp type_value!(:dropdown), do: 1
   defp type_value!(n) when n in [0, 1], do: n

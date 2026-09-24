@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Upgrading from 0.4
+
+Run `mix eda.doctor` first: it lists the lines 0.5's structs break without an error. Then read
+"Upgrading from 0.4 or an earlier beta" under 0.5.0-beta.3, which starts with those.
+
 ### Added
+
+- **`mix eda.doctor`**, for a bot upgrading to 0.5: it lists the code the structs make wrong
+  without an error — `Map.get/2`, `Map.has_key?/2` and the like with a string key that is a
+  struct field, `%{"field" => _}` patterns, enumerations compared to Discord's integers
+  (`type == 0`, `in [20, 22]`), presence statuses compared to strings, and
+  `DateTime.from_iso8601/1` on dates EDA already parses. Each finding names the file, the line
+  and what to write instead; `--strict` fails the run when there is one. Run on a bot already
+  migrated by hand, it found a `!join` command that never joined and a username lookup that
+  always fell back to the ID.
 
 - **zstd-stream transport compression, on by default.** The gateway now asks Discord for
   `compress=zstd-stream` and decompresses in EDA's precompiled NIF: on the frames Discord sent to
@@ -40,6 +54,18 @@ to about 13 µs instead of 19, a presence to 6.9 instead of 12, a role update to
 
 ### Fixed
 
+- **A user seen on the gateway no longer clears the banner a REST fetch cached.** The gateway
+  never sends `banner` or `accent_color`, not even for the bot's own user in `READY`; each event
+  from a user replaced its cached entry whole, so they went back to `nil` at the user's next
+  message. Users from the gateway now keep those two fields from the cache, and a REST result
+  still replaces the entry. `EDA.User.rest_only_fields/0` lists them, for a bot that needs to
+  know a `nil` there says nothing, and `EDA.Cache.User.merge/1` caches a user the gateway way.
+- **Converting a nil field back to Discord's value no longer raises.** `EDA.Channel.type_value/1`
+  and the fifteen other `*_value/1` conversions built on it raised `FunctionClauseError` on `nil`, although
+  the fields they convert may be nil: they return `nil` now, as the conversions to atoms always
+  did. So do the activity types of `EDA.Presence`, which also take an integer now and name the
+  known types on an unknown one, and the onboarding payloads. `EDA.Command.Option.to_map/1` and
+  `EDA.AutoMod.Action.to_map/1` no longer raise on an option or action without a type.
 - **Cached entities no longer keep whole JSON payloads alive.** JSON was decoded with strings
   that only referenced the body they came from, and a cache entry holding one of them, over 64
   bytes, kept the whole body in memory. With the JSON gateway encoding, the channels of eight
@@ -79,8 +105,26 @@ end
 
 ### Upgrading from 0.4 or an earlier beta
 
-Most of what a bot touches changed shape. The list below is what to look for in your code; the
-sections after it give every detail.
+**Start with what breaks without an error.** These lines compile, pass tests written against the
+old shapes, and misbehave. `mix eda.doctor`, from the release after this one, lists them:
+
+- **String-keyed `Map` functions read nothing.** `Map.get(member, "nick")`, `Map.fetch/2` and
+  `Map.has_key?/2` see only a struct's atom keys: they return `nil`, `:error`, `false`. Write
+  `member.nick`, or `member["nick"]`, which still reads a struct.
+- **String-keyed patterns stop matching.** `%{"channel_id" => id}` on a cached voice state,
+  `%{"username" => name}` on a cached user: the clause is skipped and the fallback runs. Match
+  `%EDA.VoiceState{channel_id: id}`.
+- **Enumerations compared to integers are always false.** `channel.type == 0`,
+  `entry.action_type in [20, 22]`, `%{type: 2}`: the fields hold `:guild_text`, `:member_kick`,
+  `:guild_voice`. A value EDA does not know yet stays the integer.
+- **Statuses compared to strings are always false**: a presence's `status` is `:online`, not
+  `"online"`, and `client_status` is keyed by platform atoms.
+- **Fixtures in the old shape keep tests green.** A stub that hands the bot string-keyed maps or
+  integer types tests the old contract, not what EDA sends; so does code that accepts both
+  shapes "to be safe". Build fixtures with the entity's `from_raw/1` from a Discord payload.
+
+The rest mostly fails loudly — a match on a wrapper struct that no longer exists, a string
+function on a `DateTime` — and the compiler or the first run points at it:
 
 - **Events deliver the entity.** Match `{:MESSAGE_CREATE, %EDA.Message{}}`,
   `{:GUILD_CREATE, %EDA.Guild{}}`, `{:GUILD_MEMBER_UPDATE, %EDA.Member{}}`,
@@ -92,15 +136,13 @@ sections after it give every detail.
   or Unix integers. `EDA.Timestamp.parse/1` reads a date from a raw payload.
 - **Integer enumerations are atoms**, Discord's name in lowercase: a channel `type` is
   `:guild_text`, a message `type` `:reply`, a component `:button`, a button style `:primary`, a
-  command `type` `:slash`. A value EDA does not know yet stays the integer. Calls that send one
-  take the atom or the integer.
+  command `type` `:slash`. Calls that send one take the atom or the integer.
 - **Nested objects are structs**: embeds (`EDA.Embed.Footer`…), components (one struct per
   kind), a message's reference, stickers, interaction metadata, an interaction's `data`
   (`EDA.Interaction.CommandData`, `ComponentData`, `ModalSubmitData`), role tags, activity
   parts, invite and webhook partial guilds and channels. A channel's kind-specific fields live
-  in `thread`, `forum`, `voice` and `dm`.
-- **`x["field"]` still reads any struct**, but returns what the struct holds: an atom, a
-  `DateTime`, a nested struct. `%{"field" => _}` patterns on EDA's values no longer match.
+  in `thread`, `forum`, `voice` and `dm`. `x["field"]` reads them, and returns what the struct
+  holds: an atom, a `DateTime`, a nested struct.
 - **The builders return structs**: `EDA.Component.button/2` an `EDA.Component.Button` with
   `style: :primary`, `EDA.Command.slash/2` an `EDA.Command` with `type: :slash`,
   `EDA.Embed.footer/3` an `EDA.Embed.Footer`. What is sent to Discord is unchanged.
@@ -112,9 +154,6 @@ sections after it give every detail.
   admission policy receives the struct.
 - **Interaction helpers**: `EDA.Interaction.component_type/1` returns an atom,
   `resolved/3` a struct, `edit_response/2` and `followup/2` an `EDA.Message`.
-- **A presence's `status` is an atom** (`:online`…), and `client_status` is keyed by platform
-  atoms.
-
 
 ### Added
 

@@ -5,6 +5,15 @@ defmodule EDA.User do
   `member` is set only on the users a guild message mentions, where Discord attaches their
   partial member (nickname, roles, join date…) as an `EDA.Member` with the message's
   `guild_id`; it is `nil` anywhere else.
+
+  ## Fields only REST returns
+
+  The gateway never sends `banner` or `accent_color`: not on a message's author, a member, a
+  presence, nor the bot's own user in `READY`. On a user from an event they are `nil` whatever
+  the profile holds; `EDA.User.fetch/1` returns them. `rest_only_fields/0` lists them.
+
+  The user cache keeps them: a user seen on the gateway updates the cached entry without
+  clearing the banner and accent colour a REST fetch put there.
   """
   use EDA.Event.Access
   @premium_types %{0 => :none, 1 => :nitro_classic, 2 => :nitro, 3 => :nitro_basic}
@@ -87,6 +96,18 @@ defmodule EDA.User do
       member: :maps.get("member", raw, nil) && EDA.Member.from_raw(:maps.get("member", raw, nil))
     }
   end
+
+  @rest_only_fields [:banner, :accent_color]
+
+  @doc """
+  The fields Discord only returns over REST, never on the gateway: on a user from an event they
+  are `nil`, which says nothing about the profile.
+
+      iex> EDA.User.rest_only_fields()
+      [:banner, :accent_color]
+  """
+  @spec rest_only_fields() :: [atom()]
+  def rest_only_fields, do: @rest_only_fields
 
   @typedoc "A Nitro tier name."
   @type premium_type :: :none | :nitro_classic | :nitro | :nitro_basic | :unknown | nil

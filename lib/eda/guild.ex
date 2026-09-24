@@ -557,28 +557,28 @@ defmodule EDA.Guild do
   @doc """
   The integer Discord uses for a verification level, from its atom or the integer itself.
   """
-  @spec verification_level_value(atom() | integer()) :: integer()
+  @spec verification_level_value(atom() | integer() | nil) :: integer() | nil
   def verification_level_value(value),
     do: EDA.Enum.value!(@verification_levels, value, "verification level")
 
   @doc """
   The integer Discord uses for a notification level, from its atom or the integer itself.
   """
-  @spec default_message_notifications_value(atom() | integer()) :: integer()
+  @spec default_message_notifications_value(atom() | integer() | nil) :: integer() | nil
   def default_message_notifications_value(value),
     do: EDA.Enum.value!(@notification_levels, value, "notification level")
 
   @doc """
   The integer Discord uses for a explicit content filter, from its atom or the integer itself.
   """
-  @spec explicit_content_filter_value(atom() | integer()) :: integer()
+  @spec explicit_content_filter_value(atom() | integer() | nil) :: integer() | nil
   def explicit_content_filter_value(value),
     do: EDA.Enum.value!(@content_filters, value, "explicit content filter")
 
   @doc """
   The integer Discord uses for a MFA level, from its atom or the integer itself.
   """
-  @spec mfa_level_value(atom() | integer()) :: integer()
+  @spec mfa_level_value(atom() | integer() | nil) :: integer() | nil
   def mfa_level_value(value), do: EDA.Enum.value!(@mfa_levels, value, "MFA level")
 
   @doc "The guild's integrations: bots, Twitch and YouTube links. Needs `MANAGE_GUILD`."

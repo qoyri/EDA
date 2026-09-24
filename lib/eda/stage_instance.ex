@@ -57,7 +57,7 @@ defmodule EDA.StageInstance do
       iex> EDA.StageInstance.privacy_level_value(:guild_only)
       2
   """
-  @spec privacy_level_value(atom() | integer()) :: integer()
+  @spec privacy_level_value(atom() | integer() | nil) :: integer() | nil
   def privacy_level_value(level), do: EDA.Enum.value!(@privacy_levels, level, "privacy level")
 
   # ── Entity Manager ──

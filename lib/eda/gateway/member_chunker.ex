@@ -289,7 +289,7 @@ defmodule EDA.Gateway.MemberChunker do
 
   defp cache_chunk(guild_id, members, presences) do
     for member <- members do
-      if user = member["user"], do: EDA.Cache.User.create(user)
+      if user = member["user"], do: EDA.Cache.User.merge(user)
       EDA.Cache.Member.create(guild_id, member)
     end
 

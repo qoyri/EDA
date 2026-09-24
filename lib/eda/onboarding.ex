@@ -88,6 +88,7 @@ defmodule EDA.Onboarding do
   end
 
   @doc false
+  def mode_value!(nil), do: nil
   def mode_value!(:default), do: 0
   def mode_value!(:advanced), do: 1
   def mode_value!(n) when n in [0, 1], do: n

@@ -66,7 +66,7 @@ defmodule EDA.AutoMod.TriggerMetadata do
   The integer Discord uses for a keyword preset, from its atom (`:profanity`, `:sexual_content`,
   `:slurs`) or the integer itself.
   """
-  @spec preset_value(atom() | integer()) :: integer()
+  @spec preset_value(atom() | integer() | nil) :: integer() | nil
   def preset_value(value), do: EDA.Enum.value!(@presets, value, "AutoMod keyword preset")
 
   defp parse_presets(nil), do: nil

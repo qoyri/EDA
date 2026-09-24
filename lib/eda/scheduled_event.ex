@@ -109,19 +109,19 @@ defmodule EDA.ScheduledEvent do
   @doc """
   The integer Discord uses for a privacy level, from its atom or the integer itself.
   """
-  @spec privacy_level_value(atom() | integer()) :: integer()
+  @spec privacy_level_value(atom() | integer() | nil) :: integer() | nil
   def privacy_level_value(value), do: EDA.Enum.value!(@privacy_levels, value, "privacy level")
 
   @doc """
   The integer Discord uses for a scheduled event status, from its atom or the integer itself.
   """
-  @spec status_value(atom() | integer()) :: integer()
+  @spec status_value(atom() | integer() | nil) :: integer() | nil
   def status_value(value), do: EDA.Enum.value!(@statuses, value, "scheduled event status")
 
   @doc """
   The integer Discord uses for a scheduled event entity type, from its atom or the integer itself.
   """
-  @spec entity_type_value(atom() | integer()) :: integer()
+  @spec entity_type_value(atom() | integer() | nil) :: integer() | nil
   def entity_type_value(value),
     do: EDA.Enum.value!(@entity_types, value, "scheduled event entity type")
 
