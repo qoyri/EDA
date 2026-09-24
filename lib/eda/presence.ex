@@ -261,12 +261,26 @@ defmodule EDA.Presence do
   defp session_status(other), do: other
 
   @doc false
-  def activity_type_value(type), do: Map.fetch!(@activity_type_map, type)
+  # Like every other conversion: nil stays nil, an integer passes, an unknown atom raises.
+  def activity_type_value(nil), do: nil
+  def activity_type_value(type) when is_integer(type), do: type
+
+  def activity_type_value(type) when is_atom(type) do
+    case @activity_type_map do
+      %{^type => value} ->
+        value
+
+      _ ->
+        raise ArgumentError,
+              "unknown activity type #{inspect(type)}; known: " <>
+                Enum.map_join(Map.keys(@activity_type_map), ", ", &inspect/1)
+    end
+  end
 
   defp serialize_activity(activity) do
     base = %{
       name: activity.name,
-      type: Map.fetch!(@activity_type_map, activity.type)
+      type: activity_type_value(activity.type)
     }
 
     if url = Map.get(activity, :url) do

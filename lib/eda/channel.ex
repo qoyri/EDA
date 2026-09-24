@@ -471,7 +471,7 @@ defmodule EDA.Channel do
       iex> EDA.Channel.type_value(15)
       15
   """
-  @spec type_value(channel_type()) :: integer()
+  @spec type_value(channel_type() | nil) :: integer() | nil
   def type_value(type), do: EDA.Enum.value!(@types, type, "channel type")
 
   @doc """

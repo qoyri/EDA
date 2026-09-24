@@ -40,6 +40,12 @@ to about 13 µs instead of 19, a presence to 6.9 instead of 12, a role update to
 
 ### Fixed
 
+- **Converting a nil field back to Discord's value no longer raises.** `EDA.Channel.type_value/1`
+  and the fifteen other `*_value/1` conversions built on it raised `FunctionClauseError` on `nil`, although
+  the fields they convert may be nil: they return `nil` now, as the conversions to atoms always
+  did. So do the activity types of `EDA.Presence`, which also take an integer now and name the
+  known types on an unknown one, and the onboarding payloads. `EDA.Command.Option.to_map/1` and
+  `EDA.AutoMod.Action.to_map/1` no longer raise on an option or action without a type.
 - **Cached entities no longer keep whole JSON payloads alive.** JSON was decoded with strings
   that only referenced the body they came from, and a cache entry holding one of them, over 64
   bytes, kept the whole body in memory. With the JSON gateway encoding, the channels of eight

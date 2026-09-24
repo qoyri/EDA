@@ -15,12 +15,13 @@ defmodule EDA.Enum do
   def name(_table, value), do: value
 
   @doc false
-  # The integer for an atom or an integer; raises on an atom the table does not have, naming what
-  # it is and the atoms it knows.
-  @spec value!(%{integer() => atom()}, atom() | integer(), String.t()) :: integer()
+  # The integer for an atom or an integer; nil stays nil, as a field the struct does not hold.
+  # Raises on an atom the table does not have, naming what it is and the atoms it knows.
+  @spec value!(%{integer() => atom()}, atom() | integer() | nil, String.t()) :: integer() | nil
+  def value!(_table, nil, _what), do: nil
   def value!(_table, value, _what) when is_integer(value), do: value
 
-  def value!(table, name, what) when is_atom(name) and not is_nil(name) do
+  def value!(table, name, what) when is_atom(name) do
     Enum.find_value(table, fn {int, atom} -> if atom == name, do: int end) ||
       raise ArgumentError,
             "unknown #{what} #{inspect(name)}; known: " <>

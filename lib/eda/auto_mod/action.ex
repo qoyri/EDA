@@ -98,6 +98,6 @@ defmodule EDA.AutoMod.Action do
   @doc """
   The integer Discord uses for an action type, from its atom or the integer itself.
   """
-  @spec type_value(atom() | integer()) :: integer()
+  @spec type_value(atom() | integer() | nil) :: integer() | nil
   def type_value(value), do: EDA.Enum.value!(@types, value, "AutoMod action type")
 end

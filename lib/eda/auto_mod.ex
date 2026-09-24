@@ -213,14 +213,14 @@ defmodule EDA.AutoMod do
   The integer Discord uses for an event type, from its atom (`:message_send`, `:member_update`)
   or the integer itself.
   """
-  @spec event_type_value(atom() | integer()) :: integer()
+  @spec event_type_value(atom() | integer() | nil) :: integer() | nil
   def event_type_value(value), do: EDA.Enum.value!(@event_types, value, "AutoMod event type")
 
   @doc """
   The integer Discord uses for a trigger type, from its atom (`:keyword`, `:spam`,
   `:keyword_preset`, `:mention_spam`, `:member_profile`) or the integer itself.
   """
-  @spec trigger_type_value(atom() | integer()) :: integer()
+  @spec trigger_type_value(atom() | integer() | nil) :: integer() | nil
   def trigger_type_value(value),
     do: EDA.Enum.value!(@trigger_types, value, "AutoMod trigger type")
 

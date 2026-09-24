@@ -28,6 +28,6 @@ defmodule EDA.PermissionOverwrite do
   @doc """
   The integer Discord uses for a permission overwrite type, from its atom or the integer itself.
   """
-  @spec type_value(atom() | integer()) :: integer()
+  @spec type_value(atom() | integer() | nil) :: integer() | nil
   def type_value(value), do: EDA.Enum.value!(@types, value, "permission overwrite type")
 end
