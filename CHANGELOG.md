@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Upgrading from 0.4
+
+Run `mix eda.doctor` first: it lists the lines 0.5's structs break without an error. Then read
+"Upgrading from 0.4 or an earlier beta" under 0.5.0-beta.3, which starts with those.
+
 ### Added
 
 - **`mix eda.doctor`**, for a bot upgrading to 0.5: it lists the code the structs make wrong
@@ -100,8 +105,26 @@ end
 
 ### Upgrading from 0.4 or an earlier beta
 
-Most of what a bot touches changed shape. The list below is what to look for in your code; the
-sections after it give every detail.
+**Start with what breaks without an error.** These lines compile, pass tests written against the
+old shapes, and misbehave. `mix eda.doctor`, from the release after this one, lists them:
+
+- **String-keyed `Map` functions read nothing.** `Map.get(member, "nick")`, `Map.fetch/2` and
+  `Map.has_key?/2` see only a struct's atom keys: they return `nil`, `:error`, `false`. Write
+  `member.nick`, or `member["nick"]`, which still reads a struct.
+- **String-keyed patterns stop matching.** `%{"channel_id" => id}` on a cached voice state,
+  `%{"username" => name}` on a cached user: the clause is skipped and the fallback runs. Match
+  `%EDA.VoiceState{channel_id: id}`.
+- **Enumerations compared to integers are always false.** `channel.type == 0`,
+  `entry.action_type in [20, 22]`, `%{type: 2}`: the fields hold `:guild_text`, `:member_kick`,
+  `:guild_voice`. A value EDA does not know yet stays the integer.
+- **Statuses compared to strings are always false**: a presence's `status` is `:online`, not
+  `"online"`, and `client_status` is keyed by platform atoms.
+- **Fixtures in the old shape keep tests green.** A stub that hands the bot string-keyed maps or
+  integer types tests the old contract, not what EDA sends; so does code that accepts both
+  shapes "to be safe". Build fixtures with the entity's `from_raw/1` from a Discord payload.
+
+The rest mostly fails loudly — a match on a wrapper struct that no longer exists, a string
+function on a `DateTime` — and the compiler or the first run points at it:
 
 - **Events deliver the entity.** Match `{:MESSAGE_CREATE, %EDA.Message{}}`,
   `{:GUILD_CREATE, %EDA.Guild{}}`, `{:GUILD_MEMBER_UPDATE, %EDA.Member{}}`,
@@ -113,15 +136,13 @@ sections after it give every detail.
   or Unix integers. `EDA.Timestamp.parse/1` reads a date from a raw payload.
 - **Integer enumerations are atoms**, Discord's name in lowercase: a channel `type` is
   `:guild_text`, a message `type` `:reply`, a component `:button`, a button style `:primary`, a
-  command `type` `:slash`. A value EDA does not know yet stays the integer. Calls that send one
-  take the atom or the integer.
+  command `type` `:slash`. Calls that send one take the atom or the integer.
 - **Nested objects are structs**: embeds (`EDA.Embed.Footer`…), components (one struct per
   kind), a message's reference, stickers, interaction metadata, an interaction's `data`
   (`EDA.Interaction.CommandData`, `ComponentData`, `ModalSubmitData`), role tags, activity
   parts, invite and webhook partial guilds and channels. A channel's kind-specific fields live
-  in `thread`, `forum`, `voice` and `dm`.
-- **`x["field"]` still reads any struct**, but returns what the struct holds: an atom, a
-  `DateTime`, a nested struct. `%{"field" => _}` patterns on EDA's values no longer match.
+  in `thread`, `forum`, `voice` and `dm`. `x["field"]` reads them, and returns what the struct
+  holds: an atom, a `DateTime`, a nested struct.
 - **The builders return structs**: `EDA.Component.button/2` an `EDA.Component.Button` with
   `style: :primary`, `EDA.Command.slash/2` an `EDA.Command` with `type: :slash`,
   `EDA.Embed.footer/3` an `EDA.Embed.Footer`. What is sent to Discord is unchanged.
@@ -133,9 +154,6 @@ sections after it give every detail.
   admission policy receives the struct.
 - **Interaction helpers**: `EDA.Interaction.component_type/1` returns an atom,
   `resolved/3` a struct, `edit_response/2` and `followup/2` an `EDA.Message`.
-- **A presence's `status` is an atom** (`:online`…), and `client_status` is keyed by platform
-  atoms.
-
 
 ### Added
 
