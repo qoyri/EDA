@@ -36,6 +36,11 @@ end
 
 That is all a bot needs — unless it joins voice channels.
 
+Coming from 0.4, run `mix eda.doctor` after upgrading. 0.5 returns structs, and some code that
+compiles and passes its tests stops working without an error: a `Map.get(member, "nick")` reads
+`nil`, a `%{"channel_id" => id}` pattern no longer matches, a `channel.type == 0` is always false.
+The task lists those lines, with what to write instead.
+
 ### Voice
 
 Since March 2026 Discord only accepts end-to-end encrypted voice, using its **DAVE** protocol, for

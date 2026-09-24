@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`mix eda.doctor`**, for a bot upgrading to 0.5: it lists the code the structs make wrong
+  without an error — `Map.get/2`, `Map.has_key?/2` and the like with a string key that is a
+  struct field, `%{"field" => _}` patterns, enumerations compared to Discord's integers
+  (`type == 0`, `in [20, 22]`), presence statuses compared to strings, and
+  `DateTime.from_iso8601/1` on dates EDA already parses. Each finding names the file, the line
+  and what to write instead; `--strict` fails the run when there is one. Run on a bot already
+  migrated by hand, it found a `!join` command that never joined and a username lookup that
+  always fell back to the ID.
+
 - **zstd-stream transport compression, on by default.** The gateway now asks Discord for
   `compress=zstd-stream` and decompresses in EDA's precompiled NIF: on the frames Discord sent to
   a real bot, 74 % less time than zlib-stream for a `GUILD_CREATE`, 46 % less for a small event
