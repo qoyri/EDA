@@ -168,7 +168,7 @@ defmodule EDA.Gateway.Events do
     do: EDA.Cache.Channel.create(channel)
 
   defp update_cache("GUILD_MEMBER_ADD", data, %EDA.Member{} = member) do
-    if member.user, do: EDA.Cache.User.create(member.user)
+    if member.user, do: EDA.Cache.User.merge(member.user)
     EDA.Cache.Member.create(data["guild_id"], member)
   end
 
@@ -177,7 +177,7 @@ defmodule EDA.Gateway.Events do
        do: EDA.Cache.Role.create(data["guild_id"], role)
 
   defp update_cache("MESSAGE_CREATE", _data, %EDA.Message{} = message) do
-    if message.author, do: EDA.Cache.User.create(message.author)
+    if message.author, do: EDA.Cache.User.merge(message.author)
 
     if message.member && message.guild_id do
       EDA.Cache.Member.create(message.guild_id, %{message.member | user: message.author})
@@ -188,7 +188,7 @@ defmodule EDA.Gateway.Events do
     if presence.guild_id, do: EDA.Cache.Presence.upsert(presence.guild_id, presence)
 
     # Presence updates carry a partial user, cached only when it has a name.
-    if presence.user && presence.user.username, do: EDA.Cache.User.create(presence.user)
+    if presence.user && presence.user.username, do: EDA.Cache.User.merge(presence.user)
   end
 
   defp update_cache(type, data, _parsed), do: update_cache(type, data)
@@ -201,7 +201,7 @@ defmodule EDA.Gateway.Events do
 
   defp cache_parsed_members(guild_id, members) do
     for member <- members do
-      if member.user, do: EDA.Cache.User.create(member.user)
+      if member.user, do: EDA.Cache.User.merge(member.user)
       EDA.Cache.Member.create(guild_id, member)
     end
   end
@@ -212,7 +212,7 @@ defmodule EDA.Gateway.Events do
     # Guild stubs from READY are incomplete (unavailable: true).
     # Full guild data arrives via GUILD_CREATE events — caching happens there.
     if user = data["user"] do
-      EDA.Cache.User.create(user)
+      EDA.Cache.User.merge(user)
     end
   end
 
@@ -280,7 +280,7 @@ defmodule EDA.Gateway.Events do
     guild_id = data["guild_id"]
 
     if user = data["user"] do
-      EDA.Cache.User.create(user)
+      EDA.Cache.User.merge(user)
     end
 
     EDA.Cache.Member.create(guild_id, data)
@@ -290,7 +290,7 @@ defmodule EDA.Gateway.Events do
     guild_id = data["guild_id"]
 
     if user = data["user"] do
-      EDA.Cache.User.create(user)
+      EDA.Cache.User.merge(user)
       EDA.Cache.Member.update(guild_id, user["id"], data)
     end
   end
@@ -329,7 +329,7 @@ defmodule EDA.Gateway.Events do
     # Also cache member data if present
     if member = data["member"] do
       if user = member["user"] do
-        EDA.Cache.User.create(user)
+        EDA.Cache.User.merge(user)
       end
 
       if guild_id do
@@ -360,7 +360,7 @@ defmodule EDA.Gateway.Events do
   # The bot's own user changed (name, avatar, ...). Without this, EDA.Cache.me/0 kept the
   # READY-time user for the whole session.
   defp update_cache("USER_UPDATE", data) do
-    EDA.Cache.User.create(data)
+    EDA.Cache.User.merge(data)
 
     user_id = data["id"]
 
@@ -379,7 +379,7 @@ defmodule EDA.Gateway.Events do
     # Presence updates include partial user data
     if user = data["user"] do
       if user["username"] do
-        EDA.Cache.User.create(user)
+        EDA.Cache.User.merge(user)
       end
     end
   end
@@ -388,7 +388,7 @@ defmodule EDA.Gateway.Events do
 
   defp update_cache("MESSAGE_CREATE", data) do
     if author = data["author"] do
-      EDA.Cache.User.create(author)
+      EDA.Cache.User.merge(author)
     end
 
     # MESSAGE_CREATE in guilds includes a member object
@@ -473,7 +473,7 @@ defmodule EDA.Gateway.Events do
 
   defp cache_guild_members(guild_id, members) do
     for member <- members do
-      if user = member["user"], do: EDA.Cache.User.create(user)
+      if user = member["user"], do: EDA.Cache.User.merge(user)
       EDA.Cache.Member.create(guild_id, member)
     end
   end

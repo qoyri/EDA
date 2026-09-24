@@ -40,6 +40,12 @@ to about 13 µs instead of 19, a presence to 6.9 instead of 12, a role update to
 
 ### Fixed
 
+- **A user seen on the gateway no longer clears the banner a REST fetch cached.** The gateway
+  never sends `banner` or `accent_color`, not even for the bot's own user in `READY`; each event
+  from a user replaced its cached entry whole, so they went back to `nil` at the user's next
+  message. Users from the gateway now keep those two fields from the cache, and a REST result
+  still replaces the entry. `EDA.User.rest_only_fields/0` lists them, for a bot that needs to
+  know a `nil` there says nothing, and `EDA.Cache.User.merge/1` caches a user the gateway way.
 - **Converting a nil field back to Discord's value no longer raises.** `EDA.Channel.type_value/1`
   and the fifteen other `*_value/1` conversions built on it raised `FunctionClauseError` on `nil`, although
   the fields they convert may be nil: they return `nil` now, as the conversions to atoms always
