@@ -5,7 +5,7 @@
 [![Hex Docs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/eda)
 [![License: MIT](https://img.shields.io/hexpm/l/eda.svg)](https://opensource.org/licenses/MIT)
 
-A complete, production-grade Discord library for Elixir. 27 API modules, 85+ event types, full voice with DAVE E2EE, automatic sharding, and 1500+ tests.
+A complete, production-grade Discord library for Elixir. 27 API modules, 85+ event types, full voice with DAVE E2EE, automatic sharding, and 2200+ tests.
 
 ## Why EDA?
 
@@ -23,13 +23,10 @@ A complete, production-grade Discord library for Elixir. 27 API modules, 85+ eve
 
 ## Installation
 
-0.5 is in beta; the stable release is `0.4.1`. Hex installs a beta only for a requirement that
-names one:
-
 ```elixir
 def deps do
   [
-    {:eda, "~> 0.5.0-beta.3"}
+    {:eda, "~> 0.5.0"}
   ]
 end
 ```
@@ -153,6 +150,13 @@ disabled = EDA.Component.disable_all(message["components"])
 # Reply to a message
 EDA.API.Message.reply(msg, "Got it!")
 
+# Permissions, from the cache or computed by Discord
+{:ok, perms} = EDA.Permission.fetch_in_channel(channel_id, user_id)
+EDA.Permission.missing(perms, [:send_messages, :embed_links])  #=> [:embed_links]
+
+# What Discord's content scanning flagged in a message
+EDA.Message.content_flags(message)     #=> [:explicit]
+
 # Mentions & formatting
 EDA.Mention.user("123")                #=> "<@123>"
 EDA.Mention.timestamp(unix, :R)        #=> "<t:1700000000:R>"
@@ -248,18 +252,12 @@ Transport compression is always on. `zstd-stream` decompresses Discord's payload
 quarter of the time `zlib-stream` takes; it runs in EDA's precompiled NIF, so without the NIF the
 gateway falls back to `zlib-stream` on its own.
 
-Gateway capabilities let you opt into a protocol change before Discord enforces it:
-
-```elixir
-config :eda, capabilities: [:channel_obfuscation]
-```
-
-`:channel_obfuscation` becomes mandatory for all bots on **2026-11-16**. Channels the bot cannot see
-are still dispatched over the gateway, but redacted — `name` becomes `"___hidden___"` and `flags`
-carry `CHANNEL_OBFUSCATED`. Discord's changelog says `GET /guilds/{id}/channels` omits them; probed
-against a real guild, REST still returned them unredacted, so do not rely on either source to hide a
-channel. Enabling it early lets you see the redacted payloads and adapt caching and permission checks
-before the deadline. Unset by default.
+Since 2026-11-16 Discord obfuscates the channels a bot cannot view. They are still dispatched
+over the gateway, redacted — `name` becomes `"___hidden___"` and `flags` carry
+`CHANNEL_OBFUSCATED` — and `GET /guilds/{id}/channels` leaves them out. EDA caches them like any
+other channel: filter a channel list with `EDA.Channel.obfuscated?/1`, and
+`EDA.Permission.in_channel/3` returns `{:error, :channel_obfuscated}` rather than compute from
+their synthetic overwrite.
 
 Sharding is automatic. EDA fetches the recommended shard count from Discord, launches shards with staggered timing, and tracks per-shard readiness. Override with:
 

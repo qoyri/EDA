@@ -7,12 +7,110 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Upgrading from 0.4
+## [0.5.0] - 2026-11-27
 
-Run `mix eda.doctor` first: it lists the lines 0.5's structs break without an error. Then read
-"Upgrading from 0.4 or an earlier beta" under 0.5.0-beta.3, which starts with those.
+0.5.0 is the release the three betas prepared. Everything Discord sends is typed down to the
+leaves, an event whose payload is an entity delivers that entity, the caches hold structs, and
+every endpoint has a typed call: that is beta.3, whose notes below are the reference for the
+whole model. Since then EDA got faster on every event, learned to point at the code its structs
+break silently, closed a hole in how it connects to Discord, and caught up with what Discord
+changed through November 2026.
+
+### Installation
+
+```elixir
+def deps do
+  [
+    {:eda, "~> 0.5.0"}
+  ]
+end
+```
+
+### Upgrading
+
+**From 0.4:** run `mix eda.doctor` first: it lists the lines 0.5's structs break without an
+error. Then read "Upgrading from 0.4 or an earlier beta" under 0.5.0-beta.3, which starts with
+those.
+
+**From a beta:** `mix deps.update eda` is enough, and brings the patched versions of what EDA
+depends on with it. Three things may show:
+
+- **The gateway and voice connections now verify Discord's certificate** (see Security). A
+  machine that could already make REST calls needs nothing; one that intercepts TLS with its
+  own certificate authority is refused, where it used to be let through unnoticed.
+- **`EDA.Attachment.all_flags/0` and `flag_list/1` name three more flags**, and
+  `EDA.Embed.Media` has a `description` field: code that matches those lists or that struct
+  exhaustively needs the additions.
+- **`config :eda, capabilities: [:channel_obfuscation]` no longer changes anything**: Discord
+  applies channel obfuscation to every bot since 2026-11-16. The line can go.
+
+### Security
+
+- **The gateway and voice WebSockets verify the server's certificate.** They did not: the
+  WebSocket client EDA uses checks nothing unless told how, so the connection that carries the
+  bot token in IDENTIFY, and the one that carries a voice session's keys, accepted any
+  certificate — a self-signed one, one for another host, an expired one. Anyone able to sit
+  between a bot and Discord could read the token. Both connections now check the chain against
+  the CA bundle REST already trusts, and the name against the host, wildcards as for HTTPS.
+  Checked against real hosts: Discord's gateway and voice servers connect, and a self-signed
+  certificate, a wrong host, an expired certificate and an unknown authority are each refused.
+  Every earlier version is affected; there is nothing to configure.
+- **Dependencies with a known advisory are no longer installable under EDA.** `mix hex.audit`
+  on beta.3's lockfile reported seven advisories in what a bot runs, two of them critical:
+  five in hackney below 4.9 (EEF-CVE-2026-115693, -115700, -112880, -113440, -97200), one in
+  ssl_verify_fun below 1.1.8 (EEF-CVE-2026-117666, a wildcard certificate matching across a
+  label boundary) and one in idna below 8 (EEF-CVE-2026-117678). EDA now requires
+  `hackney ~> 4.11` on the 4.x line and `ssl_verify_fun ~> 1.1.8`, so updating EDA updates
+  them. The 1.x line of hackney, which httpoison 2 uses, has no fixed release: a project on
+  httpoison 2 should move to 3.
+- **The DAVE library is built on patched crates**: zstd 0.13.6 (RUSTSEC-2026-0391, data from
+  an abandoned stream leaking into the next on a reused context, and the advisories in
+  zstd-safe and zstd-sys), OpenMLS 0.8.3, rand 0.8.8 and 0.9.5, crossbeam-epoch 0.9.21. Two
+  advisories remain in crates EDA cannot move on its own: libcrux-sha3 0.0.8 and
+  libcrux-secrets 0.0.5, pinned by the HPKE library OpenMLS 0.8 uses, in code the DAVE
+  ciphersuite (P-256, AES-128-GCM, SHA-256) does not run; and the timing advisory of
+  crypto-bigint 0.5, pinned by the P-256 implementation.
 
 ### Added
+
+- **Permissions as Discord computes them.** Four endpoints Discord added on 2026-10-30:
+  `EDA.Permission.fetch_in_guild/2` and `fetch_in_channel/3` for a member,
+  `fetch_for_role/2` and `fetch_for_role_in_channel/3` for a role with `@everyone`, each one
+  request returning the bitset, with nothing needed in the cache. The channel calls are masked
+  as Discord applies permissions unless `implicit: false` asks for the permissions before
+  masking, which tells "denied everything" from "cannot see the channel". The raw calls are
+  `EDA.API.Member.permissions/2`, `EDA.API.Role.permissions/2`,
+  `EDA.API.Channel.member_permissions/3` and `role_permissions/3`. Compared on a real guild
+  with what `in_guild/2` and `in_channel/3` compute from the cache: the same permissions, and
+  where the member cannot view the channel, `0` from the cache against a few permissions that
+  do not concern the channel from Discord.
+- **What Discord's content scanning found.** Discord documents the flags it sets on media it
+  scans as explicit, gore or self-harm. `EDA.Message.content_flags/1` and `flagged?/1` read a
+  whole message — attachments, embeds, the media of components, forwarded messages — and
+  `EDA.Attachment`, `EDA.Embed` and `EDA.Component.Media` each have the same two calls.
+  Scanning can finish after the message is sent, so a bot that reposts what users upload
+  should check the message it sent and its `MESSAGE_UPDATE`s. `EDA.Embed.Flags` names every
+  embed flag, and `EDA.Component.Media` keeps the scan's result in `content_scan_flags`.
+- **Embeds for audio links and for a site's own layout.** A link to an audio file gives an
+  embed of type `:audio`, with the file in `audio`; a site that describes its preview with
+  components gives one of type `:components`, whose `components` hold the container it is made
+  of, as the structs of a message's components. `EDA.Embed.Media` gained `description`, the
+  alt text Discord sends for an image, a video or an audio.
+- **`EDA.Voice.media_sink_wants/2`**, voice opcode 15: tells the voice server whose audio to
+  send. By default it sends every user's voice, listened to or not;
+  `EDA.Voice.media_sink_wants(guild_id, %{any: 0})` stops that for a bot that only plays, and
+  a map of SSRCs chooses the users. Sent on a live session, the server took it without
+  closing.
+- **The audit log actions of a reorder**: `:channel_position_update` (16) and
+  `:role_position_update` (33), with the number of positions changed in the entry's
+  `options.count`. `EDA.API.Channel.modify_positions/3`, `EDA.API.Role.modify_positions/3`
+  and `EDA.Role.modify_positions/3` take `reason:`.
+- **Nine error codes** `EDA.Error` did not name, found by comparing its table with Discord's:
+  `:invite_expired` (50270), `:no_mutual_guilds` (50278), `:one_parent_change_at_a_time`
+  (40009), `:invite_target_users_already_processing` (40114),
+  `:invite_target_users_file_not_processed` (40115), `:max_invite_target_users` (30084),
+  `:premium_subscription_required` (20015), `:cannot_send_voice_effect_while_muted` (50167)
+  and `:server_join_limited` (340015).
 
 - **`mix eda.doctor`**, for a bot upgrading to 0.5: it lists the code the structs make wrong
   without an error — `Map.get/2`, `Map.has_key?/2` and the like with a string key that is a
@@ -31,6 +129,18 @@ Run `mix eda.doctor` first: it lists the lines 0.5's structs break without an er
   `[:eda, :gateway, :zstd, :error]`, as zlib's emit `[:eda, :gateway, :zlib, :error]`.
 
 ### Changed
+
+- **A member already in a voice channel keeps `SET_VOICE_CHANNEL_STATUS` without `CONNECT`.**
+  Discord made that exception on 2026-10-29; `EDA.Permission.in_channel/3` returned `0` for
+  such a member, and now returns that one permission when they hold it. `explain/3` shows it
+  as the result of the `:no_connect` gate.
+- **Channel obfuscation is documented as it now is.** It applies to every bot since
+  2026-11-16, and `GET /guilds/{id}/channels` leaves obfuscated channels out: on a guild where
+  the gateway dispatched 95 channels, 44 of them obfuscated, REST returned the other 51. The
+  note that REST still returned them, true when it was written, is gone.
+- **Deleting a message takes no audit log reason that Discord keeps.** It does not record a
+  message a bot deletes; `EDA.Message.delete/2` said `:reason` went to the audit log. The
+  option is still accepted.
 
 - **Less work per gateway event.** With a consumer, an event is parsed once and the caches take
   the struct, where they used to parse the payload again: a `GUILD_CREATE` went from 1.24 ms to
@@ -82,6 +192,8 @@ to about 13 µs instead of 19, a presence to 6.9 instead of 12, a role update to
   struct again and lost what it held in nested structs: a message's author, a member's user,
   a channel's voice and forum settings. Helpers that read the struct cache, such as
   `EDA.Channel.children/1`, went through that path.
+- **`EDA.Member.timed_out?/1` no longer says timeouts are missing from permissions.**
+  `EDA.Permission.in_channel/3` has applied them since 0.4.0; the warning dated from before.
 
 ## [0.5.0-beta.3] - 2026-09-23
 
