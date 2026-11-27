@@ -10,6 +10,7 @@ defmodule EDA.MixProject do
       version: @version,
       elixir: "~> 1.15",
       start_permanent: Mix.env() == :prod,
+      elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
       name: "EDA",
       description: "Elixir Discord API - A modern Discord library for Elixir",
@@ -28,6 +29,10 @@ defmodule EDA.MixProject do
       mod: {EDA.Application, []}
     ]
   end
+
+  # test/support holds what only the suite needs, the DAVE test gateway and its NIF among it.
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_env), do: ["lib"]
 
   # :mnesia is deliberately NOT a runtime dependency of the library: listing it would
   # start Mnesia for every EDA user, including those who never touch

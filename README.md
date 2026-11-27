@@ -5,7 +5,7 @@
 [![Hex Docs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/eda)
 [![License: MIT](https://img.shields.io/hexpm/l/eda.svg)](https://opensource.org/licenses/MIT)
 
-A complete, production-grade Discord library for Elixir. 27 API modules, 85+ event types, full voice with DAVE E2EE, automatic sharding, and 2200+ tests.
+A complete, production-grade Discord library for Elixir. 27 API modules, 85+ event types, full voice with DAVE E2EE, automatic sharding, and 2300+ tests.
 
 ## Why EDA?
 
