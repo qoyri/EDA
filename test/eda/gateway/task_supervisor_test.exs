@@ -4,10 +4,12 @@ defmodule EDA.Gateway.TaskSupervisorTest do
   alias EDA.Gateway.Events
 
   setup do
-    # Reset counter to 0 before each test
+    # The counter is global, and a handler dispatched by the previous test may still be
+    # running. Zeroing the counter under it let its decrement land afterwards, at -1, in
+    # whichever test ran next. Wait for those handlers instead; the tests that block theirs
+    # forever release them in `release_blocked/1`.
     counter = :persistent_term.get(:eda_event_task_counter)
-    current = :counters.get(counter, 1)
-    if current != 0, do: :counters.sub(counter, 1, current)
+    wait_until(fn -> :counters.get(counter, 1) == 0 end)
 
     # Register test process so supervised tasks can send messages back
     Process.register(self(), :task_supervisor_test)
@@ -97,7 +99,14 @@ defmodule EDA.Gateway.TaskSupervisorTest do
       # Spawn 2 blocking tasks to fill capacity
       Events.dispatch("TEST_EVENT", %{})
       Events.dispatch("TEST_EVENT", %{})
-      Process.sleep(20)
+
+      blocked =
+        for _ <- 1..2 do
+          assert_receive {:blocked, pid}, 500
+          pid
+        end
+
+      on_exit(fn -> release_blocked(blocked) end)
 
       # This one should be dropped
       Events.dispatch("TEST_EVENT", %{})
@@ -192,6 +201,20 @@ defmodule EDA.Gateway.TaskSupervisorTest do
     end
   end
 
+  # A killed handler never reaches the `after` that gives its slot back, so the test does.
+  defp release_blocked(pids) do
+    Enum.each(pids, &Process.exit(&1, :kill))
+    :counters.sub(:persistent_term.get(:eda_event_task_counter), 1, length(pids))
+  end
+
+  defp wait_until(condition, attempts \\ 200) do
+    cond do
+      condition.() -> :ok
+      attempts == 0 -> flunk("handlers of a previous test are still running after 2 s")
+      true -> Process.sleep(10) && wait_until(condition, attempts - 1)
+    end
+  end
+
   # Test consumers
 
   defmodule EchoConsumer do
@@ -202,6 +225,7 @@ defmodule EDA.Gateway.TaskSupervisorTest do
 
   defmodule BlockingConsumer do
     def handle_event(_event) do
+      send(:task_supervisor_test, {:blocked, self()})
       Process.sleep(:infinity)
     end
   end
