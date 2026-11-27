@@ -68,6 +68,21 @@ depends on with it. Four things may show:
   `httpoison ~> 3.0`, `hackney ~> 4.12` and `ssl_verify_fun ~> 1.1.8`, so updating EDA
   updates them. httpoison 2 is no longer accepted: it can only use the 1.x line of hackney,
   which is no longer released and has nine advisories without a fix.
+- **Voice encryption checks what it is given, and no longer reuses a nonce.** DAVE runs on
+  davey 0.2.0, which closes defects no advisory lists:
+  - a key installed again for the epoch in effect restarted its nonce sequence, so two frames
+    went out under the same key and nonce;
+  - a welcome was accepted whatever group it was for and whoever was in it. It is now refused
+    unless it is for the call's own group, for the last key package the session offered, and
+    holds only users the voice gateway announced as connected, none of them twice;
+  - a commit claiming to be the session's own was merged even when it was not the one the
+    session had prepared; it is refused, and every commit is checked for its epoch, its sender
+    and its kind before it is applied;
+  - a frame announcing a size larger than itself is rejected.
+- **After a call went back to encryption, unencrypted audio was accepted for the rest of it.**
+  When a call that had been downgraded to no encryption was upgraded again, EDA left its
+  decryptors accepting unencrypted frames with no end. They now accept them for ten seconds,
+  the time the other members take to switch, then refuse them.
 - **The DAVE library is built on patched crates**: zstd 0.13.6 (RUSTSEC-2026-0391, data from
   an abandoned stream leaking into the next on a reused context, and the advisories in
   zstd-safe and zstd-sys), OpenMLS 0.8.3, rand 0.8.8 and 0.9.5, crossbeam-epoch 0.9.21. Two
@@ -146,6 +161,17 @@ depends on with it. Four things may show:
 - **Deleting a message takes no audit log reason that Discord keeps.** It does not record a
   message a bot deletes; `EDA.Message.delete/2` said `:reason` went to the audit log. The
   option is still accepted.
+- **A voice key changes when its transition executes, as Discord's own client does.** EDA
+  switched to a new epoch's key the moment it processed the commit or the welcome; it now
+  derives the keys then, reads incoming audio with them at once, and goes on sending with the
+  key the others expect until Discord announces the switch. A bot that joins a call under way
+  has no key before that moment: `EDA.Voice.ready?/1` is false and `EDA.Voice.play/4` returns
+  `{:error, :not_ready}` until `VOICE_DAVE_READY`, which is dispatched then, as before.
+- **`EDA.Voice.Dave.Native` follows davey 0.2.** For code that calls the NIF itself:
+  `process_welcome/3` takes the users known to be in the call, `process_commit/2` returns
+  `:ignored` for a commit that reaches a session in no group where it returned
+  `{:error, :no_group}`, and neither installs a key any more: `prepare_transition/3` and
+  `execute_transition/2` do, and `can_encrypt?/1` says whether there is one.
 
 - **Less work per gateway event.** With a consumer, an event is parsed once and the caches take
   the struct, where they used to parse the payload again: a `GUILD_CREATE` went from 1.24 ms to
@@ -169,6 +195,20 @@ to about 13 µs instead of 19, a presence to 6.9 instead of 12, a role update to
 
 ### Fixed
 
+- **Audio a bot is playing no longer stops when its DAVE session starts over.** A session
+  re-initialises when it loses a commit race or falls out of step with the call, which is
+  routine in a busy channel. Doing so dropped its keys, the next frame could not be encrypted,
+  and playback ended there, logged as a `:dave_encrypt_failed` send failure. The session now
+  keeps its keys until the transition that brings it back, so the bot goes on being heard, and
+  hearing.
+- **A commit that reaches a session waiting to be welcomed is ignored.** EDA reported it to
+  Discord as invalid and offered a new key package, starting a round nobody needed.
+- **A session whose welcome is refused twice is not left out of the call.** EDA answered the
+  first refusal and stayed silent on the next, so a session whose second welcome also failed
+  was never added again. Every refusal is now answered.
+- **A call upgrading from no encryption no longer stops playback.** EDA started encrypting as
+  soon as the upgrade was announced, before it had a key; it sends unencrypted, as the other
+  members still do, until the upgrade executes.
 - **A user seen on the gateway no longer clears the banner a REST fetch cached.** The gateway
   never sends `banner` or `accent_color`, not even for the bot's own user in `READY`; each event
   from a user replaced its cached entry whole, so they went back to `nil` at the user's next

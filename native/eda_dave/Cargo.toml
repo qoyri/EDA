@@ -10,5 +10,5 @@ crate-type = ["cdylib"]
 
 [dependencies]
 rustler = "~0.35"
-davey = "0.1"
+davey = "0.2"
 zstd = { version = "0.13", default-features = false }

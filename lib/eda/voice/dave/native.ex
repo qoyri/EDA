@@ -74,7 +74,8 @@ defmodule EDA.Voice.Dave.Native do
   Processes MLS proposals from the gateway.
 
   `operation_type` is `:append` or `:revoke`.
-  `user_ids` is a list of connected client user IDs (integers).
+  `user_ids` are the users known to be in the call, as integers, the session's own included: a
+  proposal to add anyone else is refused. An empty list checks nothing.
   Returns `{:ok, commit_binary, welcome_binary_or_nil}`.
   """
   @spec process_proposals(reference(), :append | :revoke, binary(), [non_neg_integer()]) ::
@@ -87,22 +88,75 @@ defmodule EDA.Voice.Dave.Native do
   @doc """
   Processes an MLS commit from the gateway.
 
-  A failure names its cause: `:no_group` or `:pending_group` when the session has not joined a group
-  the commit could apply to, `:invalid` otherwise.
+  `:ok` when the session moved to the commit's epoch: prepare the transition next with
+  `prepare_transition/3`, which is what derives the new keys. `:ignored` when the commit does not
+  concern this session yet, because it has no group or only the pending one it would create a group
+  from: nothing is wrong, and nothing is to be reported.
+
+  A failure names its cause: `:epoch_mismatch`, `:own_commit_mismatch` for a commit that claims to
+  be this session's and is not the one it prepared, `:no_queued_proposals`,
+  `:commit_before_welcome`, `:unexpected_group`, `:invalid_roster` for a group that would hold the
+  same user twice, `:invalid` otherwise.
   """
   @spec process_commit(reference(), binary()) ::
-          :ok | :error | {:error, :no_group | :pending_group | :invalid}
+          :ok
+          | :ignored
+          | :error
+          | {:error,
+             :epoch_mismatch
+             | :own_commit_mismatch
+             | :no_queued_proposals
+             | :commit_before_welcome
+             | :unexpected_group
+             | :invalid_roster
+             | :invalid}
   def process_commit(_ref, _commit), do: :erlang.nif_error(:nif_not_loaded)
 
   @doc """
   Processes an MLS welcome message from the gateway.
 
+  `user_ids` are the users known to be in the call, as integers, the session's own included: a
+  welcome into a group with anyone else is refused as `:unrecognized_user`. An empty list checks
+  nothing. On `:ok`, prepare the transition next with `prepare_transition/3`.
+
   A failure names its cause: `:already_in_group` when the session had already joined through a
-  commit of its own — the expected outcome of a commit race — `:no_external_sender`, or `:invalid`.
+  commit of its own — the expected outcome of a commit race — `:no_external_sender`,
+  `:unrecognized_user`, `:unexpected_group`, `:invalid_roster`, or `:invalid`, which is also what a
+  welcome for a key package other than the last one sent gets.
   """
-  @spec process_welcome(reference(), binary()) ::
-          :ok | :error | {:error, :already_in_group | :no_external_sender | :invalid}
-  def process_welcome(_ref, _welcome), do: :erlang.nif_error(:nif_not_loaded)
+  @spec process_welcome(reference(), binary(), [non_neg_integer()]) ::
+          :ok
+          | :error
+          | {:error,
+             :already_in_group
+             | :no_external_sender
+             | :unrecognized_user
+             | :unexpected_group
+             | :invalid_roster
+             | :invalid}
+  def process_welcome(_ref, _welcome, _user_ids), do: :erlang.nif_error(:nif_not_loaded)
+
+  @doc """
+  Prepares a transition to `protocol_version`, after a commit or a welcome was processed or when
+  the gateway announces one (opcode 21).
+
+  The keys of the session's current epoch are derived and decryption can use them at once.
+  Encryption keeps the key it has until `execute_transition/2`, except for transition 0, which
+  executes here. Preparing a transition to protocol version 0 lets the current decryption keys
+  expire.
+  """
+  @spec prepare_transition(reference(), 0..65_535, non_neg_integer()) :: :ok | :error
+  def prepare_transition(_ref, _transition_id, _protocol_version),
+    do: :erlang.nif_error(:nif_not_loaded)
+
+  @doc """
+  Executes a prepared transition (opcode 22): encryption switches to the key it was prepared with,
+  or stops having one for a transition to protocol version 0.
+
+  `:not_pending` when the session was not prepared for this transition.
+  """
+  @spec execute_transition(reference(), 0..65_535) :: :ok | :not_pending | :error
+  def execute_transition(_ref, _transition_id), do: :erlang.nif_error(:nif_not_loaded)
 
   @doc """
   Encrypts an Opus audio packet using DAVE E2EE.
@@ -130,29 +184,50 @@ defmodule EDA.Voice.Dave.Native do
           {:ok, non_neg_integer()} | {:error, atom()} | non_neg_integer()
   def get_epoch(_ref), do: :erlang.nif_error(:nif_not_loaded)
 
-  @doc "Returns true if the MLS session is ready (group established)."
+  @doc """
+  Returns true once the session has derived the keys of a group.
+
+  It stays true when the session is re-initialised, since the keys are kept until the next
+  transition replaces them. It does not say the session can encrypt: see `can_encrypt?/1`.
+  """
   @spec ready?(reference()) :: {:ok, boolean()} | {:error, atom()} | boolean()
   def ready?(_ref), do: :erlang.nif_error(:nif_not_loaded)
 
   @doc """
-  Sets passthrough mode on every decryptor: while it is on, unencrypted frames are accepted.
+  Returns true when the session holds a key to encrypt media with.
 
-  Turning it on is immediate; `transition_expiry` is how many seconds decryptors keep accepting
-  unencrypted frames once it is turned off again.
+  A session that joined a group through a welcome is ready as soon as the transition is prepared,
+  and has a key once it executes.
+  """
+  @spec can_encrypt?(reference()) :: {:ok, boolean()} | {:error, atom()} | boolean()
+  def can_encrypt?(_ref), do: :erlang.nif_error(:nif_not_loaded)
+
+  @doc """
+  Sets passthrough mode on every decryptor, and on those created later: while it is on,
+  unencrypted frames are accepted.
+
+  Turning it on is immediate and lasts until it is turned off; `transition_expiry` is then how many
+  seconds decryptors keep accepting unencrypted frames, and is ignored when turning it on.
   """
   @spec set_passthrough_mode(reference(), boolean(), non_neg_integer()) :: :ok | :error
   def set_passthrough_mode(_ref, _passthrough, _transition_expiry),
     do: :erlang.nif_error(:nif_not_loaded)
 
   @doc """
-  Leaves the MLS group and clears the session's key storage, keeping the external sender.
+  Leaves the MLS group and clears the session's MLS storage, keeping the external sender and the
+  media keys.
 
   It does not prepare a new pending group, so a session that must commit again needs `reinit/4`.
   """
   @spec reset(reference()) :: :ok | :error
   def reset(_ref), do: :erlang.nif_error(:nif_not_loaded)
 
-  @doc "Re-initializes the session with new parameters without creating a new resource."
+  @doc """
+  Re-initializes the session with new parameters without creating a new resource.
+
+  For the same user and channel the media keys are kept, so the session goes on encrypting and
+  decrypting until the next transition replaces them.
+  """
   @spec reinit(reference(), pos_integer(), non_neg_integer(), non_neg_integer()) :: :ok | :error
   def reinit(_ref, _protocol_version, _user_id, _channel_id),
     do: :erlang.nif_error(:nif_not_loaded)

@@ -71,13 +71,49 @@ defmodule EDA.Voice.Dave.NativeTest do
     end
   end
 
-  describe "failure reasons" do
+  describe "can_encrypt?/1" do
+    test "is false for a session that is in no group" do
+      assert {:ok, false} = Native.can_encrypt?(create_session())
+    end
+  end
+
+  describe "commits and welcomes" do
     test "a welcome before the external sender is known says so" do
-      assert {:error, :no_external_sender} = Native.process_welcome(create_session(), "garbage")
+      assert {:error, :no_external_sender} =
+               Native.process_welcome(create_session(), "garbage", [])
     end
 
-    test "a commit before joining a group says so" do
-      assert {:error, :no_group} = Native.process_commit(create_session(), "garbage")
+    test "a commit that reaches a session in no group is ignored" do
+      assert :ignored = Native.process_commit(create_session(), "garbage")
+    end
+  end
+
+  describe "transitions" do
+    test "a prepared transition executes once" do
+      ref = create_session()
+
+      assert :ok = Native.prepare_transition(ref, 4, 1)
+      assert :ok = Native.execute_transition(ref, 4)
+      assert :not_pending = Native.execute_transition(ref, 4)
+    end
+
+    test "a transition that was not prepared does not execute" do
+      assert :not_pending = Native.execute_transition(create_session(), 9)
+    end
+
+    test "transition 0 executes when it is prepared" do
+      ref = create_session()
+
+      assert :ok = Native.prepare_transition(ref, 0, 1)
+      assert :not_pending = Native.execute_transition(ref, 0)
+    end
+
+    test "re-initialising forgets the transitions that were prepared" do
+      ref = create_session()
+
+      assert :ok = Native.prepare_transition(ref, 4, 1)
+      assert :ok = Native.reinit(ref, 1, 12_345, 67_890)
+      assert :not_pending = Native.execute_transition(ref, 4)
     end
   end
 

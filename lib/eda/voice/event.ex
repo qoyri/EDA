@@ -191,8 +191,9 @@ defmodule EDA.Voice.Event do
   # DAVE opcodes 21-31 — delegate to Dave.Manager
   def handle(%{"op" => op, "d" => data}, %{dave_manager: %Dave.Manager{}} = state)
       when op in 21..31 do
+    # Proposals and welcomes are checked against who is in the call.
     data =
-      if op == 27 do
+      if op in [27, 30] do
         Map.put(data, "connected_clients", state.connected_clients)
       else
         data

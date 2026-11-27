@@ -21,11 +21,12 @@ defmodule EDA.Voice.Dave.Manager do
   @dialyzer {:nowarn_function,
              encrypt_frame: 2, encrypt_with_session: 3, normalize_encrypt_result: 1}
 
-  # Seconds decryptors keep accepting unencrypted frames after an upgrade, and while a downgrade to
-  # protocol 0 is pending. Transitions take about three seconds; the downgrade window also covers
-  # delayed connections.
+  # Seconds decryptors keep accepting unencrypted frames once an upgrade has executed: the other
+  # members switch within about three seconds of each other.
   @transition_expiry 10
-  @pending_downgrade_expiry 24
+
+  # A transition id is 16 bits on the wire.
+  @max_transition_id 0xFFFF
 
   # Frames that may fail to decrypt in a row before the session is re-initialised, as in Discord's
   # reference client. Failures while re-initialising or during a transition are expected, and not
@@ -52,11 +53,15 @@ defmodule EDA.Voice.Dave.Manager do
   @typedoc """
   The DAVE state of one voice connection.
 
-  `protocol_version` is the version in effect. The playback process works on a copy of this struct
-  taken when the connection became ready, so the version is also held in `version_ref`, an
-  `:atomics` shared by every copy: a transition executed by the session reaches playback already
-  under way. `transitions` counts executed transitions, `decrypt_failures` the frames that failed
-  to decrypt in a row.
+  `protocol_version` is the version the call has agreed on. `downgraded` is true from the moment a
+  transition to protocol 0 executes until a later transition has brought the call back to DAVE:
+  in between, and that includes the time an upgrade is announced but not yet executed, media goes
+  unencrypted.
+
+  The playback process works on a copy of this struct taken when the connection became ready, so
+  the version media is sent with is also held in `version_ref`, an `:atomics` shared by every copy:
+  a transition executed by the session reaches playback already under way. `transitions` counts
+  executed transitions, `decrypt_failures` the frames that failed to decrypt in a row.
   """
   @type t :: %__MODULE__{
           mls_session: reference() | nil,
@@ -92,21 +97,19 @@ defmodule EDA.Voice.Dave.Manager do
         nil
       end
 
-    version_ref = :atomics.new(1, signed: false)
-    :atomics.put(version_ref, 1, protocol_version)
-
-    %__MODULE__{
+    sync_version(%__MODULE__{
       mls_session: session,
       protocol_version: protocol_version,
       user_id: user_id,
       channel_id: channel_id,
-      version_ref: version_ref
-    }
+      version_ref: :atomics.new(1, signed: false),
+      downgraded: protocol_version == 0
+    })
   end
 
   @doc """
-  The protocol version currently in effect, including transitions executed after this copy of the
-  manager was taken.
+  The protocol version media is sent with, including transitions executed after this copy of the
+  manager was taken: 0 while the call is downgraded, which lasts until an upgrade has executed.
   """
   @spec current_version(t()) :: non_neg_integer()
   def current_version(%__MODULE__{version_ref: nil, protocol_version: v}), do: v
@@ -116,12 +119,22 @@ defmodule EDA.Voice.Dave.Manager do
   @spec active?(t()) :: boolean()
   def active?(%__MODULE__{protocol_version: v, mls_session: s}), do: v > 0 and not is_nil(s)
 
-  @doc "Returns true when the MLS session is ready to encrypt media."
+  @doc """
+  Returns true when media can be sent: the session holds a key to encrypt with, or the call is
+  downgraded and media goes unencrypted.
+
+  A session that has just joined a group has no key until the transition that brought it in
+  executes; `VOICE_DAVE_READY` is dispatched at that moment.
+  """
   @spec ready?(t()) :: boolean()
   def ready?(%__MODULE__{mls_session: nil}), do: false
 
-  def ready?(%__MODULE__{mls_session: session}) do
-    case normalize_ready_result(Native.ready?(session)) do
+  def ready?(%__MODULE__{mls_session: session} = manager) do
+    current_version(manager) == 0 or can_encrypt?(session)
+  end
+
+  defp can_encrypt?(session) do
+    case normalize_ready_result(Native.can_encrypt?(session)) do
       {:ok, ready} -> ready
       _ -> false
     end
@@ -269,7 +282,7 @@ defmodule EDA.Voice.Dave.Manager do
         "re-initialising the session (transition #{transition_id})"
     )
 
-    recover_from_invalid_transition(%{manager | decrypt_failures: 0}, transition_id)
+    recover_from_invalid_transition(manager, transition_id)
   end
 
   @doc """
@@ -323,7 +336,7 @@ defmodule EDA.Voice.Dave.Manager do
   def handle_mls_event(%__MODULE__{mls_session: session} = manager, 27, data)
       when not is_nil(session) do
     op_type = proposal_operation_type(data["operation_type"])
-    user_ids = connected_clients_to_ids(data["connected_clients"])
+    user_ids = recognized_user_ids(manager, data)
 
     with {:ok, proposals} <- raw_or_base64(data, "proposals_bin", "proposals"),
          {:process_proposals, {:ok, commit, welcome}} <-
@@ -354,6 +367,12 @@ defmodule EDA.Voice.Dave.Manager do
           :ok ->
             joined_transition(manager, session, transition_id, "Commit processed")
 
+          :ignored ->
+            # The session has no group the commit could apply to: it is waiting to be welcomed
+            # into one. Nothing is wrong, so nothing is reported.
+            Logger.debug("DAVE: Commit for transition #{transition_id} ignored, not in a group")
+            {manager, []}
+
           {:error, reason} ->
             Logger.warning(
               "DAVE: Commit for transition #{transition_id} refused (#{inspect(reason)}), " <>
@@ -376,7 +395,7 @@ defmodule EDA.Voice.Dave.Manager do
 
     case raw_or_base64(data, "welcome_bin", "welcome") do
       {:ok, welcome} ->
-        case process_welcome(session, transition_id, welcome) do
+        case process_welcome(session, transition_id, welcome, recognized_user_ids(manager, data)) do
           :ok ->
             joined_transition(manager, session, transition_id, "Welcome processed")
 
@@ -409,20 +428,32 @@ defmodule EDA.Voice.Dave.Manager do
   # OP 21: DAVE_PREPARE_TRANSITION
   #
   # Transition 0 is a (re)initialisation and executes at once, with nothing to acknowledge. Any other
-  # transition is acknowledged, and a pending downgrade to protocol 0 starts accepting unencrypted
-  # frames straight away, since other members may switch before the transition executes.
+  # transition is acknowledged and executes on OP 22. A downgrade to protocol 0 starts accepting
+  # unencrypted frames straight away, since other members may switch before the transition executes.
   def handle_mls_event(manager, 21, data) do
     transition_id = normalize_integer(data["transition_id"], 0)
     version = normalize_integer(data["protocol_version"], manager.protocol_version)
     Logger.debug("DAVE: Prepare transition #{transition_id}, version=#{version}")
 
-    manager = put_in(manager.pending_transitions[transition_id], version)
+    # Transition 0 executes as it is prepared.
+    if transition_id == 0, do: stop_encrypting_before_downgrade(manager, version)
 
-    if transition_id == 0 do
-      {execute_transition(manager, 0), []}
-    else
-      if version == 0, do: set_passthrough(manager, @pending_downgrade_expiry)
-      {manager, [Payload.dave_ready_for_transition(transition_id)]}
+    case prepare_transition(manager.mls_session, transition_id, version) do
+      :ok ->
+        manager = put_in(manager.pending_transitions[transition_id], version)
+        if version == 0, do: set_passthrough(manager, true)
+
+        if transition_id == 0 do
+          {execute_transition(manager, 0), []}
+        else
+          {manager, [Payload.dave_ready_for_transition(transition_id)]}
+        end
+
+      {:error, reason} ->
+        # Not acknowledged: the gateway decides what becomes of a member that is not ready.
+        Logger.warning("DAVE: Could not prepare transition #{transition_id} (#{inspect(reason)})")
+
+        {sync_version(manager), []}
     end
   end
 
@@ -440,7 +471,7 @@ defmodule EDA.Voice.Dave.Manager do
     version = normalize_integer(data["protocol_version"], manager.protocol_version)
     Logger.info("DAVE: Prepare epoch 1 (new group), protocol version #{version}")
 
-    manager |> set_version(version) |> reinit_session()
+    %{manager | protocol_version: version} |> sync_version() |> reinit_session()
   end
 
   def handle_mls_event(manager, 24, data) do
@@ -473,23 +504,36 @@ defmodule EDA.Voice.Dave.Manager do
     now > before and current_version(after_) > 0
   end
 
-  # Commit or welcome accepted. Transition 0 needs no acknowledgement and counts as executed;
-  # any other is acknowledged and executes on OP 22, at the version now in effect.
+  # Commit or welcome accepted: the session is in the new epoch, and preparing the transition
+  # derives its keys. Decryption has them at once. Encryption keeps the key the other members
+  # still expect until the transition executes: on OP 22, or here for transition 0, which needs no
+  # acknowledgement.
   defp joined_transition(manager, session, transition_id, action) do
-    epoch = normalize_epoch_result(Native.get_epoch(session))
-    Logger.info("DAVE: #{action}, transition #{transition_id}, epoch=#{epoch}")
-    :telemetry.execute([:eda, :voice, :dave, :epoch_change], %{epoch: epoch}, %{})
+    case prepare_transition(session, transition_id, session_version(manager, session)) do
+      :ok ->
+        epoch = normalize_epoch_result(Native.get_epoch(session))
+        Logger.info("DAVE: #{action}, transition #{transition_id}, epoch=#{epoch}")
+        :telemetry.execute([:eda, :voice, :dave, :epoch_change], %{epoch: epoch}, %{})
 
-    if transition_id == 0 do
-      {%{
-         manager
-         | reinitializing: false,
-           last_transition_id: 0,
-           transitions: manager.transitions + 1
-       }, []}
-    else
-      manager = put_in(manager.pending_transitions[transition_id], manager.protocol_version)
-      {manager, [Payload.dave_ready_for_transition(transition_id)]}
+        if transition_id == 0 do
+          {%{
+             manager
+             | reinitializing: false,
+               last_transition_id: 0,
+               transitions: manager.transitions + 1
+           }, []}
+        else
+          manager = put_in(manager.pending_transitions[transition_id], manager.protocol_version)
+          {manager, [Payload.dave_ready_for_transition(transition_id)]}
+        end
+
+      {:error, reason} ->
+        Logger.warning(
+          "DAVE: #{action}, but transition #{transition_id} could not be prepared " <>
+            "(#{inspect(reason)}), re-initialising"
+        )
+
+        recover_from_invalid_transition(manager, transition_id)
     end
   end
 
@@ -500,78 +544,156 @@ defmodule EDA.Voice.Dave.Manager do
         manager
 
       {version, pending} ->
-        old_version = manager.protocol_version
         manager = %{manager | pending_transitions: pending}
+        stop_encrypting_before_downgrade(manager, version)
 
-        manager =
-          cond do
-            version != old_version and version == 0 ->
-              Logger.info(
-                "DAVE: Downgraded to protocol 0, media is no longer end-to-end encrypted"
-              )
+        case execute_in_session(manager.mls_session, transition_id) do
+          :ok ->
+            executed_transition(manager, transition_id, version)
 
-              %{manager | downgraded: true}
+          {:error, reason} ->
+            Logger.warning(
+              "DAVE: Transition #{transition_id} was not executed (#{inspect(reason)})"
+            )
 
-            transition_id > 0 and manager.downgraded ->
-              Logger.info("DAVE: Upgraded back to protocol #{version}")
-              set_passthrough(manager, @transition_expiry)
-              %{manager | downgraded: false}
-
-            true ->
-              manager
-          end
-
-        Logger.info("DAVE: Executed transition #{transition_id} (v#{old_version} -> v#{version})")
-
-        %{
-          set_version(manager, version)
-          | reinitializing: false,
-            last_transition_id: transition_id,
-            transitions: manager.transitions + 1
-        }
+            sync_version(manager)
+        end
     end
   end
 
-  defp set_version(manager, version) do
-    if manager.version_ref, do: :atomics.put(manager.version_ref, 1, version)
-    %{manager | protocol_version: version}
+  defp executed_transition(manager, transition_id, version) do
+    old_version = manager.protocol_version
+
+    manager =
+      cond do
+        version != old_version and version == 0 ->
+          Logger.info("DAVE: Downgraded to protocol 0, media is no longer end-to-end encrypted")
+          %{manager | downgraded: true}
+
+        transition_id > 0 and manager.downgraded ->
+          Logger.info("DAVE: Upgraded back to protocol #{version}")
+          # Members switch within moments of each other: unencrypted frames are accepted for a
+          # few more seconds, then refused.
+          set_passthrough(manager, false)
+          %{manager | downgraded: false}
+
+        true ->
+          manager
+      end
+
+    Logger.info("DAVE: Executed transition #{transition_id} (v#{old_version} -> v#{version})")
+
+    sync_version(%{
+      manager
+      | protocol_version: version,
+        reinitializing: false,
+        last_transition_id: transition_id,
+        transitions: manager.transitions + 1
+    })
   end
 
-  defp set_passthrough(%__MODULE__{mls_session: nil}, _expiry), do: :ok
+  # The session derives the keys of its epoch. Without a session there is nothing to derive, and
+  # the transition is only recorded.
+  defp prepare_transition(nil, _transition_id, _version), do: :ok
 
-  defp set_passthrough(%__MODULE__{mls_session: session}, expiry),
-    do: Native.set_passthrough_mode(session, true, expiry)
+  defp prepare_transition(session, transition_id, version)
+       when transition_id in 0..@max_transition_id and version >= 0 do
+    case Native.prepare_transition(session, transition_id, version) do
+      :ok -> :ok
+      other -> {:error, other}
+    end
+  end
+
+  defp prepare_transition(_session, _transition_id, _version), do: {:error, :invalid_transition}
+
+  # Transition 0 was executed by the session when it was prepared.
+  defp execute_in_session(nil, _transition_id), do: :ok
+  defp execute_in_session(_session, 0), do: :ok
+
+  defp execute_in_session(session, transition_id) when transition_id in 1..@max_transition_id do
+    case Native.execute_transition(session, transition_id) do
+      :ok -> :ok
+      other -> {:error, other}
+    end
+  end
+
+  defp execute_in_session(_session, _transition_id), do: {:error, :invalid_transition}
+
+  # A commit or a welcome moves the session at the version it was created for.
+  defp session_version(manager, session) do
+    case Native.protocol_version(session) do
+      {:ok, version} when is_integer(version) -> version
+      version when is_integer(version) -> version
+      _ -> manager.protocol_version
+    end
+  end
+
+  # A downgrade takes the session's key away as it executes. Playback runs in another process
+  # and reads the version for every frame: it is told first, or a frame sent in between would
+  # find a session that should encrypt and cannot, and stop the playback. An upgrade needs no
+  # such care, the key being there before the version says to use it.
+  defp stop_encrypting_before_downgrade(%__MODULE__{version_ref: ref}, 0) when ref != nil,
+    do: :atomics.put(ref, 1, 0)
+
+  defp stop_encrypting_before_downgrade(_manager, _version), do: :ok
+
+  # What the media path reads: 0 for as long as the call is downgraded.
+  defp sync_version(%__MODULE__{version_ref: nil} = manager), do: manager
+
+  defp sync_version(%__MODULE__{version_ref: ref} = manager) do
+    :atomics.put(ref, 1, if(manager.downgraded, do: 0, else: manager.protocol_version))
+    manager
+  end
+
+  # Turned on, decryptors accept unencrypted frames until it is turned off; turned off, they go on
+  # accepting them for the transition expiry.
+  defp set_passthrough(%__MODULE__{mls_session: nil}, _passthrough), do: :ok
+
+  defp set_passthrough(%__MODULE__{mls_session: session}, passthrough),
+    do: Native.set_passthrough_mode(session, passthrough, @transition_expiry)
 
   # Re-initialises the MLS session for the version in effect. Unlike `reset`, `reinit` also prepares
-  # a new pending group, so the session can commit again if the next proposals call for it.
-  defp reinit_session(%__MODULE__{protocol_version: 0, mls_session: nil} = manager),
+  # a new pending group, so the session can commit again if the next proposals call for it. The
+  # session keeps its media keys, so it goes on encrypting and decrypting until the transition that
+  # follows replaces them. Transitions that were pending belonged to the group being left.
+  defp reinit_session(%__MODULE__{} = manager),
+    do: do_reinit_session(%{manager | pending_transitions: %{}})
+
+  defp do_reinit_session(%__MODULE__{protocol_version: 0, mls_session: nil} = manager),
     do: {manager, []}
 
-  defp reinit_session(%__MODULE__{protocol_version: 0, mls_session: session} = manager) do
+  defp do_reinit_session(%__MODULE__{protocol_version: 0, mls_session: session} = manager) do
     Native.reset(session)
-    set_passthrough(manager, @transition_expiry)
+    set_passthrough(manager, true)
     {manager, []}
   end
 
-  defp reinit_session(%__MODULE__{mls_session: nil} = manager) do
+  defp do_reinit_session(%__MODULE__{mls_session: nil} = manager) do
     case safe_new_session(manager.protocol_version, manager.user_id, manager.channel_id) do
-      {:ok, ref} when is_reference(ref) -> send_key_package(%{manager | mls_session: ref})
-      ref when is_reference(ref) -> send_key_package(%{manager | mls_session: ref})
+      {:ok, ref} when is_reference(ref) -> reinitialised(%{manager | mls_session: ref})
+      ref when is_reference(ref) -> reinitialised(%{manager | mls_session: ref})
       _ -> {manager, []}
     end
   end
 
-  defp reinit_session(%__MODULE__{mls_session: session} = manager) do
+  defp do_reinit_session(%__MODULE__{mls_session: session} = manager) do
     case mls_result(
            Native.reinit(session, manager.protocol_version, manager.user_id, manager.channel_id)
          ) do
       :ok ->
-        send_key_package(manager)
+        reinitialised(manager)
 
       {:error, reason} ->
         Logger.error("DAVE: Failed to re-initialise the session (#{inspect(reason)})")
         {manager, []}
     end
+  end
+
+  # An upgrade is under way while the call is still downgraded: the other members send unencrypted
+  # frames until the transition executes.
+  defp reinitialised(manager) do
+    if manager.downgraded, do: set_passthrough(manager, true)
+    send_key_package(manager)
   end
 
   defp send_key_package(manager) do
@@ -587,31 +709,30 @@ defmodule EDA.Voice.Dave.Manager do
   end
 
   # Tell the gateway the transition failed (OP 31) and re-initialise with a fresh key package, so we
-  # are removed and added again. Only once per failure: further commits or welcomes that fail while
-  # the session is already re-initialising would otherwise each trigger another round.
-  defp recover_from_invalid_transition(
-         %__MODULE__{reinitializing: true} = manager,
-         _transition_id
-       ),
-       do: {manager, []}
-
+  # are removed and added again.
+  #
+  # Every refusal starts a round, including one that arrives while the session is already
+  # re-initialising: the welcome that answers a round can itself be refused, and a session that
+  # stayed silent then would never be added again. A commit cannot start one needlessly, since a
+  # session waiting to be welcomed ignores commits instead of refusing them.
   defp recover_from_invalid_transition(manager, transition_id) do
-    {manager, replies} = reinit_session(%{manager | reinitializing: true})
+    {manager, replies} = reinit_session(%{manager | reinitializing: true, decrypt_failures: 0})
     {manager, [Payload.dave_mls_invalid_commit_welcome(transition_id) | replies]}
   end
 
-  defp process_welcome(session, transition_id, welcome) do
+  defp process_welcome(session, transition_id, welcome, user_ids) do
     Logger.debug(
       "DAVE: Processing welcome transition_id=#{transition_id} size=#{byte_size(welcome)}"
     )
 
-    mls_result(process_welcome_with_timeout(session, welcome))
+    mls_result(process_welcome_with_timeout(session, welcome, user_ids))
   end
 
-  # Commit, welcome and reinit results: `:ok`, `{:error, reason}`, or — from older NIF builds — a bare
-  # `:error`.
+  # Commit, welcome and reinit results: `:ok`, `:ignored` for a commit, `{:error, reason}`, or —
+  # when the session's lock is poisoned — a bare `:error`.
   defp mls_result(:ok), do: :ok
   defp mls_result({:ok, :ok}), do: :ok
+  defp mls_result(:ignored), do: :ignored
   defp mls_result({:error, reason}), do: {:error, reason}
   defp mls_result(other), do: {:error, other}
 
@@ -657,11 +778,19 @@ defmodule EDA.Voice.Dave.Manager do
     end
   end
 
+  # The users a proposal may add and a welcomed group may hold: the clients the gateway announced
+  # as connected, and this session's own user, which a welcome's roster always includes.
+  defp recognized_user_ids(manager, data) do
+    [manager.user_id | connected_clients_to_ids(data["connected_clients"])]
+    |> Enum.filter(&is_integer/1)
+    |> Enum.uniq()
+  end
+
   defp connected_clients_to_ids(%MapSet{} = clients) do
-    Enum.map(clients, fn id ->
+    Enum.flat_map(clients, fn id ->
       case Integer.parse(to_string(id)) do
-        {int, ""} -> int
-        _ -> 0
+        {int, ""} when int >= 0 -> [int]
+        _ -> []
       end
     end)
   end
@@ -720,8 +849,8 @@ defmodule EDA.Voice.Dave.Manager do
   defp normalize_epoch_result(epoch) when is_integer(epoch), do: epoch
   defp normalize_epoch_result(_), do: 0
 
-  defp process_welcome_with_timeout(session, payload) do
-    task = Task.async(fn -> Native.process_welcome(session, payload) end)
+  defp process_welcome_with_timeout(session, payload, user_ids) do
+    task = Task.async(fn -> Native.process_welcome(session, payload, user_ids) end)
 
     case Task.yield(task, 2_000) || Task.shutdown(task, :brutal_kill) do
       {:ok, result} -> result
