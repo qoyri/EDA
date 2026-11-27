@@ -266,9 +266,8 @@ defmodule EDA.User do
   @doc """
   URL of the user's server tag badge, or `nil`.
 
-  discord.js exposes the same helper on the user (`guildTagBadgeURL()`) rather than
-  only on the nested object, because that is where callers have it to hand. Accepts a
-  struct or a raw user map, like `avatar_url/1`.
+  The helper sits on the user rather than only on the nested object, because that is
+  where callers have it to hand. Accepts a struct or a raw user map, like `avatar_url/1`.
 
   ## Options
 

@@ -2,14 +2,13 @@ defmodule EDA.Role.Colors do
   @moduledoc """
   A role's colours: solid, gradient, or holographic.
 
-  Supersedes the role's single `color` field, which Discord deprecated — JDA marks
-  its equivalent `getColor()` as `@ReplaceWith("getColors().getPrimary()")`, and
-  discord.js sends only `colors` when editing a role, never `color`.
+  Supersedes the role's single `color` field, which Discord deprecated: editing a role
+  sends only `colors`, never `color`.
 
   ## Four styles
 
-  `style/1` returns `:default`, `:solid`, `:gradient` or `:holographic`, mirroring JDA's
-  `isDefault()` / `isSolid()` / `isGradient()` / `isHolographic()`. Two distinctions matter:
+  `style/1` returns `:default`, `:solid`, `:gradient` or `:holographic`. Two distinctions
+  matter:
 
     * `:default` — **no colour at all**. Discord represents this as `primary_color: 0`, which
       is not the same as an explicitly chosen black. Measured across 201 roles on 8 real
@@ -148,7 +147,7 @@ defmodule EDA.Role.Colors do
   @doc """
   Returns the colour style: `:default`, `:solid`, `:gradient` or `:holographic`.
 
-  `primary_color: 0` means *no colour*, not black — it is `:default`, as in JDA.
+  `primary_color: 0` means *no colour*, not black — it is `:default`.
 
   ## Examples
 

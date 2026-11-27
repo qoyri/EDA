@@ -1093,18 +1093,18 @@ end
   Flags reference rather than transcribed, so the twelve guild-level permissions and the text/voice/
   stage split come from the source. `inapplicable/2` lists the permissions in a bitset that have no
   effect in a given channel — Discord accepts `KICK_MEMBERS` in a channel overwrite and silently
-  ignores it. JDA classifies permissions but offers no such check; Nostrum does neither
+  ignores it
 - **`EDA.Permission.explain/3`** — returns *how* a member's channel permissions were derived, not
   just the result: `:base` role permissions, the ordered `:steps` (each overwrite tier with the
   `:allow`/`:deny` it applied and the running result), which `:gates` fired, and `:denied_by` naming
-  the gate that reduced the result to zero. Neither JDA nor Nostrum exposes the derivation
-- **`EDA.Member.timed_out?/1`** and **`time_out_end/1`** — mirroring JDA's `isTimedOut()` /
-  `getTimeOutEnd()`. Discord leaves `communication_disabled_until` populated after expiry, so
+  the gate that reduced the result to zero. "Why can't my bot post here" is otherwise answered
+  by guesswork against an opaque integer
+- **`EDA.Member.timed_out?/1`** and **`time_out_end/1`**. Discord leaves `communication_disabled_until` populated after expiry, so
   `time_out_end/1` may return a past date while `timed_out?/1` answers `false`. Both accept a struct
   or a raw member map
 
 - **`EDA.API.Role.member_counts/1`** — `GET /guilds/{id}/roles/member-counts`, returning a map of
-  role ID to member count, mirroring discord.js's `guild.roles.fetchMemberCounts()`. The `@everyone`
+  role ID to member count. The `@everyone`
   role is absent from the result (every member carries it), and the counts overlap — a member with
   three roles is counted in all three, so they sum to more than the guild's `member_count`.
   Unlike counting from `EDA.Cache.members/1`, it needs neither the privileged `:guild_members` intent
@@ -1112,17 +1112,16 @@ end
   entirely
 
 - **`EDA.Role.colors`** / **`EDA.Role.Colors`** — role colours, superseding the deprecated single
-  `color` field. Three styles, matching JDA's `isDefault`/`isGradient`/`isHolographic` and
-  discord.js's `RoleColors`: `style/1` returns `:default`, `:solid`, `:gradient` or `:holographic`,
+  `color` field. Four styles: `style/1` returns `:default`, `:solid`, `:gradient` or `:holographic`,
   with `default?/1`, `solid?/1`, `gradient?/1` and `holographic?/1`. **`gradient?/1` is false for
   holographic roles** — Discord treats them as distinct styles. `EDA.Role.primary_color/1` prefers
   `colors.primary_color` and falls back to `color`
-- **`primary_color: 0` means *no colour*, not black** — it is `:default`, as in JDA's `isDefault()`.
+- **`primary_color: 0` means *no colour*, not black** — it is `:default`.
   Measured across 201 roles on 8 real guilds, 78 were in that state (39%), only 8 of them
   `@everyone`, so treating them as solid would mis-colour most of a guild's roles
 - **Writing colours** — `EDA.API.Role.set_colors/4` and `EDA.Role.set_colors/4`, with the
   `EDA.Role.Colors.solid/1`, `gradient/2` and `holographic/0` constructors. Only the `colors` object
-  is sent, never the deprecated `color`, matching discord.js. `EDA.Role.Colors` implements
+  is sent, never the deprecated `color`. `EDA.Role.Colors` implements
   `Jason.Encoder` and `to_map/1` omits nil keys so a solid colour does not accidentally clear a
   gradient
 - **Holographic is a constrained style**: sending `tertiary_color` makes Discord enforce
@@ -1167,8 +1166,7 @@ end
 - **`EDA.Permission.in_channel/3` now accounts for member timeouts.** Discord removes every
   permission except `VIEW_CHANNEL` and `READ_MESSAGE_HISTORY` from a timed-out member; EDA was
   reporting them as able to send messages, so a bot gating an action on `has_permission?/4` would
-  wrongly allow a silenced member. Neither Nostrum nor JDA applies this — JDA documents the rule but
-  leaves enforcement to the caller. The gate restricts and never grants, and guild owners and
+  wrongly allow a silenced member. The gate restricts and never grants, and guild owners and
   administrators are exempt, since Discord refuses to time them out at all
 - **`EDA.Permission.in_channel/3` returns `{:error, :channel_obfuscated}`** for a channel Discord has
   redacted. The synthetic `@everyone` `VIEW_CHANNEL` deny is indistinguishable from a real overwrite,
@@ -1235,7 +1233,7 @@ end
 
 ### Added
 
-- **EDA.Collector** — Discord.js-style `await` patterns for messages, reactions, components with filters, timeouts, and max count ([#4](https://github.com/qoyri/EDA/pull/4))
+- **EDA.Collector** — `await` patterns for messages, reactions, components with filters, timeouts, and max count ([#4](https://github.com/qoyri/EDA/pull/4))
 - **EDA.AutoDelete** — Timer-based auto-deletion using BEAM timer wheel. `delete_after:` option on `Message.create`, `Interaction.respond`, `Interaction.followup`
 - **EDA.Color** — 30 named colors with individual functions, crypto-random generation (`Color.random()`), hex parsing, `:random` support in `Embed.color/2`
 - **EDA.Mention** — User, channel, role, emoji, and timestamp formatting helpers

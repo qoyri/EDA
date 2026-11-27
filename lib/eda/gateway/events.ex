@@ -3,7 +3,7 @@ defmodule EDA.Gateway.Events do
   Handles dispatching Gateway events to consumers and updating caches.
 
   Every event that carries state is used to keep the ETS caches up-to-date
-  in real time (JDA-style). The consumer callback runs asynchronously
+  in real time. The consumer callback runs asynchronously
   so it never blocks the gateway.
   """
 

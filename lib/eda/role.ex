@@ -122,7 +122,7 @@ defmodule EDA.Role do
   Returns `true` when the role uses a two-colour gradient.
 
   **Not** true for holographic roles — use `holographic?/1` for those. Discord treats
-  the two as distinct styles, as do JDA and discord.js.
+  the two as distinct styles.
 
   ## Examples
 

@@ -346,8 +346,7 @@ defmodule EDA.Permission do
   Lists the permissions in a bitset that have **no effect** in the given channel.
 
   Use it to catch a meaningless overwrite before sending it — Discord accepts
-  `KICK_MEMBERS` in a channel overwrite and silently ignores it. Neither JDA nor
-  Nostrum offers this check.
+  `KICK_MEMBERS` in a channel overwrite and silently ignores it.
 
   ## Examples
 
@@ -472,7 +471,7 @@ defmodule EDA.Permission do
 
   Returns `{:ok, bitset}` or `{:error, reason}`.
 
-  ## Algorithm (matches Discord's official spec + JDA)
+  ## Algorithm (Discord's documented one)
   1. Owner → ALL_PERMISSIONS
   2. Compute guild base permissions
   3. ADMINISTRATOR → ALL_PERMISSIONS (skips all overwrites)
@@ -541,9 +540,8 @@ defmodule EDA.Permission do
   @doc """
   Explains **how** a member's channel permissions were derived.
 
-  `in_channel/3` answers *what* a member may do; this answers *why*. Neither JDA nor
-  Nostrum exposes the derivation, and "why can't my bot post here" is usually answered
-  by guesswork against an opaque integer.
+  `in_channel/3` answers *what* a member may do; this answers *why*. "Why can't my bot
+  post here" is otherwise answered by guesswork against an opaque integer.
 
   Returns the same `:effective` bitset as `in_channel/3`, plus:
 
@@ -721,7 +719,7 @@ defmodule EDA.Permission do
   end
 
   # ── Internal: 3-Tier Overwrite Cascade ────────────────────────────
-  # Matches Discord's official algorithm and JDA's PermissionUtil.
+  # Discord's documented algorithm.
   #
   # Tier 1: @everyone role overwrite
   # Tier 2: All role overwrites (merged via OR)

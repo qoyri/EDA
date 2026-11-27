@@ -2,7 +2,7 @@ defmodule EDA.Gateway.ShardManager do
   @moduledoc """
   Orchestrates the lifecycle of all gateway shards.
 
-  Inspired by JDA's `DefaultShardManager` but built on OTP primitives:
+  Built on OTP primitives:
   - Fetches `/gateway/bot` for recommended shard count and `max_concurrency`
   - Launches shards via `DynamicSupervisor` with staggered timing
   - Monitors shards and auto-reconnects with exponential backoff + jitter
