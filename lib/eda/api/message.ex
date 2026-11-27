@@ -383,7 +383,10 @@ defmodule EDA.API.Message do
     patch("/channels/#{channel_id}/messages/#{message_id}", payload, opts)
   end
 
-  @doc "Deletes a message."
+  @doc """
+  Deletes a message. Discord does not record a message a bot deletes in the audit log: a
+  `:reason` is sent and has no effect.
+  """
   @spec delete(String.t() | integer(), String.t() | integer(), keyword()) ::
           :ok | {:error, term()}
   def delete(channel_id, message_id, opts \\ []) do

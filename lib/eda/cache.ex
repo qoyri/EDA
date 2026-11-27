@@ -38,10 +38,9 @@ defmodule EDA.Cache do
 
   ## Obfuscated channels
 
-  From **2026-11-16** Discord redacts channels the bot cannot view rather than hiding
+  Since **2026-11-16** Discord redacts channels the bot cannot view rather than hiding
   them: they are still dispatched over the gateway, with `name` set to `"___hidden___"`,
-  sensitive fields nulled, and the `CHANNEL_OBFUSCATED` flag set. Before that date the
-  behaviour is opt-in via `config :eda, capabilities: [:channel_obfuscation]`.
+  sensitive fields nulled, and the `CHANNEL_OBFUSCATED` flag set.
 
   **EDA caches them like any other channel.** They are dropped neither on write nor on
   read, because "this channel exists and I cannot see it" is real information — Discord

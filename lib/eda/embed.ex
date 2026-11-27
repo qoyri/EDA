@@ -30,11 +30,19 @@ defmodule EDA.Embed do
   An embed on a received message is the same struct, down to its parts: `EDA.Embed.Footer`,
   `EDA.Embed.Author`, `EDA.Embed.Field`, `EDA.Embed.Media` for the image, thumbnail and video,
   and `EDA.Embed.Provider` for the site a link embed comes from. `timestamp` is a `DateTime`,
-  and `type` is `:rich` for an embed a bot built, or `:image`, `:video`, `:gifv`, `:article`,
-  `:link` or `:poll_result` for one Discord made; a type added later stays its string.
+  and `type` is `:rich` for an embed a bot built, or `:image`, `:video`, `:audio`, `:gifv`,
+  `:article`, `:link`, `:poll_result` or `:components` for one Discord made; a type added later
+  stays its string.
+
+  A link to an audio file gives an `:audio` embed, with the file in `audio`. A site that
+  describes its own preview gives a `:components` embed: `components` then holds the one
+  `EDA.Component.Container` it is made of, display only.
+
+  `content_flags/1` and `flagged?/1` say what Discord's content scanning found in the embed's
+  media; `EDA.Embed.Flags` names every flag.
 
   A received embed can be sent again as is: `to_map/1` leaves out what only Discord sets (the
-  type, the proxied URLs, the sizes, the video and the provider).
+  type, the proxied URLs, the sizes, the video, the audio, the components and the provider).
   """
 
   use EDA.Event.Access
@@ -53,13 +61,25 @@ defmodule EDA.Embed do
     :image,
     :thumbnail,
     :video,
+    :audio,
     :provider,
     :author,
+    :components,
     :flags,
     fields: []
   ]
 
-  @type type :: :rich | :image | :video | :gifv | :article | :link | :poll_result | String.t()
+  @type type ::
+          :rich
+          | :image
+          | :video
+          | :audio
+          | :gifv
+          | :article
+          | :link
+          | :poll_result
+          | :components
+          | String.t()
 
   @type t :: %__MODULE__{
           title: String.t() | nil,
@@ -72,13 +92,18 @@ defmodule EDA.Embed do
           image: Media.t() | nil,
           thumbnail: Media.t() | nil,
           video: Media.t() | nil,
+          audio: Media.t() | nil,
           provider: Provider.t() | nil,
           author: Author.t() | nil,
+          components: [EDA.Component.t()] | nil,
           flags: non_neg_integer() | nil,
           fields: [Field.t()]
         }
 
-  @types Map.new(~w(rich image video gifv article link poll_result)a, &{Atom.to_string(&1), &1})
+  @types Map.new(
+           ~w(rich image video audio gifv article link poll_result components)a,
+           &{Atom.to_string(&1), &1}
+         )
 
   @colors %{
     blurple: 0x5865F2,
@@ -163,8 +188,10 @@ defmodule EDA.Embed do
       image: Media.from_raw(:maps.get("image", raw, nil)),
       thumbnail: Media.from_raw(:maps.get("thumbnail", raw, nil)),
       video: Media.from_raw(:maps.get("video", raw, nil)),
+      audio: Media.from_raw(:maps.get("audio", raw, nil)),
       provider: Provider.from_raw(:maps.get("provider", raw, nil)),
       author: Author.from_raw(:maps.get("author", raw, nil)),
+      components: EDA.Component.parse_list(:maps.get("components", raw, nil)),
       flags: :maps.get("flags", raw, nil),
       fields: Enum.map(:maps.get("fields", raw, nil) || [], &Field.from_raw/1)
     }
@@ -345,6 +372,36 @@ defmodule EDA.Embed do
       {:error, reasons} -> raise ArgumentError, Enum.join(reasons, "; ")
     end
   end
+
+  # ── Content scanning ────────────────────────────────────────────────
+
+  @doc """
+  What Discord's content scanning flagged this embed's media as: any of `:explicit`, `:gore`
+  and `:self_harm`, or `[]`.
+
+  Scanning can finish after the message is sent, so the flags may arrive in a later
+  `MESSAGE_UPDATE`; see `EDA.Message.content_flags/1`.
+
+      iex> EDA.Embed.content_flags(%EDA.Embed{flags: 0b1010000})
+      [:explicit, :gore]
+
+      iex> EDA.Embed.content_flags(%EDA.Embed{})
+      []
+  """
+  @spec content_flags(t()) :: [:explicit | :gore | :self_harm]
+  def content_flags(%__MODULE__{flags: flags}), do: EDA.ContentScan.media(flags)
+
+  @doc """
+  Whether Discord's content scanning flagged this embed's media as explicit, gore or self-harm.
+
+      iex> EDA.Embed.flagged?(%EDA.Embed{flags: 128})
+      true
+
+      iex> EDA.Embed.flagged?(%EDA.Embed{flags: 32})
+      false
+  """
+  @spec flagged?(t()) :: boolean()
+  def flagged?(%__MODULE__{} = embed), do: content_flags(embed) != []
 
   # ── Serialization ───────────────────────────────────────────────────
 

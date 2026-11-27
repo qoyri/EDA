@@ -2,23 +2,25 @@ defmodule EDA.Gateway.Capabilities do
   @moduledoc """
   Gateway capabilities — opt-in protocol behaviour sent in the IDENTIFY payload.
 
-  Capabilities let a bot enable a gateway behaviour before Discord makes it
-  mandatory, so the change can be observed and handled ahead of its deadline.
+  Capabilities let a bot enable a gateway behaviour before Discord makes it mandatory, so the
+  change can be observed and handled ahead of its deadline.
 
   ## Configuration
 
-      config :eda, capabilities: [:channel_obfuscation]
-      config :eda, capabilities: :channel_obfuscation   # single capability
       config :eda, capabilities: 32768                  # raw bitfield
+      config :eda, capabilities: [:channel_obfuscation] # by name
 
-  Unset (the default) sends no `capabilities` field at all, so gateway behaviour
-  is unchanged.
+  Unset (the default) sends no `capabilities` field at all.
+
+  **Discord currently defines no capability.** The only one it ever had,
+  `:channel_obfuscation` (`1 <<< 15`), opted a bot into channel obfuscation before
+  2026-11-16; since that date obfuscation applies to every bot and the flag changes nothing.
+  It is still accepted here, so a configuration written for the opt-in period keeps working,
+  and a raw integer passes through for a capability Discord may add later.
 
   ## Channel obfuscation
 
-  `:channel_obfuscation` (`1 <<< 15`) opts into Discord's redaction of channels the
-  bot cannot see. Once enabled — and **for every bot from 2026-11-16, whether opted
-  in or not** — such channels are still dispatched over the gateway but caviarded:
+  A channel the bot cannot view is still dispatched over the gateway, redacted:
 
     * `name` becomes `"___hidden___"`,
     * sensitive fields are nulled or reduced,
@@ -26,19 +28,10 @@ defmodule EDA.Gateway.Capabilities do
       guild's `@everyone` role,
     * the channel's `flags` carry `CHANNEL_OBFUSCATED` (`1 <<< 17`).
 
-  Interaction payloads are built through a separate path and are never obfuscated.
-
-  > #### REST is not obfuscated {: .info}
-  >
-  > Discord's changelog states `GET /guilds/{guild.id}/channels` omits inaccessible
-  > channels. **That is not the observed behaviour.** Probed against a real guild on
-  > 2026-09-19 with this capability enabled: all 44 obfuscated channels were returned
-  > by REST, with their real `name`, `flags: 0` and their genuine permission
-  > overwrites — only the gateway payloads were redacted. Treat the two sources as
-  > disagreeing, and do not rely on either to hide a channel.
-
-  The same opt-in is available as the "Private Channel Obfuscation" toggle in the
-  Developer Portal; this option is the programmatic equivalent.
+  When the bot gains access, a `CHANNEL_UPDATE` brings the full channel. Interaction payloads
+  are never obfuscated. Over REST, `GET /guilds/{guild.id}/channels` leaves those channels out
+  altogether: on a guild where the gateway dispatched 95 channels, 44 of them obfuscated, the
+  endpoint returned the other 51.
 
   > #### Cache and permissions {: .warning}
   >

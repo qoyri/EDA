@@ -8,6 +8,7 @@ defmodule EDA.Voice.Payload do
   - 3: HEARTBEAT
   - 5: SPEAKING
   - 7: RESUME
+  - 15: MEDIA_SINK_WANTS
   """
 
   @doc """
@@ -91,6 +92,16 @@ defmodule EDA.Voice.Payload do
         token: token
       }
     }
+  end
+
+  @doc """
+  Builds a MEDIA_SINK_WANTS payload (OP 15): which users' voice the server should send.
+
+  `wants` maps an SSRC, or `:any` for every SSRC not listed, to `0` (do not send) through
+  `100` (send). The payload replaces the previous one whole.
+  """
+  def media_sink_wants(wants) when is_map(wants) do
+    %{op: 15, d: Map.new(wants, fn {ssrc, value} -> {to_string(ssrc), value} end)}
   end
 
   # DAVE (E2EE) Opcodes

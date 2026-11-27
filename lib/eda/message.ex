@@ -375,6 +375,78 @@ defmodule EDA.Message do
   def deletable?(%__MODULE__{type: type}), do: type not in @undeletable
 
   @doc """
+  What Discord's content scanning flagged in the message: any of `:explicit`, `:gore` and
+  `:self_harm`, or `[]`. Attachments, embeds, the media of components and forwarded messages
+  are all read.
+
+  Scanning can finish after the message is sent. The message a bot receives, or gets back
+  from sending one, may carry no flag yet, and the result then arrives in a `MESSAGE_UPDATE`:
+  a bot that reposts what users upload should check both, and remove its repost when a flag
+  appears.
+
+      def handle_event({:MESSAGE_UPDATE, message}) do
+        if message.author.id == EDA.Cache.me().id and EDA.Message.flagged?(message),
+          do: EDA.Message.delete(message)
+      end
+
+      iex> message = %EDA.Message{
+      ...>   attachments: [%EDA.Attachment{flags: 16}],
+      ...>   embeds: [%EDA.Embed{flags: 64}]
+      ...> }
+      iex> EDA.Message.content_flags(message)
+      [:explicit, :gore]
+  """
+  @spec content_flags(t()) :: [:explicit | :gore | :self_harm]
+  def content_flags(%__MODULE__{} = message) do
+    found =
+      Enum.flat_map(message.attachments || [], &EDA.Attachment.content_flags/1) ++
+        Enum.flat_map(message.embeds || [], &embed_content_flags/1) ++
+        component_content_flags(message.components) ++
+        Enum.flat_map(message.message_snapshots || [], &content_flags/1)
+
+    Enum.filter([:explicit, :gore, :self_harm], &(&1 in found))
+  end
+
+  @doc """
+  Whether Discord's content scanning flagged anything in the message. See `content_flags/1`
+  for what is read, and when the flags arrive.
+
+      iex> EDA.Message.flagged?(%EDA.Message{attachments: [%EDA.Attachment{flags: 8}]})
+      false
+  """
+  @spec flagged?(t()) :: boolean()
+  def flagged?(%__MODULE__{} = message), do: content_flags(message) != []
+
+  # A `:components` embed holds its media in components.
+  defp embed_content_flags(%EDA.Embed{} = embed),
+    do: EDA.Embed.content_flags(embed) ++ component_content_flags(embed.components)
+
+  defp embed_content_flags(_embed), do: []
+
+  defp component_content_flags(components) when is_list(components),
+    do: Enum.flat_map(components, &component_content_flags/1)
+
+  defp component_content_flags(%EDA.Component.Media{} = media),
+    do: EDA.Component.Media.content_flags(media)
+
+  defp component_content_flags(%EDA.Component.Thumbnail{media: media}),
+    do: component_content_flags(media)
+
+  defp component_content_flags(%EDA.Component.File{file: media}),
+    do: component_content_flags(media)
+
+  defp component_content_flags(%EDA.Component.MediaGallery{items: items}),
+    do: Enum.flat_map(items || [], &component_content_flags(&1.media))
+
+  defp component_content_flags(%EDA.Component.Section{components: children, accessory: accessory}),
+    do: component_content_flags(children) ++ component_content_flags(accessory)
+
+  defp component_content_flags(%{components: children}) when is_list(children),
+    do: component_content_flags(children)
+
+  defp component_content_flags(_other), do: []
+
+  @doc """
   The content with its mentions written out as Discord shows them: `@name` for users (their
   nickname in a guild), `@role` for roles and `#channel` for channels, read from the message
   and the cache. A mention EDA cannot name stays as it is.
@@ -542,9 +614,9 @@ defmodule EDA.Message do
   @doc """
   Deletes a message.
 
-  ## Options
-
-  - `:reason` - Audit log reason
+  Discord does not record a message a bot deletes in the audit log, so there is no reason to
+  give: a `:reason` is accepted and sent, and has no effect. A bulk delete is recorded, and
+  takes one.
   """
   @spec delete(t(), keyword()) :: :ok | {:error, term()}
   def delete(message, opts \\ [])

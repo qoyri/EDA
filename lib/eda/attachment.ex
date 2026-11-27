@@ -110,18 +110,32 @@ defmodule EDA.Attachment do
   @flag_thumbnail 1 <<< 1
   @flag_remix 1 <<< 2
   @flag_spoiler 1 <<< 3
+  @flag_explicit_content 1 <<< 4
   @flag_animated 1 <<< 5
+  @flag_gore_content 1 <<< 6
+  @flag_self_harm_content 1 <<< 7
 
   @attachment_flags %{
     clip: @flag_clip,
     thumbnail: @flag_thumbnail,
     remix: @flag_remix,
     spoiler: @flag_spoiler,
-    animated: @flag_animated
+    explicit_content: @flag_explicit_content,
+    animated: @flag_animated,
+    gore_content: @flag_gore_content,
+    self_harm_content: @flag_self_harm_content
   }
 
   @typedoc "An attachment flag name."
-  @type flag :: :clip | :thumbnail | :remix | :spoiler | :animated
+  @type flag ::
+          :clip
+          | :thumbnail
+          | :remix
+          | :spoiler
+          | :explicit_content
+          | :animated
+          | :gore_content
+          | :self_harm_content
 
   @doc "This attachment is a Clip from a stream (`1 <<< 0`)."
   @spec flag_clip() :: integer()
@@ -142,6 +156,18 @@ defmodule EDA.Attachment do
   @doc "This attachment is an animated image (`1 <<< 5`)."
   @spec flag_animated() :: integer()
   def flag_animated, do: @flag_animated
+
+  @doc "Discord's content scanning flagged this attachment as explicit (`1 <<< 4`)."
+  @spec flag_explicit_content() :: integer()
+  def flag_explicit_content, do: @flag_explicit_content
+
+  @doc "Discord's content scanning flagged this attachment as gore (`1 <<< 6`)."
+  @spec flag_gore_content() :: integer()
+  def flag_gore_content, do: @flag_gore_content
+
+  @doc "Discord's content scanning flagged this attachment as self-harm (`1 <<< 7`)."
+  @spec flag_self_harm_content() :: integer()
+  def flag_self_harm_content, do: @flag_self_harm_content
 
   @doc "Every flag name EDA knows about."
   @spec all_flags() :: [flag()]
@@ -237,6 +263,47 @@ defmodule EDA.Attachment do
   @doc "Returns `true` if this attachment is an animated image."
   @spec animated?(t() | map() | integer() | nil) :: boolean()
   def animated?(attachment), do: has_flag?(attachment, :animated)
+
+  @doc """
+  What Discord's content scanning flagged this attachment as: any of `:explicit`, `:gore` and
+  `:self_harm`, or `[]`.
+
+  Scanning can finish after the message is sent: the flags may be absent from the message a
+  bot receives or sends, and arrive in a later `MESSAGE_UPDATE`. An attachment in an
+  interaction's resolved data — a file upload, an `attachment` option — never carries them;
+  they are set once it is sent in a message. A bot that reposts what users upload should
+  therefore check the message it sent, and its updates. `EDA.Message.content_flags/1` checks
+  a whole message.
+
+  ## Examples
+
+      iex> EDA.Attachment.content_flags(%EDA.Attachment{flags: (1 <<< 4) ||| (1 <<< 3)})
+      [:explicit]
+
+      iex> EDA.Attachment.content_flags(%EDA.Attachment{flags: 0})
+      []
+  """
+  @spec content_flags(t() | map() | integer() | nil) :: [:explicit | :gore | :self_harm]
+  def content_flags(attachment)
+
+  def content_flags(%__MODULE__{flags: flags}), do: EDA.ContentScan.media(flags)
+  def content_flags(%{"flags" => flags}), do: EDA.ContentScan.media(flags)
+  def content_flags(flags), do: EDA.ContentScan.media(flags)
+
+  @doc """
+  Returns `true` if Discord's content scanning flagged this attachment as explicit, gore or
+  self-harm. See `content_flags/1` for when the flags arrive.
+
+  ## Examples
+
+      iex> EDA.Attachment.flagged?(%EDA.Attachment{flags: 1 <<< 6})
+      true
+
+      iex> EDA.Attachment.flagged?(%EDA.Attachment{flags: 1 <<< 3})
+      false
+  """
+  @spec flagged?(t() | map() | integer() | nil) :: boolean()
+  def flagged?(attachment), do: content_flags(attachment) != []
 
   # ── Edit requests ──
 

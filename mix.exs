@@ -159,6 +159,7 @@ defmodule EDA.MixProject do
           EDA.Embed,
           EDA.Embed.Author,
           EDA.Embed.Field,
+          EDA.Embed.Flags,
           EDA.Embed.Footer,
           EDA.Embed.Media,
           EDA.Embed.Provider,

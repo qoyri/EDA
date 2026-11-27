@@ -4,7 +4,12 @@ defmodule EDA.AuditLog.Entry.Options do
   message pin, the days and members of a prune, the overwritten role or member of a permission
   change (`type` `:role` or `:member`, the name in `role_name`), the rule an AutoMod action came
   from, the application of a command permission change, the kind of integration removed, a
-  voice channel's new status.
+  voice channel's new status. For a `:channel_position_update` or a `:role_position_update`,
+  `count` is the number of positions the reorder changed.
+
+  Discord merges some entries: a moderator's deletes, bulk deletes, disconnects, moves and
+  reorders in quick succession update the first entry's `count` instead of adding one, keep the
+  first reason only, and send no `GUILD_AUDIT_LOG_ENTRY_CREATE` for what they add.
 
   Discord sends the counts and the overwrite type as strings; they are integers and atoms here.
   """
