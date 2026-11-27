@@ -33,8 +33,13 @@ error. Then read "Upgrading from 0.4 or an earlier beta" under 0.5.0-beta.3, whi
 those.
 
 **From a beta:** `mix deps.update eda` is enough, and brings the patched versions of what EDA
-depends on with it. Three things may show:
+depends on with it. Four things may show:
 
+- **httpoison 2 is no longer accepted**, because the hackney it uses is no longer maintained
+  (see Security). A project that names `{:httpoison, "~> 2.0"}` itself, or has a dependency
+  that does, fails to resolve until that requirement allows 3. Code that calls HTTPoison
+  itself should read its 3.0 notes: redirects no longer return `HTTPoison.MaybeRedirect`,
+  and an async response's `id` is a pid.
 - **The gateway and voice connections now verify Discord's certificate** (see Security). A
   machine that could already make REST calls needs nothing; one that intercepts TLS with its
   own certificate authority is refused, where it used to be let through unnoticed.
@@ -60,9 +65,9 @@ depends on with it. Three things may show:
   five in hackney below 4.9 (EEF-CVE-2026-115693, -115700, -112880, -113440, -97200), one in
   ssl_verify_fun below 1.1.8 (EEF-CVE-2026-117666, a wildcard certificate matching across a
   label boundary) and one in idna below 8 (EEF-CVE-2026-117678). EDA now requires
-  `hackney ~> 4.11` on the 4.x line and `ssl_verify_fun ~> 1.1.8`, so updating EDA updates
-  them. The 1.x line of hackney, which httpoison 2 uses, has no fixed release: a project on
-  httpoison 2 should move to 3.
+  `httpoison ~> 3.0`, `hackney ~> 4.12` and `ssl_verify_fun ~> 1.1.8`, so updating EDA
+  updates them. httpoison 2 is no longer accepted: it can only use the 1.x line of hackney,
+  which is no longer released and has nine advisories without a fix.
 - **The DAVE library is built on patched crates**: zstd 0.13.6 (RUSTSEC-2026-0391, data from
   an abandoned stream leaking into the next on a reused context, and the advisories in
   zstd-safe and zstd-sys), OpenMLS 0.8.3, rand 0.8.8 and 0.9.5, crossbeam-epoch 0.9.21. Two

@@ -43,18 +43,16 @@ defmodule EDA.MixProject do
       # WebSocket client
       {:websockex, "~> 0.4"},
 
-      # HTTP client. 3.x brings hackney 4, which fixes the CVEs in hackney 1.x
-      # (EEF-CVE-2026-47069, -47071, -47075, -47076); 2.x is still accepted so that a
-      # project pinned to httpoison 2 for another dependency can resolve.
-      {:httpoison, "~> 2.0 or ~> 3.0"},
+      # HTTP client. 3.x is the line built on hackney 4; httpoison 2 can only use hackney 1.x,
+      # which is no longer released and carries advisories that will not be fixed.
+      {:httpoison, "~> 3.0"},
 
       # Not called by EDA: these two only set a floor under what httpoison brings, so that
       # installing EDA cannot leave a version with a known advisory in place. hackney 4.11 is
       # the first to carry both the fixes of 4.9 (EEF-CVE-2026-115693, -115700, -112880,
-      # -113440, -97200) and idna 8 (EEF-CVE-2026-117678); ssl_verify_fun 1.1.8 fixes the
-      # wildcard match of EEF-CVE-2026-117666. The 1.x line of hackney stays allowed for
-      # httpoison 2 and has no fixed release.
-      {:hackney, "~> 1.17 or ~> 4.11"},
+      # -113440, -97200) and idna 8 (EEF-CVE-2026-117678), and 4.12 is the line maintained
+      # today; ssl_verify_fun 1.1.8 fixes the wildcard match of EEF-CVE-2026-117666.
+      {:hackney, "~> 4.12"},
       {:ssl_verify_fun, "~> 1.1.8"},
 
       # JSON encoding/decoding
