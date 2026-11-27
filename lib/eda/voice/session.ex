@@ -82,9 +82,11 @@ defmodule EDA.Voice.Session do
 
     Logger.info("Connecting to voice gateway: #{url}")
 
-    WebSockex.start_link(url, __MODULE__, state,
-      name: via(guild_id),
-      handle_initial_conn_failure: true
+    WebSockex.start_link(
+      url,
+      __MODULE__,
+      state,
+      [name: via(guild_id), handle_initial_conn_failure: true] ++ EDA.TLS.websocket_options()
     )
   end
 
