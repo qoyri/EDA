@@ -17,6 +17,17 @@ defmodule EDA.API.Member do
     EDA.HTTP.Client.get("/guilds/#{guild_id}/members/#{user_id}")
   end
 
+  @doc """
+  Gets a member's guild permissions as Discord computes them: their roles and `@everyone`
+  combined. Returns `%{"permissions" => "<bitfield>"}`; `EDA.Permission.fetch_in_guild/2`
+  returns the bitset.
+  """
+  @spec permissions(String.t() | integer(), String.t() | integer()) ::
+          {:ok, map()} | {:error, term()}
+  def permissions(guild_id, user_id) do
+    EDA.HTTP.Client.get("/guilds/#{guild_id}/permissions/member/#{user_id}")
+  end
+
   @doc "Lists members of a guild."
   @spec list(String.t() | integer(), keyword()) :: {:ok, [map()]} | {:error, term()}
   def list(guild_id, opts \\ []) do

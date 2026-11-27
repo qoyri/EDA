@@ -119,10 +119,24 @@ defmodule EDA.API.Role do
     end
   end
 
-  @doc "Modifies guild role positions."
-  @spec modify_positions(String.t() | integer(), [map()]) ::
+  @doc """
+  Gets the guild permissions a role gives, combined with `@everyone` — no other role, and
+  nothing specific to a member. Returns `%{"permissions" => "<bitfield>"}`;
+  `EDA.Permission.fetch_for_role/2` returns the bitset.
+  """
+  @spec permissions(String.t() | integer(), String.t() | integer()) ::
+          {:ok, map()} | {:error, term()}
+  def permissions(guild_id, role_id) do
+    EDA.HTTP.Client.get("/guilds/#{guild_id}/permissions/role/#{role_id}")
+  end
+
+  @doc """
+  Modifies guild role positions. With `reason:`, the reorder is recorded with it, as one
+  `:role_position_update` audit log entry.
+  """
+  @spec modify_positions(String.t() | integer(), [map()], keyword()) ::
           {:ok, [map()]} | {:error, term()}
-  def modify_positions(guild_id, positions) do
-    patch("/guilds/#{guild_id}/roles", positions)
+  def modify_positions(guild_id, positions, opts \\ []) do
+    patch("/guilds/#{guild_id}/roles", positions, opts)
   end
 end
