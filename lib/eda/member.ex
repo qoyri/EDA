@@ -114,7 +114,6 @@ defmodule EDA.Member do
 
   May return a date in the **past**, in which case the timeout has expired — Discord
   leaves the field populated. Use `timed_out?/1` to ask whether it is currently active.
-  JDA draws the same distinction with `getTimeOutEnd()` / `isTimedOut()`.
 
   Accepts a struct or a raw member map.
 
@@ -138,12 +137,11 @@ defmodule EDA.Member do
 
   Accepts a struct or a raw member map.
 
-  > #### Not reflected in permissions {: .warning}
+  > #### Reflected in channel permissions only {: .info}
   >
   > Discord removes every permission except `VIEW_CHANNEL` and `READ_MESSAGE_HISTORY`
-  > from a timed-out member, but `EDA.Permission.in_channel/3` does **not** account for
-  > it — neither does JDA's `hasPermission`. Check this yourself before gating an action
-  > on a permission.
+  > from a timed-out member. `EDA.Permission.in_channel/3` applies that;
+  > `EDA.Permission.in_guild/2`, which reads the roles alone, does not.
 
   ## Examples
 

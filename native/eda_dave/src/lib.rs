@@ -19,10 +19,17 @@ mod atoms {
         pending,
         awaiting_response,
         active,
+        ignored,
+        not_pending,
         already_in_group,
         no_external_sender,
-        no_group,
-        pending_group,
+        unrecognized_user,
+        unexpected_group,
+        invalid_roster,
+        epoch_mismatch,
+        no_queued_proposals,
+        commit_before_welcome,
+        own_commit_mismatch,
         invalid,
     }
 }
@@ -96,9 +103,7 @@ fn process_proposals<'a>(
         ProposalsOperationType::APPEND
     };
 
-    let expected = if user_ids.is_empty() { None } else { Some(user_ids.as_slice()) };
-
-    match session.process_proposals(op_type, proposals.as_slice(), expected) {
+    match session.process_proposals(op_type, proposals.as_slice(), recognized(&user_ids)) {
         Ok(Some(commit_welcome)) => {
             let commit_bin = to_binary(env, &commit_welcome.commit);
             let welcome_bin = match commit_welcome.welcome {
@@ -115,8 +120,24 @@ fn process_proposals<'a>(
     }
 }
 
+// An empty list means "do not check": the caller always names itself, so a list that reaches
+// here empty comes from a caller that tracks no one.
+fn recognized(user_ids: &[u64]) -> Option<&[u64]> {
+    if user_ids.is_empty() {
+        None
+    } else {
+        Some(user_ids)
+    }
+}
+
 // Commit and welcome failures carry a reason, because they call for different handling: a welcome
 // refused as `already_in_group` is the expected outcome of a commit race, while a malformed one is not.
+//
+// Neither installs a key: the caller prepares the transition next, and the key media is encrypted
+// with only changes when that transition executes.
+//
+// `ignored` is a commit that does not concern this session yet: it has no group, or only the
+// pending one it would create a group from. Nothing is wrong and nothing is to be reported.
 #[rustler::nif(schedule = "DirtyCpu")]
 fn process_commit<'a>(
     env: Env<'a>,
@@ -128,11 +149,18 @@ fn process_commit<'a>(
         Err(_) => return atoms::error().encode(env),
     };
     match session.process_commit(commit.as_slice()) {
-        Ok(()) => atoms::ok().encode(env),
+        Ok(true) => atoms::ok().encode(env),
+        Ok(false) => atoms::ignored().encode(env),
         Err(e) => {
             let reason = match e {
-                ProcessCommitError::NoGroup => atoms::no_group(),
-                ProcessCommitError::PendingGroup => atoms::pending_group(),
+                ProcessCommitError::NoQueuedProposals => atoms::no_queued_proposals(),
+                ProcessCommitError::CommitBeforeWelcome => atoms::commit_before_welcome(),
+                ProcessCommitError::MessageForDifferentGroup => atoms::unexpected_group(),
+                ProcessCommitError::EpochMismatch => atoms::epoch_mismatch(),
+                ProcessCommitError::OwnCommitMismatch | ProcessCommitError::NoPendingCommit => {
+                    atoms::own_commit_mismatch()
+                }
+                ProcessCommitError::InvalidRoster(_) => atoms::invalid_roster(),
                 _ => atoms::invalid(),
             };
             (atoms::error(), reason).encode(env)
@@ -140,26 +168,66 @@ fn process_commit<'a>(
     }
 }
 
+// `user_ids` are the users the caller knows to be in the call, itself included: a welcome into a
+// group with anyone else is refused.
 #[rustler::nif(schedule = "DirtyCpu")]
 fn process_welcome<'a>(
     env: Env<'a>,
     resource: ResourceArc<DaveSessionResource>,
     welcome: Binary,
+    user_ids: Vec<u64>,
 ) -> Term<'a> {
     let mut session = match resource.0.lock() {
         Ok(s) => s,
         Err(_) => return atoms::error().encode(env),
     };
-    match session.process_welcome(welcome.as_slice()) {
+    match session.process_welcome(welcome.as_slice(), recognized(&user_ids)) {
         Ok(()) => atoms::ok().encode(env),
         Err(e) => {
             let reason = match e {
                 ProcessWelcomeError::AlreadyInGroup => atoms::already_in_group(),
                 ProcessWelcomeError::NoExternalSender => atoms::no_external_sender(),
+                ProcessWelcomeError::UnrecognizedUser(_) => atoms::unrecognized_user(),
+                ProcessWelcomeError::UnexpectedGroupId => atoms::unexpected_group(),
+                ProcessWelcomeError::InvalidRoster(_) => atoms::invalid_roster(),
                 _ => atoms::invalid(),
             };
             (atoms::error(), reason).encode(env)
         }
+    }
+}
+
+// Derives the keys of the epoch the session is now in, for a transition to `protocol_version`.
+// Decryption can use them at once; encryption switches when the transition executes, which for
+// transition 0 is here and now.
+#[rustler::nif(schedule = "DirtyCpu")]
+fn prepare_transition(
+    resource: ResourceArc<DaveSessionResource>,
+    transition_id: u16,
+    protocol_version: u16,
+) -> Atom {
+    let mut session = match resource.0.lock() {
+        Ok(s) => s,
+        Err(_) => return atoms::error(),
+    };
+    match session.prepare_transition(transition_id, protocol_version) {
+        Ok(()) => atoms::ok(),
+        Err(_) => atoms::error(),
+    }
+}
+
+// Switches the encryption key to the one the transition was prepared with. `not_pending` when the
+// session was not prepared for this transition.
+#[rustler::nif(schedule = "DirtyCpu")]
+fn execute_transition(resource: ResourceArc<DaveSessionResource>, transition_id: u16) -> Atom {
+    let mut session = match resource.0.lock() {
+        Ok(s) => s,
+        Err(_) => return atoms::error(),
+    };
+    match session.execute_transition(transition_id) {
+        Ok(true) => atoms::ok(),
+        Ok(false) => atoms::not_pending(),
+        Err(_) => atoms::error(),
     }
 }
 
@@ -173,7 +241,7 @@ fn encrypt_opus<'a>(
     match session.encrypt_opus(packet.as_slice()) {
         Ok(encrypted) => Ok((atoms::ok(), to_binary(env, &encrypted))),
         Err(EncryptError::NotReady) => Err(atoms::not_ready()),
-        Err(EncryptError::EncryptionFailed) => Err(atoms::encryption_failed()),
+        Err(EncryptError::EncryptionFailed(_)) => Err(atoms::encryption_failed()),
     }
 }
 
@@ -217,6 +285,14 @@ fn get_epoch(resource: ResourceArc<DaveSessionResource>) -> Result<u64, Atom> {
 fn is_ready(resource: ResourceArc<DaveSessionResource>) -> Result<bool, Atom> {
     let session = resource.0.lock().map_err(|_| atoms::error())?;
     Ok(session.is_ready())
+}
+
+// Ready, and holding a key to encrypt with. A session that joined a group through a welcome is
+// ready from the moment the transition is prepared, and has a key once it executes.
+#[rustler::nif(name = "can_encrypt?")]
+fn can_encrypt(resource: ResourceArc<DaveSessionResource>) -> Result<bool, Atom> {
+    let session = resource.0.lock().map_err(|_| atoms::error())?;
+    Ok(session.can_encrypt())
 }
 
 #[rustler::nif]

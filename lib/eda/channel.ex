@@ -340,8 +340,8 @@ defmodule EDA.Channel do
   not compute permissions from those overwrites, and consider filtering them out of
   channel listings shown to users.
 
-  Mandatory for every bot from **2026-11-16**; before then it is opt-in via
-  `config :eda, capabilities: [:channel_obfuscation]` (see `EDA.Gateway.Capabilities`).
+  Discord obfuscates channels for every bot since **2026-11-16**; over REST,
+  `GET /guilds/{guild.id}/channels` leaves them out instead.
 
   ## Examples
 

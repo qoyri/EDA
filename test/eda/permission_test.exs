@@ -655,6 +655,80 @@ defmodule EDA.PermissionTest do
       assert {:ok, 0} = Permission.in_channel(@guild_id, @user_id, @voice_channel_id)
     end
 
+    test "a member already in the channel keeps SET_VOICE_CHANNEL_STATUS, and nothing else" do
+      status = Permission.to_bit(:set_voice_channel_status)
+
+      EDA.Cache.Channel.update(@voice_channel_id, %{
+        "permission_overwrites" => [
+          %{
+            "id" => @guild_id,
+            "type" => 0,
+            "allow" => to_string(status),
+            "deny" => to_string(Permission.to_bit(:connect))
+          }
+        ]
+      })
+
+      # Not connected: losing CONNECT takes everything.
+      assert {:ok, 0} = Permission.in_channel(@guild_id, @user_id, @voice_channel_id)
+
+      EDA.Cache.VoiceState.upsert(@guild_id, %{
+        "user_id" => @user_id,
+        "channel_id" => @voice_channel_id
+      })
+
+      on_exit(fn ->
+        EDA.Cache.VoiceState.upsert(@guild_id, %{"user_id" => @user_id, "channel_id" => nil})
+      end)
+
+      assert {:ok, ^status} = Permission.in_channel(@guild_id, @user_id, @voice_channel_id)
+
+      {:ok, why} = Permission.explain(@guild_id, @user_id, @voice_channel_id)
+      assert why.denied_by == :no_connect
+      assert List.last(why.steps) == %{stage: :gate, gate: :no_connect, result: status}
+    end
+
+    test "being connected elsewhere, or lacking the permission, keeps nothing" do
+      EDA.Cache.Channel.update(@voice_channel_id, %{
+        "permission_overwrites" => [
+          %{
+            "id" => @guild_id,
+            "type" => 0,
+            "allow" => "0",
+            "deny" => to_string(Permission.to_bit(:connect))
+          }
+        ]
+      })
+
+      on_exit(fn ->
+        EDA.Cache.VoiceState.upsert(@guild_id, %{"user_id" => @user_id, "channel_id" => nil})
+      end)
+
+      # In the channel, without SET_VOICE_CHANNEL_STATUS.
+      EDA.Cache.VoiceState.upsert(@guild_id, %{
+        "user_id" => @user_id,
+        "channel_id" => @voice_channel_id
+      })
+
+      assert {:ok, 0} = Permission.in_channel(@guild_id, @user_id, @voice_channel_id)
+
+      # With it, in another channel.
+      EDA.Cache.Channel.update(@voice_channel_id, %{
+        "permission_overwrites" => [
+          %{
+            "id" => @guild_id,
+            "type" => 0,
+            "allow" => to_string(Permission.to_bit(:set_voice_channel_status)),
+            "deny" => to_string(Permission.to_bit(:connect))
+          }
+        ]
+      })
+
+      EDA.Cache.VoiceState.upsert(@guild_id, %{"user_id" => @user_id, "channel_id" => "999"})
+
+      assert {:ok, 0} = Permission.in_channel(@guild_id, @user_id, @voice_channel_id)
+    end
+
     test "CONNECT gate does not apply to text channels" do
       # Text channel without connect — should still work fine
       EDA.Cache.Channel.update(@channel_id, %{

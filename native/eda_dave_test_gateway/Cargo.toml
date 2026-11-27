@@ -1,0 +1,19 @@
+[package]
+name = "eda_dave_test_gateway"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Test support only: the part of Discord's voice gateway that DAVE cannot run without. It is built
+# for `mix test`, never shipped in the package and never downloaded by a bot.
+
+[lib]
+name = "eda_dave_test_gateway"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+rustler = "~0.35"
+openmls = "0.8.3"
+openmls_basic_credential = "0.5"
+openmls_rust_crypto = "0.5.1"

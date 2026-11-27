@@ -83,7 +83,12 @@ defmodule EDA.Gateway.Connection do
       encoding: Encoding.module()
     }
 
-    WebSockex.start_link(gateway_url, __MODULE__, state, name: via(shard_id))
+    WebSockex.start_link(
+      gateway_url,
+      __MODULE__,
+      state,
+      [name: via(shard_id)] ++ EDA.TLS.websocket_options()
+    )
   end
 
   @doc """

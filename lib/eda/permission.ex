@@ -346,8 +346,7 @@ defmodule EDA.Permission do
   Lists the permissions in a bitset that have **no effect** in the given channel.
 
   Use it to catch a meaningless overwrite before sending it — Discord accepts
-  `KICK_MEMBERS` in a channel overwrite and silently ignores it. Neither JDA nor
-  Nostrum offers this check.
+  `KICK_MEMBERS` in a channel overwrite and silently ignores it.
 
   ## Examples
 
@@ -472,7 +471,7 @@ defmodule EDA.Permission do
 
   Returns `{:ok, bitset}` or `{:error, reason}`.
 
-  ## Algorithm (matches Discord's official spec + JDA)
+  ## Algorithm (Discord's documented one)
   1. Owner → ALL_PERMISSIONS
   2. Compute guild base permissions
   3. ADMINISTRATOR → ALL_PERMISSIONS (skips all overwrites)
@@ -481,7 +480,8 @@ defmodule EDA.Permission do
      b. All role overwrites (merged via OR, then applied)
      c. Member-specific overwrite (highest priority)
   5. Access gate: no VIEW_CHANNEL → 0
-  6. Access gate: voice/stage channel + no CONNECT → 0
+  6. Access gate: voice/stage channel + no CONNECT → 0, or `SET_VOICE_CHANNEL_STATUS` alone
+     for a member already connected to it, who may still set its status
 
   ## Obfuscated channels
 
@@ -513,6 +513,69 @@ defmodule EDA.Permission do
     end
   end
 
+  # ── Asking Discord ────────────────────────────────────────────────
+
+  @doc """
+  A member's guild permissions, computed by Discord: one request, and no need for the member,
+  the guild or its roles to be cached. `in_guild/2` computes the same from the cache, without
+  a request.
+
+      {:ok, perms} = EDA.Permission.fetch_in_guild(guild_id, user_id)
+      EDA.Permission.has?(perms, :ban_members)
+
+  For the owner or an administrator Discord sets every bit, the ones it does not document
+  included: the result then holds `all/0` and more, so test it with `has?/2` or `missing/2`
+  rather than comparing it to `all/0`.
+  """
+  @spec fetch_in_guild(String.t() | integer(), String.t() | integer()) ::
+          {:ok, bitset()} | {:error, term()}
+  def fetch_in_guild(guild_id, user_id),
+    do: guild_id |> EDA.API.Member.permissions(user_id) |> fetched()
+
+  @doc """
+  The guild permissions a role gives together with `@everyone`, computed by Discord — what a
+  member holding only that role may do.
+  """
+  @spec fetch_for_role(String.t() | integer(), String.t() | integer()) ::
+          {:ok, bitset()} | {:error, term()}
+  def fetch_for_role(guild_id, role_id),
+    do: guild_id |> EDA.API.Role.permissions(role_id) |> fetched()
+
+  @doc """
+  A member's permissions in a channel, computed by Discord from their roles and the channel's
+  overwrites. `in_channel/3` computes the same from the cache; this asks Discord, so it also
+  answers for a member or a channel that is not cached. The bot must be able to view the
+  channel, and to connect to it when it is a voice or stage channel.
+
+  The result is masked as Discord applies permissions: without `VIEW_CHANNEL`, or without
+  `CONNECT` in a voice or stage channel, what the channel would have granted is removed. A
+  few permissions that do not concern the channel can remain — `CHANGE_NICKNAME`, for
+  instance — where `in_channel/3` returns `0`; neither lets the member do anything there. A
+  bot's permissions are not masked. Pass `implicit: false` for the permissions before
+  masking, to tell "denied everything" from "cannot see the channel".
+
+      {:ok, perms} = EDA.Permission.fetch_in_channel(channel_id, user_id)
+      EDA.Permission.missing(perms, [:send_messages, :embed_links])
+  """
+  @spec fetch_in_channel(String.t() | integer(), String.t() | integer(), keyword()) ::
+          {:ok, bitset()} | {:error, term()}
+  def fetch_in_channel(channel_id, user_id, opts \\ []),
+    do: channel_id |> EDA.API.Channel.member_permissions(user_id, opts) |> fetched()
+
+  @doc """
+  The permissions a role gives in a channel together with `@everyone`, with the channel's
+  overwrites for both, computed by Discord. Other roles and member overwrites are left out.
+  Takes `implicit:` like `fetch_in_channel/3`.
+  """
+  @spec fetch_for_role_in_channel(String.t() | integer(), String.t() | integer(), keyword()) ::
+          {:ok, bitset()} | {:error, term()}
+  def fetch_for_role_in_channel(channel_id, role_id, opts \\ []),
+    do: channel_id |> EDA.API.Channel.role_permissions(role_id, opts) |> fetched()
+
+  defp fetched({:ok, %{"permissions" => permissions}}), do: {:ok, parse_permissions(permissions)}
+  defp fetched({:ok, other}), do: {:error, {:unexpected_response, other}}
+  defp fetched({:error, _} = error), do: error
+
   @typedoc """
   A step in a permission derivation.
 
@@ -541,9 +604,8 @@ defmodule EDA.Permission do
   @doc """
   Explains **how** a member's channel permissions were derived.
 
-  `in_channel/3` answers *what* a member may do; this answers *why*. Neither JDA nor
-  Nostrum exposes the derivation, and "why can't my bot post here" is usually answered
-  by guesswork against an opaque integer.
+  `in_channel/3` answers *what* a member may do; this answers *why*. "Why can't my bot
+  post here" is otherwise answered by guesswork against an opaque integer.
 
   Returns the same `:effective` bitset as `in_channel/3`, plus:
 
@@ -712,16 +774,33 @@ defmodule EDA.Permission do
          gates ++ [:no_view_channel], :no_view_channel}
 
       (channel["type"] || 0) in @voice_types and (perms &&& @flags.connect) != @flags.connect ->
-        {0, steps ++ [%{stage: :gate, gate: :no_connect, result: 0}], gates ++ [:no_connect],
-         :no_connect}
+        # Losing CONNECT takes everything else with it, with one exception Discord makes: a
+        # member already in the channel may still set its status.
+        kept =
+          if connected_to?(member, channel),
+            do: perms &&& @flags.set_voice_channel_status,
+            else: 0
+
+        {kept, steps ++ [%{stage: :gate, gate: :no_connect, result: kept}],
+         gates ++ [:no_connect], :no_connect}
 
       true ->
         {perms, steps, gates, nil}
     end
   end
 
+  defp connected_to?(member, channel) do
+    with guild_id when guild_id != nil <- channel["guild_id"],
+         %{channel_id: channel_id} when channel_id != nil <-
+           EDA.Cache.get_voice_state(guild_id, get_user_id(member)) do
+      to_string(channel_id) == to_string(channel["id"])
+    else
+      _ -> false
+    end
+  end
+
   # ── Internal: 3-Tier Overwrite Cascade ────────────────────────────
-  # Matches Discord's official algorithm and JDA's PermissionUtil.
+  # Discord's documented algorithm.
   #
   # Tier 1: @everyone role overwrite
   # Tier 2: All role overwrites (merged via OR)

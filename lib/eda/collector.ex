@@ -2,7 +2,7 @@ defmodule EDA.Collector do
   @moduledoc """
   Event collector for awaiting Discord gateway events.
 
-  Provides Discord.js-style `await` patterns for blocking on specific events
+  Provides `await` patterns for blocking on specific events
   with filters and timeouts. Useful for interactive flows (confirmations,
   paginated menus, quizzes, etc.).
 

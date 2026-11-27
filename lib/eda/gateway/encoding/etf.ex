@@ -41,6 +41,7 @@ defmodule EDA.Gateway.Encoding.ETF do
   @known_keys ~w(
     accent_color accessory account action action_type actions activities activity added_members
     afk_channel_id afk_timeout alert_system_message_id allow allow_list allow_multiselect animated
+    audio content_scan_metadata
     animation_id animation_type answer_id answers app_permissions application application_commands
     application_id applied_tags approximate_guild_count approximate_member_count
     approximate_presence_count approximate_user_authorization_count approximate_user_install_count

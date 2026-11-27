@@ -1,10 +1,11 @@
 defmodule EDA.Embed.Media do
   @moduledoc """
-  An embed's image, thumbnail or video.
+  An embed's image, thumbnail, video or audio.
 
   A bot sends only `url`. On an embed it receives, Discord adds its cached copy in `proxy_url`,
-  the size, the `content_type`, and a `placeholder` (a small thumbhash, base64) to show while
-  the image loads. `animated?/1` reads `flags`.
+  the size, the `content_type`, the alt text in `description`, and a `placeholder` (a small
+  thumbhash, base64) to show while the image loads. `animated?/1` reads `flags`. An audio has
+  no size, placeholder or flags.
   """
 
   import Bitwise
@@ -19,6 +20,7 @@ defmodule EDA.Embed.Media do
     :content_type,
     :placeholder,
     :placeholder_version,
+    :description,
     :flags
   ]
 
@@ -30,6 +32,7 @@ defmodule EDA.Embed.Media do
           content_type: String.t() | nil,
           placeholder: String.t() | nil,
           placeholder_version: non_neg_integer() | nil,
+          description: String.t() | nil,
           flags: non_neg_integer() | nil
         }
 
@@ -50,6 +53,7 @@ defmodule EDA.Embed.Media do
       content_type: :maps.get("content_type", raw, nil),
       placeholder: :maps.get("placeholder", raw, nil),
       placeholder_version: :maps.get("placeholder_version", raw, nil),
+      description: :maps.get("description", raw, nil),
       flags: :maps.get("flags", raw, nil)
     }
   end

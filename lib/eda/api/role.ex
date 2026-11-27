@@ -29,9 +29,8 @@ defmodule EDA.API.Role do
 
   ## Why not count from the cache?
 
-  The traditional approach in other libraries is to filter cached members —
-  discord.js's `Role.members`, JDA's `getMembersWithRoles/1`. EDA can do the same with
-  `EDA.Cache.members/1`, but that needs the privileged `:guild_members` intent **and** a
+  The traditional approach is to filter cached members. EDA can do that with
+  `EDA.Cache.members/1`, but it needs the privileged `:guild_members` intent **and** a
   fully chunked member cache (`config :eda, chunk_members: true`). This endpoint needs
   neither.
 
@@ -40,9 +39,6 @@ defmodule EDA.API.Role do
   cache saw only **52** roles against the endpoint's 56 — **roles with zero members are
   absent from a cache-derived tally and present here**. If you are listing every role with
   its count, that difference is the whole point.
-
-  discord.js exposes the same endpoint as `guild.roles.fetchMemberCounts()` and documents
-  the same `@everyone` exclusion.
 
   ## Examples
 
@@ -69,8 +65,7 @@ defmodule EDA.API.Role do
   Sets a role's colours.
 
   Accepts an `EDA.Role.Colors` struct or a plain map. Sends only the `colors` object,
-  never the deprecated `color` field — matching discord.js, whose `setColors` builds
-  the same payload.
+  never the deprecated `color` field.
 
   Discord enforces the holographic triple whenever `tertiary_color` is present, so
   build that case with `EDA.Role.Colors.holographic/0` rather than by hand.
@@ -124,10 +119,24 @@ defmodule EDA.API.Role do
     end
   end
 
-  @doc "Modifies guild role positions."
-  @spec modify_positions(String.t() | integer(), [map()]) ::
+  @doc """
+  Gets the guild permissions a role gives, combined with `@everyone` — no other role, and
+  nothing specific to a member. Returns `%{"permissions" => "<bitfield>"}`;
+  `EDA.Permission.fetch_for_role/2` returns the bitset.
+  """
+  @spec permissions(String.t() | integer(), String.t() | integer()) ::
+          {:ok, map()} | {:error, term()}
+  def permissions(guild_id, role_id) do
+    EDA.HTTP.Client.get("/guilds/#{guild_id}/permissions/role/#{role_id}")
+  end
+
+  @doc """
+  Modifies guild role positions. With `reason:`, the reorder is recorded with it, as one
+  `:role_position_update` audit log entry.
+  """
+  @spec modify_positions(String.t() | integer(), [map()], keyword()) ::
           {:ok, [map()]} | {:error, term()}
-  def modify_positions(guild_id, positions) do
-    patch("/guilds/#{guild_id}/roles", positions)
+  def modify_positions(guild_id, positions, opts \\ []) do
+    patch("/guilds/#{guild_id}/roles", positions, opts)
   end
 end

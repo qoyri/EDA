@@ -122,7 +122,7 @@ defmodule EDA.Role do
   Returns `true` when the role uses a two-colour gradient.
 
   **Not** true for holographic roles — use `holographic?/1` for those. Discord treats
-  the two as distinct styles, as do JDA and discord.js.
+  the two as distinct styles.
 
   ## Examples
 
@@ -408,11 +408,13 @@ defmodule EDA.Role do
 
   @doc """
   Reorders a guild's roles. Takes `[%{id: role_id, position: n}]`; returns every role, as
-  structs.
+  structs. `reason:` goes to the audit log, where the reorder is one `:role_position_update`
+  entry.
   """
-  @spec modify_positions(String.t() | integer(), [map()]) :: {:ok, [t()]} | {:error, term()}
-  def modify_positions(guild_id, positions) do
-    case EDA.API.Role.modify_positions(guild_id, positions) do
+  @spec modify_positions(String.t() | integer(), [map()], keyword()) ::
+          {:ok, [t()]} | {:error, term()}
+  def modify_positions(guild_id, positions, opts \\ []) do
+    case EDA.API.Role.modify_positions(guild_id, positions, opts) do
       {:ok, list} when is_list(list) ->
         {:ok, Enum.map(list, &%{from_raw(&1) | guild_id: to_string(guild_id)})}
 

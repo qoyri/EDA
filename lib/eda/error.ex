@@ -117,6 +117,7 @@ defmodule EDA.Error do
     20_012 =>
       {:not_authorized_for_application,
        "You are not authorized to perform this action on this application"},
+    20_015 => {:premium_subscription_required, "This action requires a premium subscription"},
     20_016 =>
       {:slowmode_rate_limit, "This action cannot be performed due to slowmode rate limit"},
     20_018 => {:only_owner, "Only the owner of this account can perform this action"},
@@ -184,6 +185,7 @@ defmodule EDA.Error do
       {:max_channel_permission_overwrites,
        "Maximum number of channel permission overwrites reached (1000)"},
     30_061 => {:guild_channels_too_large, "The channels for this guild are too large"},
+    30_084 => {:max_invite_target_users, "Target users limit for this guild reached"},
 
     # ── Authorization / Rate Limits (40xxx) ──
     40_001 => {:unauthorized, "Unauthorized. Provide a valid token and try again"},
@@ -198,6 +200,8 @@ defmodule EDA.Error do
     40_006 =>
       {:feature_temporarily_disabled, "This feature has been temporarily disabled server-side"},
     40_007 => {:user_banned, "The user is banned from this guild"},
+    40_009 =>
+      {:one_parent_change_at_a_time, "Only one channel can have a parent_id modified at a time"},
     40_012 => {:connection_revoked, "Connection has been revoked"},
     40_018 => {:only_consumable_skus, "Only consumable SKUs can be consumed"},
     40_019 => {:only_sandbox_entitlements, "You can only delete sandbox entitlements."},
@@ -219,6 +223,11 @@ defmodule EDA.Error do
     40_094 =>
       {:max_follow_up_messages,
        "This interaction has hit the maximum number of follow up messages"},
+    40_114 =>
+      {:invite_target_users_already_processing,
+       "Target users are already being processed for this invite"},
+    40_115 =>
+      {:invite_target_users_file_not_processed, "Target users file has not been processed"},
     40_333 =>
       {:cloudflare_blocking,
        "Cloudflare is blocking your request. This can often be resolved by setting a proper User Agent"},
@@ -317,9 +326,15 @@ defmodule EDA.Error do
     50_163 =>
       {:cannot_delete_guild_subscription_integration,
        "Cannot delete guild subscription integration"},
+    50_167 =>
+      {:cannot_send_voice_effect_while_muted,
+       "Cannot send voice effect when user is server muted, deafened, or suppressed"},
     50_173 => {:cannot_send_voice_messages, "You cannot send voice messages in this channel."},
     50_178 => {:user_account_must_be_verified, "The user account must first be verified"},
     50_192 => {:invalid_file_duration, "The provided file does not have a valid duration."},
+    50_270 => {:invite_expired, "Invite is expired."},
+    50_278 =>
+      {:no_mutual_guilds, "Cannot send messages to this user due to having no mutual guilds"},
     50_600 =>
       {:no_permission_to_send_sticker, "You do not have permission to send this sticker."},
 
@@ -401,6 +416,8 @@ defmodule EDA.Error do
     # ── Harmful Links (240xxx) ──
     240_000 =>
       {:message_blocked_by_harmful_links_filter, "Message blocked by harmful links filter"},
+    340_015 =>
+      {:server_join_limited, "Access to joining new servers has been limited for the user"},
 
     # ── Onboarding (340xxx–350xxx) ──
     350_000 => {:cannot_enable_onboarding, "Cannot enable onboarding, requirements are not met"},
@@ -696,6 +713,10 @@ defmodule EDA.Error do
   @spec not_authorized_for_application() :: 20_012
   def not_authorized_for_application, do: 20_012
 
+  @doc "This action requires a premium subscription (20015)."
+  @spec premium_subscription_required() :: 20_015
+  def premium_subscription_required, do: 20_015
+
   @doc "Slowmode rate limit (20016)."
   @spec slowmode_rate_limit() :: 20_016
   def slowmode_rate_limit, do: 20_016
@@ -866,6 +887,10 @@ defmodule EDA.Error do
   @spec guild_channels_too_large() :: 30_061
   def guild_channels_too_large, do: 30_061
 
+  @doc "Target users limit for this guild reached (30084)."
+  @spec max_invite_target_users() :: 30_084
+  def max_invite_target_users, do: 30_084
+
   # ── Authorization / Rate Limits (40xxx) ──
 
   @doc "Unauthorized (40001)."
@@ -895,6 +920,10 @@ defmodule EDA.Error do
   @doc "User is banned from guild (40007)."
   @spec user_banned() :: 40_007
   def user_banned, do: 40_007
+
+  @doc "Only one channel can have its parent changed at a time (40009)."
+  @spec one_parent_change_at_a_time() :: 40_009
+  def one_parent_change_at_a_time, do: 40_009
 
   @doc "Connection has been revoked (40012)."
   @spec connection_revoked() :: 40_012
@@ -955,6 +984,14 @@ defmodule EDA.Error do
   @doc "Maximum follow-up messages reached (40094)."
   @spec max_follow_up_messages() :: 40_094
   def max_follow_up_messages, do: 40_094
+
+  @doc "Target users already being processed for this invite (40114)."
+  @spec invite_target_users_already_processing() :: 40_114
+  def invite_target_users_already_processing, do: 40_114
+
+  @doc "Target users file not processed (40115)."
+  @spec invite_target_users_file_not_processed() :: 40_115
+  def invite_target_users_file_not_processed, do: 40_115
 
   @doc "Cloudflare blocking request (40333)."
   @spec cloudflare_blocking() :: 40_333
@@ -1230,6 +1267,10 @@ defmodule EDA.Error do
   @spec cannot_delete_guild_subscription_integration() :: 50_163
   def cannot_delete_guild_subscription_integration, do: 50_163
 
+  @doc "Cannot send a voice effect while server muted, deafened or suppressed (50167)."
+  @spec cannot_send_voice_effect_while_muted() :: 50_167
+  def cannot_send_voice_effect_while_muted, do: 50_167
+
   @doc "Cannot send voice messages in this channel (50173)."
   @spec cannot_send_voice_messages() :: 50_173
   def cannot_send_voice_messages, do: 50_173
@@ -1241,6 +1282,14 @@ defmodule EDA.Error do
   @doc "Invalid file duration (50192)."
   @spec invalid_file_duration() :: 50_192
   def invalid_file_duration, do: 50_192
+
+  @doc "Invite is expired (50270)."
+  @spec invite_expired() :: 50_270
+  def invite_expired, do: 50_270
+
+  @doc "Cannot message this user: no mutual guilds (50278)."
+  @spec no_mutual_guilds() :: 50_278
+  def no_mutual_guilds, do: 50_278
 
   @doc "No permission to send sticker (50600)."
   @spec no_permission_to_send_sticker() :: 50_600
@@ -1397,6 +1446,10 @@ defmodule EDA.Error do
   @doc "Message blocked by harmful links filter (240000)."
   @spec message_blocked_by_harmful_links_filter() :: 240_000
   def message_blocked_by_harmful_links_filter, do: 240_000
+
+  @doc "Joining new servers has been limited for the user (340015)."
+  @spec server_join_limited() :: 340_015
+  def server_join_limited, do: 340_015
 
   # ── Onboarding (340xxx–350xxx) ──
 

@@ -32,13 +32,56 @@ defmodule EDA.API.Channel do
     post("/guilds/#{guild_id}/channels", payload, opts)
   end
 
-  @doc "Modifies guild channel positions."
-  @spec modify_positions(String.t() | integer(), [map()]) :: :ok | {:error, term()}
-  def modify_positions(guild_id, positions) do
-    case patch("/guilds/#{guild_id}/channels", positions) do
+  @doc """
+  Modifies guild channel positions. Takes `[%{id: channel_id, position: n}]`; an entry may also
+  move the channel with `parent_id`, and `lock_permissions` then syncs its overwrites with the
+  new category.
+
+  With `reason:`, the reorder is recorded with it, as one `:channel_position_update` audit log
+  entry; an entry that changes `parent_id` is recorded as a `:channel_update` of that channel.
+  """
+  @spec modify_positions(String.t() | integer(), [map()], keyword()) :: :ok | {:error, term()}
+  def modify_positions(guild_id, positions, opts \\ []) do
+    case patch("/guilds/#{guild_id}/channels", positions, opts) do
       {:ok, _} -> :ok
       error -> error
     end
+  end
+
+  @doc """
+  Gets a member's permissions in a channel as Discord computes them, from their roles and the
+  channel's overwrites; a thread uses its parent's. The bot needs `VIEW_CHANNEL` there, and
+  `CONNECT` for a voice or stage channel.
+
+  By default the result is masked as Discord masks it — what the channel grants is removed
+  without `VIEW_CHANNEL`, or without `CONNECT` in a voice or stage channel — except when the
+  member is a bot. `implicit: false` returns the permissions before that masking.
+
+  Returns `%{"permissions" => "<bitfield>"}`; `EDA.Permission.fetch_in_channel/3` returns the
+  bitset.
+  """
+  @spec member_permissions(String.t() | integer(), String.t() | integer(), keyword()) ::
+          {:ok, map()} | {:error, term()}
+  def member_permissions(channel_id, user_id, opts \\ []) do
+    EDA.HTTP.Client.get(
+      with_query("/channels/#{channel_id}/permissions/member/#{user_id}", opts, [:implicit])
+    )
+  end
+
+  @doc """
+  Gets the permissions a role gives in a channel, combined with `@everyone` and with the
+  overwrites of both — no other role, and no member overwrite. Takes `implicit:` like
+  `member_permissions/3`.
+
+  Returns `%{"permissions" => "<bitfield>"}`; `EDA.Permission.fetch_for_role_in_channel/3`
+  returns the bitset.
+  """
+  @spec role_permissions(String.t() | integer(), String.t() | integer(), keyword()) ::
+          {:ok, map()} | {:error, term()}
+  def role_permissions(channel_id, role_id, opts \\ []) do
+    EDA.HTTP.Client.get(
+      with_query("/channels/#{channel_id}/permissions/role/#{role_id}", opts, [:implicit])
+    )
   end
 
   @doc "Edits channel permission overwrites for a user or role."

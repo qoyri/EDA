@@ -13,7 +13,8 @@ on:
     branches:
       - "**"
     paths:
-      - "native/**"
+      # native/eda_dave_test_gateway is test support, never released.
+      - "native/eda_dave/**"
       - ".github/workflows/release-nif.yml"
   workflow_dispatch:
 

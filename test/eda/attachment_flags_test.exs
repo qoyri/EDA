@@ -26,13 +26,29 @@ defmodule EDA.AttachmentFlagsTest do
       assert Attachment.flag_animated() == 1 <<< 5
     end
 
-    test "bit 4 is not claimed — Discord documents no flag there" do
-      refute (1 <<< 4) in Enum.map(Attachment.all_flags(), &flag_value/1)
+    test "bits 4, 6 and 7 are the content scanning flags Discord documented later" do
+      assert Attachment.flag_explicit_content() == 1 <<< 4
+      assert Attachment.flag_gore_content() == 1 <<< 6
+      assert Attachment.flag_self_harm_content() == 1 <<< 7
+    end
+
+    test "no bit beyond the documented eight is claimed" do
+      assert Enum.sort(Enum.map(Attachment.all_flags(), &flag_value/1)) ==
+               [1, 2, 4, 8, 16, 32, 64, 128]
     end
 
     test "all_flags lists every name" do
       assert Enum.sort(Attachment.all_flags()) ==
-               [:animated, :clip, :remix, :spoiler, :thumbnail]
+               [
+                 :animated,
+                 :clip,
+                 :explicit_content,
+                 :gore_content,
+                 :remix,
+                 :self_harm_content,
+                 :spoiler,
+                 :thumbnail
+               ]
     end
   end
 

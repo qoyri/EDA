@@ -122,6 +122,48 @@ defmodule EDA.Voice do
   end
 
   @doc """
+  Tells the voice server whose audio to send, so that what the bot does not need never
+  reaches it. By default the server sends every user's voice over UDP, listened to or not.
+
+  `wants` maps an SSRC to `0` (do not send) or `100` (send), and `:any` to the value of every
+  SSRC it does not list. A user's SSRC comes with their `VOICE_SPEAKING_START` event. Values
+  in between only matter for video.
+
+      # Nothing at all — a bot that only plays.
+      EDA.Voice.media_sink_wants(guild_id, %{any: 0})
+
+      # Only these two users.
+      EDA.Voice.media_sink_wants(guild_id, %{ssrc_a => 100, ssrc_b => 100, any: 0})
+
+      # Everyone but one.
+      EDA.Voice.media_sink_wants(guild_id, %{ssrc => 0, any: 100})
+
+  Each call replaces the previous one whole: list every SSRC that needs a value each time. It
+  takes effect at once, without reconnecting, and is forgotten when the voice session is —
+  send it again after a `VOICE_READY`.
+
+  Returns `{:error, :not_ready}` before the voice session is ready, and `{:error, :not_connected}`
+  without one. Raises `ArgumentError` for a key that is neither `:any` nor an SSRC, or a value
+  outside `0..100`.
+  """
+  @spec media_sink_wants(String.t(), %{optional(:any | non_neg_integer()) => 0..100}) ::
+          :ok | {:error, :not_ready | :not_connected}
+  def media_sink_wants(guild_id, wants) when is_map(wants) do
+    Enum.each(wants, &check_sink_want!/1)
+    GenServer.call(__MODULE__, {:media_sink_wants, guild_id, wants})
+  end
+
+  defp check_sink_want!({key, value})
+       when (key == :any or (is_integer(key) and key >= 0)) and value in 0..100,
+       do: :ok
+
+  defp check_sink_want!({key, value}) do
+    raise ArgumentError,
+          "EDA.Voice.media_sink_wants/2: expected :any or an SSRC mapped to 0..100, " <>
+            "got #{inspect(key)} => #{inspect(value)}"
+  end
+
+  @doc """
   Returns `true` if audio is currently playing in the given guild.
   """
   @spec playing?(String.t()) :: boolean()
@@ -375,6 +417,20 @@ defmodule EDA.Voice do
         Session.start_listening(guild_id)
         new_vs = %{voice_state | listening: true}
         {:reply, :ok, put_in(state, [:guilds, guild_id], new_vs)}
+
+      %State{} ->
+        {:reply, {:error, :not_ready}, state}
+
+      nil ->
+        {:reply, {:error, :not_connected}, state}
+    end
+  end
+
+  def handle_call({:media_sink_wants, guild_id, wants}, _from, state) do
+    case Map.get(state.guilds, guild_id) do
+      %State{ready: true} ->
+        Session.send_payload(guild_id, EDA.Voice.Payload.media_sink_wants(wants))
+        {:reply, :ok, state}
 
       %State{} ->
         {:reply, {:error, :not_ready}, state}

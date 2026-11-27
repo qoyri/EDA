@@ -127,6 +127,14 @@ defmodule EDA.Voice.Dave.ManagerTest do
       assert {^manager, []} = Manager.handle_mls_event(manager, 22, %{"transition_id" => 9})
     end
 
+    test "a transition id that does not fit the protocol is not acknowledged", %{manager: manager} do
+      assert {^manager, []} =
+               Manager.handle_mls_event(manager, 21, %{
+                 "transition_id" => 70_000,
+                 "protocol_version" => 1
+               })
+    end
+
     test "a downgrade to protocol 0 is acknowledged, then turns encryption off", %{
       manager: manager
     } do
@@ -152,6 +160,19 @@ defmodule EDA.Voice.Dave.ManagerTest do
       assert {:ok, ^frame, _} = Manager.decrypt_frame(downgraded, frame, 42)
     end
 
+    # Playback is told of a downgrade before the session executes it. Should the session then
+    # not execute it, playback must not be left sending unencrypted media.
+    test "a downgrade the session does not execute leaves media encrypted", %{manager: manager} do
+      unprepared = %{manager | pending_transitions: %{2 => 0}}
+
+      {manager, []} = Manager.handle_mls_event(unprepared, 22, %{"transition_id" => 2})
+
+      refute manager.downgraded
+      assert manager.protocol_version == 1
+      assert Manager.current_version(manager) == 1
+      assert manager.pending_transitions == %{}
+    end
+
     test "an upgrade after a downgrade restores DAVE", %{manager: manager} do
       {manager, _} =
         Manager.handle_mls_event(manager, 21, %{"transition_id" => 2, "protocol_version" => 0})
@@ -174,14 +195,16 @@ defmodule EDA.Voice.Dave.ManagerTest do
       %{manager: Manager.new(1, 12_345, 67_890)}
     end
 
-    test "a refused commit reports the transition and offers a new key package", %{
+    # A session that is in no group yet cannot tell a good commit from a bad one, and has no
+    # reason to: it is waiting for a welcome. Commits a member refuses are in group_test.exs.
+    test "a commit that reaches a session in no group is ignored, not reported", %{
       manager: manager
     } do
-      {manager, replies} =
-        Manager.handle_mls_event(manager, 29, %{"transition_id" => 3, "commit_bin" => "garbage"})
-
-      assert [%{op: 31, d: %{transition_id: 3}}, {:binary, <<26, _::binary>>}] = replies
-      assert manager.reinitializing
+      assert {^manager, []} =
+               Manager.handle_mls_event(manager, 29, %{
+                 "transition_id" => 3,
+                 "commit_bin" => "garbage"
+               })
     end
 
     test "a refused welcome reports the transition and offers a new key package", %{
@@ -194,15 +217,41 @@ defmodule EDA.Voice.Dave.ManagerTest do
       assert manager.reinitializing
     end
 
-    test "recovers once, not once per failure", %{manager: manager} do
+    test "while it waits to be added again, a commit starts no new round", %{manager: manager} do
       {manager, [_ | _]} =
         Manager.handle_mls_event(manager, 30, %{"transition_id" => 5, "welcome_bin" => "garbage"})
 
-      assert {_, []} =
+      assert {^manager, []} =
                Manager.handle_mls_event(manager, 29, %{
                  "transition_id" => 6,
                  "commit_bin" => "garbage"
                })
+    end
+
+    # The welcome that answers a round can be refused in its turn. Staying silent then would
+    # leave the session out of the group for the rest of the call.
+    test "a welcome refused while it waits starts another round", %{manager: manager} do
+      {manager, [_ | _]} =
+        Manager.handle_mls_event(manager, 30, %{"transition_id" => 5, "welcome_bin" => "garbage"})
+
+      {manager, replies} =
+        Manager.handle_mls_event(manager, 30, %{"transition_id" => 6, "welcome_bin" => "garbage"})
+
+      assert [%{op: 31, d: %{transition_id: 6}}, {:binary, <<26, _::binary>>}] = replies
+      assert manager.reinitializing
+    end
+
+    test "a round forgets the transitions that were pending", %{manager: manager} do
+      {manager, _} =
+        Manager.handle_mls_event(manager, 21, %{"transition_id" => 4, "protocol_version" => 1})
+
+      assert manager.pending_transitions == %{4 => 1}
+
+      {manager, _} =
+        Manager.handle_mls_event(manager, 30, %{"transition_id" => 5, "welcome_bin" => "garbage"})
+
+      assert manager.pending_transitions == %{}
+      assert {^manager, []} = Manager.handle_mls_event(manager, 22, %{"transition_id" => 4})
     end
 
     test "an executed transition ends the recovery", %{manager: manager} do

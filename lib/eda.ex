@@ -2,7 +2,7 @@ defmodule EDA do
   @moduledoc """
   EDA - Elixir Discord API
 
-  A modern Discord library for Elixir, inspired by JDA (Java Discord API).
+  A modern Discord library for Elixir, built on OTP.
 
   ## Quick Start
 

@@ -26,7 +26,7 @@ defmodule EDA.RoleColorsTest do
     end
   end
 
-  describe "style/1 — four styles, as in JDA" do
+  describe "style/1 — four styles" do
     test "a real primary colour is solid" do
       assert Colors.style(%Colors{primary_color: 1}) == :solid
     end
